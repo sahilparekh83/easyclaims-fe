@@ -39,7 +39,8 @@ apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config as AxiosRequestConfig & { _retry?: boolean };
-    if (error.response?.status === 401 && !original._retry) {
+    const isAuthEndpoint = original.url?.includes("/auth/");
+    if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true;
 
       if (isRefreshing) {

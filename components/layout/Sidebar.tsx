@@ -7,10 +7,8 @@ import styled from "styled-components";
 import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
-  BadgeCheck, Mail, Sparkles, LogOut, Briefcase, BarChart2,
+  BadgeCheck, Mail, Briefcase, BarChart2,
 } from "lucide-react";
-import { useAuthStore } from "@/stores/AuthStore";
-import { logout } from "@/imports/core/api";
 
 interface NavItem {
   label: string;
@@ -22,13 +20,14 @@ interface NavItem {
 const ADMIN_NAV: NavItem[] = [
   { label: "Dashboard",      href: "/admin/dashboard",       icon: <LayoutDashboard size={18} /> },
   { label: "Membership plans", href: "/admin/plans",         icon: <CreditCard size={18} /> },
-  { label: "Members",        href: "/admin/members",         icon: <Users size={18} /> },
   { label: "Partners",       href: "/admin/partners",        icon: <Briefcase size={18} /> },
+  { label: "Members",        href: "/admin/members",         icon: <Users size={18} /> },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, badge: 7 },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} /> },
   { label: "Policy Types",   href: "/admin/policy-types",    icon: <Package size={18} /> },
   { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} /> },
   { label: "Email Templates", href: "/admin/email-templates", icon: <Mail size={18} /> },
+  { label: "Settings",        href: "/admin/settings",        icon: <Settings size={18} /> },
 ];
 
 const PARTNER_NAV: NavItem[] = [
@@ -159,64 +158,13 @@ const NavBadge = styled.span`
   font-family: var(--ec-font-mono, 'IBM Plex Mono', ui-monospace, monospace);
 `;
 
-const AICopilot = styled.div`
-  padding: 14px;
-  margin: 12px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.07);
-  border: 1px solid rgba(255,255,255,0.08);
-`;
-
-const AIHeader = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 7px;
-  font-weight: 700;
-  font-size: 13px;
-`;
-
-const AIBlurb = styled.p`
-  margin: 0;
-  font-size: 12px;
-  color: rgba(255,255,255,0.72);
-  line-height: 1.5;
-`;
-
-const SignOutBtn = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 15px 24px;
-  border: none;
-  border-top: 1px solid rgba(255,255,255,0.1);
-  background: transparent;
-  color: rgba(255,255,255,0.72);
-  cursor: pointer;
-  font-size: 13.5px;
-  font-weight: 500;
-  width: 100%;
-  text-align: left;
-  transition: color 0.15s;
-
-  &:hover {
-    color: #fff;
-  }
-`;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Sidebar({ portal }: { portal: "admin" | "partner" | "member" }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { clearAuth, accessToken } = useAuthStore();
   const navItems = NAV_MAP[portal] || [];
-
-  const handleSignOut = async () => {
-    try { if (accessToken) await logout(accessToken); } catch {}
-    clearAuth();
-    router.push("/login");
-  };
 
   return (
     <Wrap>
@@ -250,19 +198,6 @@ export default function Sidebar({ portal }: { portal: "admin" | "partner" | "mem
           );
         })}
       </Nav>
-
-      <AICopilot>
-        <AIHeader>
-          <Sparkles size={15} color="#a3cd7a" />
-          AI Copilot
-        </AIHeader>
-        <AIBlurb>82% of claims this week were auto-triaged by AI.</AIBlurb>
-      </AICopilot>
-
-      <SignOutBtn onClick={handleSignOut}>
-        <LogOut size={18} />
-        Sign out
-      </SignOutBtn>
     </Wrap>
   );
 }

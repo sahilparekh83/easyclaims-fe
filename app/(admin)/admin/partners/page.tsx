@@ -429,9 +429,9 @@ export default function PartnersPage() {
 
   const KPIS = [
     { label: "Active partners", value: total, loading: isLoading, bg: "#eff6ff", color: "#2563eb", icon: <Briefcase size={18} /> },
-    { label: "Memberships sold (MTD)", value: "—", loading: false, bg: "#f0fdf4", color: "#16a34a", icon: <TrendingUp size={18} /> },
-    { label: "Revenue (MTD)", value: "—", loading: false, bg: "#fefce8", color: "#ca8a04", icon: <CreditCard size={18} /> },
-    { label: "Renewals due", value: "—", loading: false, bg: "#fff1f2", color: "#be123c", icon: <RefreshCw size={18} /> },
+    { label: "Memberships sold (MTD)", value: 0, loading: false, bg: "#f0fdf4", color: "#16a34a", icon: <TrendingUp size={18} /> },
+    { label: "Revenue (MTD)", value: 0, loading: false, bg: "#fefce8", color: "#ca8a04", icon: <CreditCard size={18} /> },
+    { label: "Renewals due", value: 0, loading: false, bg: "#fff1f2", color: "#be123c", icon: <RefreshCw size={18} /> },
   ];
 
   return (
@@ -569,13 +569,6 @@ export default function PartnersPage() {
           </SectionCard>
         </RightCol>
       </TwoCol>
-
-      {/* Add customer button */}
-      <div>
-        <AccentBtn onClick={() => setAddCustomerOpen(true)}>
-          + Add customer
-        </AccentBtn>
-      </div>
 
       {/* ── Add Customer Modal ─────────────────────────────────────────────── */}
       {addCustomerOpen && (

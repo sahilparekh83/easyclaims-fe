@@ -226,108 +226,108 @@ export const partnerDeleteNotification = (id: string) =>
 // MEMBER — PROFILE
 // ─────────────────────────────────────────────
 export const memberGetProfile = () =>
-  apiClient.get("/me/profile").then((r) => r.data);
+  apiClient.get("/member/profile").then((r) => r.data);
 
 export const memberUpdateProfile = (data: object) =>
-  apiClient.patch("/me/profile", data).then((r) => r.data);
+  apiClient.patch("/member/profile", data).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — FAMILY
 // ─────────────────────────────────────────────
 export const memberListFamily = () =>
-  apiClient.get("/me/family").then((r) => r.data);
+  apiClient.get("/member/family").then((r) => r.data);
 
 export const memberCreateFamily = (data: object) =>
-  apiClient.post("/me/family", data).then((r) => r.data);
+  apiClient.post("/member/family", data).then((r) => r.data);
 
 export const memberUpdateFamily = (id: string, data: object) =>
-  apiClient.patch(`/me/family/${id}`, data).then((r) => r.data);
+  apiClient.patch(`/member/family/${id}`, data).then((r) => r.data);
 
 export const memberDeleteFamily = (id: string) =>
-  apiClient.delete(`/me/family/${id}`).then((r) => r.data);
+  apiClient.delete(`/member/family/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — NOMINEES
 // ─────────────────────────────────────────────
 export const memberListNominees = () =>
-  apiClient.get("/me/nominees").then((r) => r.data);
+  apiClient.get("/member/nominees").then((r) => r.data);
 
 export const memberCreateNominee = (data: object) =>
-  apiClient.post("/me/nominees", data).then((r) => r.data);
+  apiClient.post("/member/nominees", data).then((r) => r.data);
 
 export const memberUpdateNominee = (id: string, data: object) =>
-  apiClient.patch(`/me/nominees/${id}`, data).then((r) => r.data);
+  apiClient.patch(`/member/nominees/${id}`, data).then((r) => r.data);
 
 export const memberDeleteNominee = (id: string) =>
-  apiClient.delete(`/me/nominees/${id}`).then((r) => r.data);
+  apiClient.delete(`/member/nominees/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — POLICIES
 // ─────────────────────────────────────────────
 export const memberListPolicies = (params?: object) =>
-  apiClient.post("/me/policies/list", params || {}).then((r) => r.data);
+  apiClient.post("/member/policies/list", params || {}).then((r) => r.data);
 
 export const memberGetPolicy = (id: string) =>
-  apiClient.get(`/me/policies/${id}`).then((r) => r.data);
+  apiClient.get(`/member/policies/${id}`).then((r) => r.data);
 
 export const memberUploadPolicy = (formData: FormData) =>
-  apiClient.post("/me/policies", formData, {
+  apiClient.post("/member/policies", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   }).then((r) => r.data);
 
 export const memberUpdatePolicy = (id: string, data: object) =>
-  apiClient.patch(`/me/policies/${id}`, data).then((r) => r.data);
+  apiClient.patch(`/member/policies/${id}`, data).then((r) => r.data);
 
 export const memberDeletePolicy = (id: string) =>
-  apiClient.delete(`/me/policies/${id}`).then((r) => r.data);
+  apiClient.delete(`/member/policies/${id}`).then((r) => r.data);
 
 export const memberViewPolicyPdf = (policyId: string) =>
-  apiClient.get(`/me/policies/${policyId}/view`, { responseType: "blob" }).then((r) => r.data);
+  apiClient.get(`/member/policies/${policyId}/view`, { responseType: "blob" }).then((r) => r.data);
 
 export const memberDownloadPolicyPdf = (policyId: string) =>
-  apiClient.get(`/me/policies/${policyId}/download`, { responseType: "blob" }).then((r) => r.data);
+  apiClient.get(`/member/policies/${policyId}/download`, { responseType: "blob" }).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — PLAN
 // ─────────────────────────────────────────────
 export const memberGetPlan = () =>
-  apiClient.get("/me/plan").then((r) => r.data);
+  apiClient.get("/member/plan").then((r) => r.data);
 
 export const memberSwitchPlan = (plan_id: string) =>
-  apiClient.put("/me/plan", { plan_id }).then((r) => r.data);
+  apiClient.put("/member/plan", { plan_id }).then((r) => r.data);
 
 export const memberListAvailablePlans = () =>
-  apiClient.get("/me/plan/available").then((r) => r.data);
+  apiClient.get("/member/plan/available").then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — CONSENT
 // ─────────────────────────────────────────────
 export const memberListConsents = () =>
-  apiClient.get("/me/consent").then((r) => r.data);
+  apiClient.get("/member/consent").then((r) => r.data);
 
 export const memberCreateConsent = (data: object) =>
-  apiClient.post("/me/consent", data).then((r) => r.data);
+  apiClient.post("/member/consent", data).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — PARTNERS (enrolled partners)
 // ─────────────────────────────────────────────
 export const memberListPartners = () =>
-  apiClient.get("/me/partners").then((r) => r.data);
+  apiClient.get("/member/partners").then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — NOTIFICATIONS
 // ─────────────────────────────────────────────
 export const memberListNotifications = (params?: object) =>
-  apiClient.get("/me/notifications", { params }).then((r) => r.data);
+  apiClient.get("/member/notifications", { params }).then((r) => r.data);
 
 export const memberMarkNotificationRead = (id: string) =>
-  apiClient.patch(`/me/notifications/${id}/read`, {}).then((r) => r.data);
+  apiClient.patch(`/member/notifications/${id}/read`, {}).then((r) => r.data);
 
 export const memberMarkAllNotificationsRead = () =>
-  apiClient.patch("/me/notifications/read-all", {}).then((r) => r.data);
+  apiClient.patch("/member/notifications/read-all", {}).then((r) => r.data);
 
 export const memberDeleteNotification = (id: string) =>
-  apiClient.delete(`/me/notifications/${id}`).then((r) => r.data);
+  apiClient.delete(`/member/notifications/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — EMAIL TEMPLATES
@@ -346,6 +346,31 @@ export const adminUpdateEmailTemplate = (id: string, data: object) =>
 // ─────────────────────────────────────────────
 export const adminRunExpiryCheck = () =>
   apiClient.post("/admin/cron/run-expiry-check", {}).then((r) => r.data);
+
+export const adminApprovePolicy = (id: string) =>
+  apiClient.post(`/admin/policies/${id}/approve`, {}).then((r) => r.data);
+
+export const adminRejectPolicy = (id: string) =>
+  apiClient.post(`/admin/policies/${id}/reject`, {}).then((r) => r.data);
+
+export const adminUpdatePolicyFields = (id: string, fields: object) =>
+  apiClient.patch(`/admin/policies/${id}/fields`, fields).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — DASHBOARD ANALYTICS
+// ─────────────────────────────────────────────
+export const adminGetDashboard = () =>
+  apiClient.get("/admin/dashboard").then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — SYSTEM SETTINGS
+// ─────────────────────────────────────────────
+export const adminListSettings = () =>
+  apiClient.get("/admin/settings").then((r) => r.data);
+
+export const adminUpdateSetting = (key: string, value: string) =>
+  apiClient.patch(`/admin/settings/${key}`, { value }).then((r) => r.data);
+
 
 // ─────────────────────────────────────────────
 // ADMIN — MEMBER ENROLLMENT

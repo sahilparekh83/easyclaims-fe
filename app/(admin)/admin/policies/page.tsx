@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
-import { Eye, Download, FileSearch, FileText, CheckCircle, AlertTriangle, Sparkles, Upload, X, ChevronRight, Check, Info } from "lucide-react";
+import { Download, FileSearch, FileText, CheckCircle, AlertTriangle, Sparkles, Upload, X, ChevronRight, Check, Info, ChevronDown, Filter } from "lucide-react";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
@@ -135,8 +136,24 @@ const StatusPill = styled.span<{ $status: string }>`
   display: inline-flex; align-items: center;
   font-size: 11.5px; font-weight: 700;
   padding: 3px 10px; border-radius: 999px;
-  background: ${p => p.$status === 'Active' ? '#f0fdf4' : p.$status === 'Expired' ? '#fef9c3' : p.$status === 'Cancelled' ? '#fef2f2' : '#f8fafc'};
-  color: ${p => p.$status === 'Active' ? '#16a34a' : p.$status === 'Expired' ? '#854d0e' : p.$status === 'Cancelled' ? '#b91c1c' : '#64748b'};
+  background: ${p => p.$status === 'active' ? '#f0fdf4' : p.$status === 'rejected' ? '#fef2f2' : p.$status === 'Expired' ? '#fef9c3' : '#f8fafc'};
+  color: ${p => p.$status === 'active' ? '#16a34a' : p.$status === 'rejected' ? '#b91c1c' : p.$status === 'Expired' ? '#854d0e' : '#64748b'};
+`;
+
+const AiExtractionBadge = styled.span<{ $s: string }>`
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+  background: ${p =>
+    p.$s === 'processing'  ? '#eff6ff' :
+    p.$s === 'need_review' ? '#fffbeb' :
+    p.$s === 'active'      ? '#f0fdf4' :
+    p.$s === 'rejected'    ? '#fef2f2' : '#f8fafc'};
+  color: ${p =>
+    p.$s === 'processing'  ? '#2563eb' :
+    p.$s === 'need_review' ? '#b45309' :
+    p.$s === 'active'      ? '#16a34a' :
+    p.$s === 'rejected'    ? '#b91c1c' : '#64748b'};
 `;
 
 const ActionBtns = styled.div`
@@ -171,6 +188,39 @@ const Skeleton = styled.div`
   background-size: 200% 100%; border-radius: 6px;
   animation: shimmer 1.4s infinite;
   @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+`;
+
+// Filter Dropdown
+const ThFilterWrap = styled.div`
+  display: inline-flex; align-items: center; gap: 4px; position: relative;
+`;
+
+const FilterBtn = styled.button<{ $active: boolean }>`
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px 5px; border-radius: 5px; border: none;
+  background: ${p => p.$active ? '#eff6ff' : 'transparent'};
+  color: ${p => p.$active ? '#2563eb' : '#94a3b8'};
+  cursor: pointer; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.04em;
+  transition: background 0.12s, color 0.12s;
+  &:hover { background: #f1f5f9; color: #374151; }
+`;
+
+const DropMenu = styled.div`
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 200;
+  background: #fff; border: 1px solid #e8eaf0; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 150px; padding: 4px 0;
+  animation: popIn 0.12s ease;
+  @keyframes popIn { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+`;
+
+const DropItem = styled.button<{ $selected: boolean }>`
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 14px; border: none; background: none; cursor: pointer;
+  font-size: 12.5px; color: ${p => p.$selected ? '#2563eb' : '#374151'};
+  font-weight: ${p => p.$selected ? 700 : 400};
+  text-align: left;
+  &:hover { background: #f8f9fb; }
 `;
 
 // KV Dialog
@@ -404,6 +454,51 @@ const STEP_LABELS: Record<string, string> = {
   summary:    'Step 3 of 3 · Policy summary',
 };
 
+// ─── FilterDropdown component ─────────────────────────────────────────────────
+
+interface DropOption { label: string; value: string; }
+
+function FilterDropdown({
+  label, options, value, onChange,
+}: { label: string; options: DropOption[]; value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const active = !!value;
+  const selectedLabel = options.find(o => o.value === value)?.label;
+
+  return (
+    <ThFilterWrap ref={ref}>
+      <span>{label}</span>
+      <FilterBtn $active={active} onClick={() => setOpen(v => !v)} title={active ? `Filtered: ${selectedLabel}` : "Filter"}>
+        <Filter size={9} />
+        {active && <span>{selectedLabel}</span>}
+        <ChevronDown size={9} />
+      </FilterBtn>
+      {open && (
+        <DropMenu>
+          <DropItem $selected={value === ""} onClick={() => { onChange(""); setOpen(false); }}>
+            {value === "" && <Check size={12} />} All
+          </DropItem>
+          {options.map(o => (
+            <DropItem key={o.value} $selected={value === o.value} onClick={() => { onChange(o.value); setOpen(false); }}>
+              {value === o.value && <Check size={12} />} {o.label}
+            </DropItem>
+          ))}
+        </DropMenu>
+      )}
+    </ThFilterWrap>
+  );
+}
+
 // ─── PDF helpers ──────────────────────────────────────────────────────────────
 
 async function openPdf(policyId: string) {
@@ -435,10 +530,21 @@ async function downloadPdf(policyId: string, fileName?: string) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const STATUS_LABELS_MAP: Record<string, string> = {
+  active: "Active", need_review: "Need Review",
+  rejected: "Rejected", processing: "Processing",
+};
+
 export default function PoliciesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const statusFilter = searchParams.get("status") ?? "";
+
   const [search, setSearch] = useState("");
   const [first, setFirst] = useState(0);
   const [detailPolicy, setDetailPolicy] = useState<any>(null);
+  const [typeFilter, setTypeFilter] = useState("");
+  const [aiFilter, setAiFilter] = useState("");
   const debouncedSearch = useDebounce(search, 300);
 
   // Upload modal state
@@ -448,16 +554,23 @@ export default function PoliciesPage() {
   const [editedFields, setEditedFields] = useState<Record<string, string>>({});
   const extractTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { setFirst(0); }, [debouncedSearch]);
+  useEffect(() => { setFirst(0); }, [debouncedSearch, statusFilter, typeFilter, aiFilter]);
+
+  const activeFilters = [
+    ...(statusFilter ? [{ field: "status", value: statusFilter }] : []),
+    ...(typeFilter   ? [{ field: "policy_type", value: typeFilter }] : []),
+    ...(aiFilter     ? [{ field: "status", value: aiFilter }] : []),
+  ];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "policies", debouncedSearch, first],
+    queryKey: ["admin", "policies", debouncedSearch, statusFilter, typeFilter, aiFilter, first],
     queryFn: () => adminListPolicies({
       global_filter: debouncedSearch,
       sort_field: "created_at",
       sort_order: -1,
       limit: ROWS,
       skip: first,
+      filters: activeFilters,
     }),
   });
 
@@ -515,7 +628,7 @@ export default function PoliciesPage() {
               <CheckCircle size={18} />
             </StatIconBox>
             <div>
-              <StatValue>{policies.filter((p: any) => p.status === "Active" || p.status === "active").length || "—"}</StatValue>
+              <StatValue>{policies.filter((p: any) => p.status === "Active" || p.status === "active").length}</StatValue>
               <StatLabel>Active policies</StatLabel>
             </div>
           </AiStat>
@@ -525,7 +638,7 @@ export default function PoliciesPage() {
               <AlertTriangle size={18} />
             </StatIconBox>
             <div>
-              <StatValue>{policies.filter((p: any) => p.status === "Expired" || p.status === "expired").length || "—"}</StatValue>
+              <StatValue>{policies.filter((p: any) => p.status === "Expired" || p.status === "expired").length}</StatValue>
               <StatLabel>Expired policies</StatLabel>
             </div>
           </AiStat>
@@ -545,7 +658,7 @@ export default function PoliciesPage() {
         </CardHeader>
 
         {/* Search */}
-        <div style={{ padding: "14px 22px 0", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ padding: "14px 22px 0", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <div style={{ position: "relative", width: 280 }}>
             <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8", pointerEvents: "none" }}>
               <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -559,17 +672,81 @@ export default function PoliciesPage() {
               style={{ width: "100%", height: 36, paddingLeft: 32, paddingRight: 10, borderRadius: 999, border: "1px solid #e8eaf0", fontSize: 13, outline: "none", background: "#f8f9fb" }}
             />
           </div>
+          {statusFilter && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12.5, fontWeight: 600, color: "#1d4ed8" }}>
+              Status: {STATUS_LABELS_MAP[statusFilter] ?? statusFilter}
+              <button onClick={() => router.push("/admin/policies")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", color: "#1d4ed8" }}>
+                <X size={13} />
+              </button>
+            </div>
+          )}
+          {typeFilter && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12.5, fontWeight: 600, color: "#1d4ed8" }}>
+              Type: {typeFilter}
+              <button onClick={() => setTypeFilter("")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", color: "#1d4ed8" }}>
+                <X size={13} />
+              </button>
+            </div>
+          )}
+          {aiFilter && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12.5, fontWeight: 600, color: "#1d4ed8" }}>
+              AI: {STATUS_LABELS_MAP[aiFilter] ?? aiFilter}
+              <button onClick={() => setAiFilter("")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", color: "#1d4ed8" }}>
+                <X size={13} />
+              </button>
+            </div>
+          )}
         </div>
 
         <Table style={{ marginTop: 4 }}>
           <thead>
             <tr>
               <Th>Policy</Th>
-              <ThSm>Type</ThSm>
+              <ThSm>
+                <FilterDropdown
+                  label="Type"
+                  value={typeFilter}
+                  onChange={v => { setTypeFilter(v); setFirst(0); }}
+                  options={[
+                    { label: "Health", value: "Health" },
+                    { label: "Life",   value: "Life" },
+                    { label: "Motor",  value: "Motor" },
+                    { label: "Travel", value: "Travel" },
+                    { label: "Home",   value: "Home" },
+                  ]}
+                />
+              </ThSm>
               <ThSm>Insurer</ThSm>
               <ThSm>Sum Insured</ThSm>
-              <ThSm>AI Extraction</ThSm>
-              <Th style={{ paddingLeft: 8 }}>Status</Th>
+              <ThSm>
+                <FilterDropdown
+                  label="AI Extraction"
+                  value={aiFilter}
+                  onChange={v => { setAiFilter(v); setFirst(0); }}
+                  options={[
+                    { label: "Processing",  value: "processing" },
+                    { label: "Need Review", value: "need_review" },
+                    { label: "Approved",    value: "active" },
+                    { label: "Rejected",    value: "rejected" },
+                  ]}
+                />
+              </ThSm>
+              <Th style={{ paddingLeft: 8 }}>
+                <FilterDropdown
+                  label="Status"
+                  value={statusFilter}
+                  onChange={v => {
+                    setFirst(0);
+                    router.push(v ? `/admin/policies?status=${v}` : "/admin/policies");
+                  }}
+                  options={[
+                    { label: "Active",     value: "active" },
+                    { label: "Pending",    value: "need_review" },
+                    { label: "Processing", value: "processing" },
+                    { label: "Rejected",   value: "rejected" },
+                  ]}
+                />
+              </Th>
               <Th style={{ paddingLeft: 8 }}>Actions</Th>
             </tr>
           </thead>
@@ -609,30 +786,29 @@ export default function PoliciesPage() {
                     {row.sum_insured != null ? `₹${Number(row.sum_insured).toLocaleString("en-IN")}` : "—"}
                   </TdSm>
                   <TdSm>
-                    <ExtractTag $low={!hasExtracted}>
-                      {hasExtracted
-                        ? <><Check size={12} /> Extracted</>
-                        : <><AlertTriangle size={12} /> Needs review</>}
-                    </ExtractTag>
+                    {row.status === 'processing'                         && <AiExtractionBadge $s="processing"><span>⏳</span> Processing</AiExtractionBadge>}
+                    {(row.status === 'need_review' || row.status === 'pending') && <AiExtractionBadge $s="need_review"><AlertTriangle size={12} /> Need Review</AiExtractionBadge>}
+                    {row.status === 'active'                            && <AiExtractionBadge $s="active"><Check size={12} /> Approved</AiExtractionBadge>}
+                    {row.status === 'rejected'                          && <AiExtractionBadge $s="rejected"><X size={12} /> Rejected</AiExtractionBadge>}
                   </TdSm>
                   <Td style={{ paddingLeft: 8 }}>
                     {row.status
-                      ? <StatusPill $status={row.status}>{row.status}</StatusPill>
+                      ? <StatusPill $status={row.status}>
+                          {row.status === 'processing'  ? 'Processing' :
+                           row.status === 'need_review' ? 'Pending' :
+                           row.status === 'active'      ? 'Active' :
+                           row.status === 'rejected'    ? 'Rejected' : row.status}
+                        </StatusPill>
                       : <span style={{ color: "#94a3b8" }}>—</span>}
                   </Td>
                   <Td style={{ paddingLeft: 8 }}>
                     <ActionBtns>
                       {row.has_file && (
-                        <>
-                          <IconBtn $color="#2563eb" title="View PDF" onClick={() => openPdf(row.id)}>
-                            <Eye size={14} />
-                          </IconBtn>
-                          <IconBtn title="Download" onClick={() => downloadPdf(row.id, row.file_name)}>
-                            <Download size={14} />
-                          </IconBtn>
-                        </>
+                        <IconBtn title="Download PDF" onClick={() => downloadPdf(row.id, row.file_name)}>
+                          <Download size={14} />
+                        </IconBtn>
                       )}
-                      <IconBtn $color="#7c3aed" title="Extracted Details" onClick={() => setDetailPolicy(row)}>
+                      <IconBtn $color="#7c3aed" title="Review Policy" onClick={() => router.push(`/admin/policies/${row.id}`)}>
                         <FileSearch size={14} />
                       </IconBtn>
                     </ActionBtns>

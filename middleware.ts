@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/"];
+const PUBLIC_PATHS = ["/login", "/", "/upload"];
 
 const PORTAL_MAP: Record<string, string[]> = {
   SUPERADMIN: ["/admin"],
@@ -29,10 +29,12 @@ export function middleware(request: NextRequest) {
   response.headers.set("x-nonce", nonce);
 
   if (!isAuthenticated && !isPublic) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("next", pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
-  if (isAuthenticated && isPublic) {
+  if (isAuthenticated && isPublic && pathname !== "/upload") {
     const redirectTo = userType === "SUPERADMIN"
       ? "/admin/dashboard"
       : userType === "PARTNER"
