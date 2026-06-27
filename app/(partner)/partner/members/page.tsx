@@ -216,8 +216,27 @@ interface MemberFormValues {
   email: string;
   name: string;
   mobile_no: string;
+  gender: string;
+  address_line: string;
+  address_city: string;
+  address_state: string;
+  address_pin: string;
+  sale_date: string;
+  sales_channel: string;
+  branch_code: string;
+  salesperson_name: string;
+  employee_code: string;
+  data1: string;
+  data2: string;
+  data3: string;
   plan_id: string;
 }
+
+const GENDER_OPTIONS = [
+  { label: "Male", value: "Male" },
+  { label: "Female", value: "Female" },
+  { label: "Other", value: "Other" },
+];
 
 interface Plan {
   id: string;
@@ -248,7 +267,7 @@ export default function MembersPage() {
   useEffect(() => { setPage(0); }, [debouncedSearch, tab]);
 
   const form = useForm<MemberFormValues>({
-    defaultValues: { email: "", name: "", mobile_no: "", plan_id: "" },
+    defaultValues: { email: "", name: "", mobile_no: "", gender: "", address_line: "", address_city: "", address_state: "", address_pin: "", sale_date: "", sales_channel: "", branch_code: "", salesperson_name: "", employee_code: "", data1: "", data2: "", data3: "", plan_id: "" },
   });
 
   const isActiveFilter = tab === "active" ? true : tab === "inactive" ? false : undefined;
@@ -283,6 +302,19 @@ export default function MembersPage() {
     mutationFn: (v: MemberFormValues) => {
       const payload: Record<string, unknown> = { email: v.email, name: v.name };
       if (v.mobile_no) payload.mobile_no = v.mobile_no;
+      if (v.gender) payload.gender = v.gender;
+      if (v.address_line) payload.address_line = v.address_line;
+      if (v.address_city) payload.address_city = v.address_city;
+      if (v.address_state) payload.address_state = v.address_state;
+      if (v.address_pin) payload.address_pin = v.address_pin;
+      if (v.sale_date) payload.sale_date = v.sale_date;
+      if (v.sales_channel) payload.sales_channel = v.sales_channel;
+      if (v.branch_code) payload.branch_code = v.branch_code;
+      if (v.salesperson_name) payload.salesperson_name = v.salesperson_name;
+      if (v.employee_code) payload.employee_code = v.employee_code;
+      if (v.data1) payload.data1 = v.data1;
+      if (v.data2) payload.data2 = v.data2;
+      if (v.data3) payload.data3 = v.data3;
       if (v.plan_id) payload.plan_id = v.plan_id;
       return partnerCreateMember(payload);
     },
@@ -298,7 +330,7 @@ export default function MembersPage() {
   });
 
   const openCreate = () => {
-    form.reset({ email: "", name: "", mobile_no: "", plan_id: "" });
+    form.reset({ email: "", name: "", mobile_no: "", gender: "", address_line: "", address_city: "", address_state: "", address_pin: "", sale_date: "", sales_channel: "", branch_code: "", salesperson_name: "", employee_code: "", data1: "", data2: "", data3: "", plan_id: "" });
     setCreateOpen(true);
   };
 
@@ -411,78 +443,143 @@ export default function MembersPage() {
         header="Add Member"
         visible={createOpen}
         onHide={() => { setCreateOpen(false); form.reset(); }}
-        style={{ width: "480px" }}
+        style={{ width: "600px" }}
         footer={dialogFooter}
+        maximizable
       >
         <FormGrid>
-          <Field>
-            <FieldLabel htmlFor="m-email">Email *</FieldLabel>
-            <Controller
-              name="email"
-              control={form.control}
-              rules={{
-                required: "Email is required",
-                pattern: { value: /^\S+@\S+\.\S+$/, message: "Invalid email address" },
-              }}
-              render={({ field, fieldState }) => (
-                <>
-                  <InputText id="m-email" type="email" {...field} className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} />
-                  {fieldState.error && <Err>{fieldState.error.message}</Err>}
-                </>
-              )}
-            />
-          </Field>
+          {/* Basic */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <Field>
+              <FieldLabel>Full Name *</FieldLabel>
+              <Controller name="name" control={form.control} rules={{ required: "Name is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )} />
+            </Field>
+            <Field>
+              <FieldLabel>Email *</FieldLabel>
+              <Controller name="email" control={form.control} rules={{ required: "Email is required", pattern: { value: /^\S+@\S+\.\S+$/, message: "Invalid email" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText type="email" {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )} />
+            </Field>
+            <Field>
+              <FieldLabel>Mobile No. *</FieldLabel>
+              <Controller name="mobile_no" control={form.control} rules={{ required: "Mobile is required", pattern: { value: /^\+?[\d\s\-()]{7,15}$/, message: "Invalid mobile" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} placeholder="+91 98765 43210" invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )} />
+            </Field>
+            <Field>
+              <FieldLabel>Gender *</FieldLabel>
+              <Controller name="gender" control={form.control} rules={{ required: "Gender is required" }}
+                render={({ field, fieldState }) => (
+                  <><Dropdown value={field.value} options={GENDER_OPTIONS} onChange={e => field.onChange(e.value)} placeholder="Select gender" style={{ width: "100%" }} invalid={!!fieldState.error} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )} />
+            </Field>
+          </div>
 
+          {/* Address */}
+          <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: "0.75rem" }}>
+            <FieldLabel style={{ fontSize: "0.72rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Address</FieldLabel>
+          </div>
           <Field>
-            <FieldLabel htmlFor="m-name">Name *</FieldLabel>
-            <Controller
-              name="name"
-              control={form.control}
-              rules={{ required: "Name is required" }}
+            <FieldLabel>Address Line *</FieldLabel>
+            <Controller name="address_line" control={form.control} rules={{ required: "Address is required" }}
               render={({ field, fieldState }) => (
-                <>
-                  <InputText id="m-name" {...field} className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} />
-                  {fieldState.error && <Err>{fieldState.error.message}</Err>}
-                </>
-              )}
-            />
+                <><InputText {...field} style={{ width: "100%" }} invalid={!!fieldState.error} />
+                {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+              )} />
           </Field>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+            <Field>
+              <FieldLabel>City *</FieldLabel>
+              <Controller name="address_city" control={form.control} rules={{ required: "City is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} style={{ width: "100%" }} invalid={!!fieldState.error} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )} />
+            </Field>
+            <Field>
+              <FieldLabel>State *</FieldLabel>
+              <Controller name="address_state" control={form.control} rules={{ required: "State is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} style={{ width: "100%" }} invalid={!!fieldState.error} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )} />
+            </Field>
+            <Field>
+              <FieldLabel>PIN Code *</FieldLabel>
+              <Controller name="address_pin" control={form.control} rules={{ required: "PIN is required", pattern: { value: /^\d{6}$/, message: "6-digit PIN" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} placeholder="400001" maxLength={6} style={{ width: "100%" }} invalid={!!fieldState.error} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )} />
+            </Field>
+          </div>
 
-          <Field>
-            <FieldLabel htmlFor="m-mobile">Mobile No</FieldLabel>
-            <Controller
-              name="mobile_no"
-              control={form.control}
-              rules={{
-                pattern: { value: /^\+?[\d\s\-()]{7,15}$/, message: "Invalid mobile number (7–15 digits)" },
-              }}
-              render={({ field, fieldState }) => (
-                <>
-                  <InputText id="m-mobile" {...field} placeholder="+91 98765 43210" className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} />
-                  {fieldState.error && <Err>{fieldState.error.message}</Err>}
-                </>
-              )}
-            />
-          </Field>
+          {/* Onboarding */}
+          <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: "0.75rem" }}>
+            <FieldLabel style={{ fontSize: "0.72rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Onboarding &amp; Sales (optional)</FieldLabel>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+            <Field>
+              <FieldLabel>Sale Date</FieldLabel>
+              <Controller name="sale_date" control={form.control}
+                render={({ field }) => <InputText {...field} placeholder="YYYY-MM-DD" style={{ width: "100%" }} />} />
+            </Field>
+            <Field>
+              <FieldLabel>Sales Channel</FieldLabel>
+              <Controller name="sales_channel" control={form.control}
+                render={({ field }) => <InputText {...field} style={{ width: "100%" }} />} />
+            </Field>
+            <Field>
+              <FieldLabel>Branch Code</FieldLabel>
+              <Controller name="branch_code" control={form.control}
+                render={({ field }) => <InputText {...field} style={{ width: "100%" }} />} />
+            </Field>
+            <Field>
+              <FieldLabel>Salesperson Name</FieldLabel>
+              <Controller name="salesperson_name" control={form.control}
+                render={({ field }) => <InputText {...field} style={{ width: "100%" }} />} />
+            </Field>
+            <Field>
+              <FieldLabel>Employee Code</FieldLabel>
+              <Controller name="employee_code" control={form.control}
+                render={({ field }) => <InputText {...field} style={{ width: "100%" }} />} />
+            </Field>
+            <Field>
+              <FieldLabel>Data 1</FieldLabel>
+              <Controller name="data1" control={form.control}
+                render={({ field }) => <InputText {...field} style={{ width: "100%" }} />} />
+            </Field>
+            <Field>
+              <FieldLabel>Data 2</FieldLabel>
+              <Controller name="data2" control={form.control}
+                render={({ field }) => <InputText {...field} style={{ width: "100%" }} />} />
+            </Field>
+            <Field>
+              <FieldLabel>Data 3</FieldLabel>
+              <Controller name="data3" control={form.control}
+                render={({ field }) => <InputText {...field} style={{ width: "100%" }} />} />
+            </Field>
+          </div>
 
+          {/* Plan */}
+          <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: "0.75rem" }}>
+            <FieldLabel style={{ fontSize: "0.72rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Enrollment</FieldLabel>
+          </div>
           <Field>
-            <FieldLabel htmlFor="m-plan">Plan</FieldLabel>
-            <Controller
-              name="plan_id"
-              control={form.control}
+            <FieldLabel>Plan</FieldLabel>
+            <Controller name="plan_id" control={form.control}
               render={({ field }) => (
-                <Dropdown
-                  id="m-plan"
-                  value={field.value}
-                  onChange={e => field.onChange(e.value)}
-                  options={planOptions}
-                  placeholder="Select a plan"
-                  showClear
-                  filter
-                  style={{ width: "100%" }}
-                />
-              )}
-            />
+                <Dropdown value={field.value} onChange={e => field.onChange(e.value)} options={planOptions} placeholder="Select a plan" showClear filter style={{ width: "100%" }} />
+              )} />
           </Field>
         </FormGrid>
       </Dialog>

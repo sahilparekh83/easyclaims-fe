@@ -9,12 +9,13 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { InputSwitch } from "primereact/inputswitch";
-import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck, Briefcase } from "lucide-react";
+import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck, Briefcase, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminGetMember, adminRenewMemberEnrollment, adminUpdateMember } from "@/imports/core/api";
+import { adminGetMember, adminRenewMemberEnrollment, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest } from "@/imports/core/api";
+import { InputTextarea } from "primereact/inputtextarea";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -297,15 +298,54 @@ const FieldLabel = styled.label`
   color: #374151;
 `;
 
+const Err = styled.small`
+  color: #ef4444;
+  font-size: 0.75rem;
+  margin-top: 2px;
+`;
+
 const FooterRow = styled.div`
   display: flex;
   justify-content: flex-end;
   gap: 0.5rem;
 `;
 
+const CrStatusPill = styled.span<{ $s: string }>`
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: ${p => p.$s === "pending" ? "#fef3c7" : p.$s === "approved" ? "#dcfce7" : "#fee2e2"};
+  color: ${p => p.$s === "pending" ? "#92400e" : p.$s === "approved" ? "#166534" : "#991b1b"};
+`;
+
+const CrRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  &:hover { background: #f9fafb; }
+  &:last-child { border-bottom: none; }
+`;
+
+const FieldPill = styled.span`
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  margin: 2px;
+`;
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const TABS = ["Profile", "Family", "Policies", "Communication"] as const;
+const TABS = ["Profile", "Family", "Policies", "Change Requests", "Communication"] as const;
 type TabKey = (typeof TABS)[number];
 
 const GENDER_OPTIONS = [
@@ -313,6 +353,13 @@ const GENDER_OPTIONS = [
   { label: "Female", value: "Female" },
   { label: "Other", value: "Other" },
 ];
+
+interface FamilyMemberDetail {
+  id: string; name: string; relation: string;
+  gender?: string; dob?: string; coverage_type?: string;
+  policy_count: number;
+  linked_policies: Array<{ id: string; policy_number: string; insurer: string; status: string; }>;
+}
 
 interface EditFormValues {
   name: string;
@@ -339,11 +386,48 @@ export default function MemberDetailPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("Profile");
   const [editOpen, setEditOpen] = useState(false);
+  const [crStatusFilter, setCrStatusFilter] = useState<string>("pending");
+  const [crDetailOpen, setCrDetailOpen] = useState(false);
+  const [selectedCr, setSelectedCr] = useState<any>(null);
+  const [adminNote, setAdminNote] = useState("");
+  const [familyCrOpen, setFamilyCrOpen] = useState(false);
+  const [selectedFamilyCr, setSelectedFamilyCr] = useState<any>(null);
+  const [familyCrNote, setFamilyCrNote] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "member", id],
     queryFn: () => adminGetMember(id),
     enabled: !!id,
+  });
+
+  const { data: crData, refetch: refetchCr } = useQuery({
+    queryKey: ["admin", "member-change-requests", id, crStatusFilter],
+    queryFn: () => adminListChangeRequests({ member_id: id, status: crStatusFilter === "all" ? undefined : crStatusFilter, limit: 50 }),
+    enabled: activeTab === "Change Requests" && !!id,
+  });
+  const changeRequests: any[] = (crData as any)?.data?.data ?? [];
+
+  const { data: familyCrData, refetch: refetchFamilyCr } = useQuery({
+    queryKey: ["admin", "family-crs", id],
+    queryFn: () => adminListChangeRequests({ member_id: id, entity_type: "family_member", limit: 50 }),
+    enabled: activeTab === "Family",
+  });
+  const familyCrs: any[] = (familyCrData as any)?.data?.items ?? [];
+
+  const approveFamilyCrMutation = useMutation({
+    mutationFn: ({ crId, note }: { crId: string; note: string }) => adminApproveChangeRequest(crId, note),
+    onSuccess: () => {
+      toast.success("Change approved and applied");
+      refetchFamilyCr();
+      queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
+    },
+    onError: () => toast.error("Failed to approve"),
+  });
+
+  const rejectFamilyCrMutation = useMutation({
+    mutationFn: ({ crId, note }: { crId: string; note: string }) => adminRejectChangeRequest(crId, note),
+    onSuccess: () => { toast.success("Change request rejected"); refetchFamilyCr(); },
+    onError: () => toast.error("Failed to reject"),
   });
 
   const member = data?.data;
@@ -380,25 +464,24 @@ export default function MemberDetailPage() {
 
   const updateMutation = useMutation({
     mutationFn: (v: EditFormValues) => {
+      // Backend expects a flat AdminMemberUpdate payload (no nested profile key)
       const payload: Record<string, any> = {
         name: v.name || undefined,
         mobile_no: v.mobile_no || undefined,
         is_active: v.is_active,
-        profile: {
-          gender: v.gender || undefined,
-          address_line: v.address_line || undefined,
-          address_city: v.address_city || undefined,
-          address_state: v.address_state || undefined,
-          address_pin: v.address_pin || undefined,
-          sale_date: v.sale_date || undefined,
-          sales_channel: v.sales_channel || undefined,
-          branch_code: v.branch_code || undefined,
-          salesperson_name: v.salesperson_name || undefined,
-          employee_code: v.employee_code || undefined,
-          data1: v.data1 || undefined,
-          data2: v.data2 || undefined,
-          data3: v.data3 || undefined,
-        },
+        gender: v.gender || undefined,
+        address_line: v.address_line || undefined,
+        address_city: v.address_city || undefined,
+        address_state: v.address_state || undefined,
+        address_pin: v.address_pin || undefined,
+        sale_date: v.sale_date || undefined,
+        sales_channel: v.sales_channel || undefined,
+        branch_code: v.branch_code || undefined,
+        salesperson_name: v.salesperson_name || undefined,
+        employee_code: v.employee_code || undefined,
+        data1: v.data1 || undefined,
+        data2: v.data2 || undefined,
+        data3: v.data3 || undefined,
       };
       return adminUpdateMember(id, payload);
     },
@@ -408,6 +491,29 @@ export default function MemberDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
     },
     onError: () => toast.error("Failed to update member"),
+  });
+
+  const approveCrMutation = useMutation({
+    mutationFn: ({ crId, note }: { crId: string; note: string }) => adminApproveChangeRequest(crId, note),
+    onSuccess: () => {
+      toast.success("Change request approved");
+      setCrDetailOpen(false);
+      setSelectedCr(null);
+      refetchCr();
+      queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
+    },
+    onError: () => toast.error("Failed to approve"),
+  });
+
+  const rejectCrMutation = useMutation({
+    mutationFn: ({ crId, note }: { crId: string; note: string }) => adminRejectChangeRequest(crId, note),
+    onSuccess: () => {
+      toast.success("Change request rejected");
+      setCrDetailOpen(false);
+      setSelectedCr(null);
+      refetchCr();
+    },
+    onError: () => toast.error("Failed to reject"),
   });
 
   const openEdit = () => {
@@ -672,73 +778,87 @@ export default function MemberDetailPage() {
 
       {/* Family Tab */}
       {activeTab === "Family" && (
-        <div>
-          {familyCount === 0 ? (
-            <Card>
-              <p style={{ color: "#9ca3af" }}>No family members added.</p>
-            </Card>
-          ) : (
-            <FamilyGrid>
-              {(member.family ?? []).map((f: any) => (
-                <FamilyCard key={f.id}>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      marginBottom: "10px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: "50%",
-                        background: "#f5f3ff",
-                        color: "#7c3aed",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 700,
-                        fontSize: "0.9rem",
-                      }}
-                    >
-                      {(f.name || "F")[0].toUpperCase()}
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <Card>
+            <CardTitle>
+              <Users size={14} /> Family Members ({(member.family ?? []).length}
+              {member.enrollment?.plan_family_limit != null
+                ? ` / ${member.enrollment.plan_family_limit} allowed`
+                : ""})
+            </CardTitle>
+            {(member.family ?? []).length === 0 ? (
+              <p style={{ color: "#9ca3af", fontSize: 13 }}>No family members added.</p>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+                {(member.family as FamilyMemberDetail[]).map((f) => (
+                  <div key={f.id} style={{
+                    border: "1px solid #e9e8f4", borderRadius: 10, padding: "12px 16px",
+                    background: f.policy_count > 0 ? "#fffbeb" : "#fff",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                      <span style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>{f.name}</span>
+                      <span style={{ fontSize: 11, background: "#f1f5f9", color: "#374151", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{f.relation}</span>
+                      {f.coverage_type && <span style={{ fontSize: 11, background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{f.coverage_type}</span>}
+                      {f.policy_count > 0 && (
+                        <span style={{ fontSize: 11, background: "#fef9c3", color: "#92400e", padding: "2px 8px", borderRadius: 999, fontWeight: 700, border: "1px solid #fde68a" }}>
+                          🔗 {f.policy_count} Policy{f.policy_count > 1 ? "ies" : ""}
+                        </span>
+                      )}
                     </div>
-                    <div>
-                      <div
-                        style={{
-                          fontWeight: 600,
-                          fontSize: "0.875rem",
-                          color: "#111827",
-                        }}
-                      >
-                        {f.name}
+                    {f.gender || f.dob ? (
+                      <div style={{ fontSize: 12, color: "#6b7280" }}>
+                        {f.gender}{f.gender && f.dob ? " · " : ""}{f.dob ? dayjs(f.dob).format("DD MMM YYYY") : ""}
                       </div>
-                      <div style={{ fontSize: "0.72rem", color: "#6b7280" }}>
-                        {f.relation}
+                    ) : null}
+                    {f.linked_policies.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Linked Policies</div>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                          {f.linked_policies.map(p => (
+                            <span key={p.id} style={{ fontSize: 11, background: "#eff6ff", color: "#1d4ed8", padding: "2px 8px", borderRadius: 999, border: "1px solid #bfdbfe", fontWeight: 600 }}>
+                              #{p.policy_number} · {p.insurer}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                  <InfoGrid
-                    style={{ gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}
-                  >
-                    <InfoField>
-                      <InfoLabel>Gender</InfoLabel>
-                      <InfoValue style={{ fontSize: "0.8rem" }}>
-                        {f.gender || "—"}
-                      </InfoValue>
-                    </InfoField>
-                    <InfoField>
-                      <InfoLabel>Date of Birth</InfoLabel>
-                      <InfoValue style={{ fontSize: "0.8rem" }}>
-                        {f.dob ? dayjs(f.dob).format("DD MMM YYYY") : "—"}
-                      </InfoValue>
-                    </InfoField>
-                  </InfoGrid>
-                </FamilyCard>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          {/* Pending family change requests */}
+          {familyCrs.length > 0 && (
+            <Card>
+              <CardTitle style={{ color: "#d97706" }}>
+                ⚠ Pending Family Change Requests ({familyCrs.filter(c => c.status === "pending").length})
+              </CardTitle>
+              {familyCrs.map((cr: any) => (
+                <div key={cr.id} style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", marginBottom: 4 }}>
+                      {cr.family_member_name && <span>Re: <strong>{cr.family_member_name}</strong> — </span>}
+                      <span style={{ padding: "2px 8px", borderRadius: 999, fontSize: 11, fontWeight: 700,
+                        background: cr.status === "pending" ? "#fef3c7" : cr.status === "approved" ? "#dcfce7" : "#fee2e2",
+                        color: cr.status === "pending" ? "#92400e" : cr.status === "approved" ? "#166534" : "#991b1b" }}>
+                        {cr.status}
+                      </span>
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 4 }}>
+                      {Object.entries(cr.requested_fields ?? {}).map(([k, v]: any) => (
+                        <span key={k} style={{ fontSize: 10, background: "#eff6ff", color: "#1d4ed8", padding: "1px 7px", borderRadius: 999, border: "1px solid #bfdbfe" }}>{k}: {v}</span>
+                      ))}
+                    </div>
+                    {cr.reason && <div style={{ fontSize: 12, color: "#6b7280" }}>Reason: {cr.reason}</div>}
+                  </div>
+                  {cr.status === "pending" && (
+                    <Button label="Review" size="small" severity="warning" outlined style={{ fontSize: 11 }}
+                      onClick={() => { setSelectedFamilyCr(cr); setFamilyCrNote(""); setFamilyCrOpen(true); }} />
+                  )}
+                </div>
               ))}
-            </FamilyGrid>
+            </Card>
           )}
         </div>
       )}
@@ -795,6 +915,50 @@ export default function MemberDetailPage() {
             ))
           )}
         </div>
+      )}
+
+      {/* Change Requests Tab */}
+      {activeTab === "Change Requests" && (
+        <Card>
+          <CardTitle style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span>Change Requests</span>
+            <div style={{ display: "flex", gap: 6 }}>
+              {["pending", "approved", "rejected", "all"].map(s => (
+                <button
+                  key={s}
+                  onClick={() => setCrStatusFilter(s)}
+                  style={{
+                    padding: "3px 12px", borderRadius: 999, fontSize: 11, fontWeight: 700, cursor: "pointer", border: "1px solid",
+                    background: crStatusFilter === s ? "#1d4ed8" : "#fff",
+                    color: crStatusFilter === s ? "#fff" : "#6b7280",
+                    borderColor: crStatusFilter === s ? "#1d4ed8" : "#e5e7eb",
+                  }}
+                >{s.charAt(0).toUpperCase() + s.slice(1)}</button>
+              ))}
+            </div>
+          </CardTitle>
+          {changeRequests.length === 0 ? (
+            <div style={{ padding: "2rem", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No change requests found.</div>
+          ) : changeRequests.map((cr: any) => (
+            <CrRow key={cr.id} onClick={() => { setSelectedCr(cr); setAdminNote(cr.admin_note || ""); setCrDetailOpen(true); }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                  <CrStatusPill $s={cr.status}>{cr.status}</CrStatusPill>
+                  <span style={{ fontSize: 11, color: "#9ca3af" }}>{cr.created_at ? dayjs(cr.created_at).format("DD MMM YYYY HH:mm") : ""}</span>
+                </div>
+                <div>
+                  {Object.keys(cr.requested_fields ?? {}).map((f: string) => (
+                    <FieldPill key={f}>{f}: {String(cr.requested_fields[f])}</FieldPill>
+                  ))}
+                </div>
+                {cr.reason && <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>{cr.reason}</div>}
+              </div>
+              {cr.status === "pending" && (
+                <span style={{ fontSize: 12, color: "#1d4ed8", fontWeight: 600 }}>Review →</span>
+              )}
+            </CrRow>
+          ))}
+        </Card>
       )}
 
       {/* Communication Tab */}
@@ -864,22 +1028,30 @@ export default function MemberDetailPage() {
           {/* Basic info */}
           <FormRow>
             <Field>
-              <FieldLabel>Full Name</FieldLabel>
+              <FieldLabel>Full Name *</FieldLabel>
               <Controller
                 name="name"
                 control={editForm.control}
-                render={({ field }) => (
-                  <InputText {...field} style={{ width: "100%" }} />
+                rules={{ required: "Full name is required" }}
+                render={({ field, fieldState }) => (
+                  <>
+                    <InputText {...field} style={{ width: "100%" }} invalid={!!fieldState.error} />
+                    {fieldState.error && <Err>{fieldState.error.message}</Err>}
+                  </>
                 )}
               />
             </Field>
             <Field>
-              <FieldLabel>Mobile No</FieldLabel>
+              <FieldLabel>Mobile No.</FieldLabel>
               <Controller
                 name="mobile_no"
                 control={editForm.control}
-                render={({ field }) => (
-                  <InputText {...field} style={{ width: "100%" }} />
+                rules={{ pattern: { value: /^\+?[\d\s\-()]{7,15}$/, message: "Invalid mobile number (7–15 digits)" } }}
+                render={({ field, fieldState }) => (
+                  <>
+                    <InputText {...field} placeholder="+91 98765 43210" style={{ width: "100%" }} invalid={!!fieldState.error} />
+                    {fieldState.error && <Err>{fieldState.error.message}</Err>}
+                  </>
                 )}
               />
             </Field>
@@ -964,8 +1136,12 @@ export default function MemberDetailPage() {
             <Controller
               name="address_pin"
               control={editForm.control}
-              render={({ field }) => (
-                <InputText {...field} style={{ width: "100%" }} />
+              rules={{ pattern: { value: /^\d{6}$/, message: "PIN must be exactly 6 digits" } }}
+              render={({ field, fieldState }) => (
+                <>
+                  <InputText {...field} placeholder="400001" maxLength={6} style={{ width: "100%" }} invalid={!!fieldState.error} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}
+                </>
               )}
             />
           </Field>
@@ -1068,6 +1244,113 @@ export default function MemberDetailPage() {
             />
           </Field>
         </FormGrid>
+      </Dialog>
+
+      {/* Change Request Detail Dialog */}
+      <Dialog
+        header="Review Change Request"
+        visible={crDetailOpen}
+        onHide={() => { setCrDetailOpen(false); setSelectedCr(null); }}
+        style={{ width: "480px" }}
+        footer={
+          selectedCr?.status === "pending" ? (
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Button label="Reject" severity="danger" outlined
+                loading={rejectCrMutation.isPending}
+                onClick={() => rejectCrMutation.mutate({ crId: selectedCr.id, note: adminNote })} />
+              <Button label="Approve" severity="success"
+                loading={approveCrMutation.isPending}
+                onClick={() => approveCrMutation.mutate({ crId: selectedCr.id, note: adminNote })} />
+            </div>
+          ) : null
+        }
+      >
+        {selectedCr && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 6 }}>Requested Changes</div>
+              {Object.entries(selectedCr.requested_fields ?? {}).map(([k, v]: [string, any]) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+                  <span style={{ color: "#6b7280", fontWeight: 600 }}>{k}</span>
+                  <span style={{ color: "#111827", fontWeight: 500 }}>{String(v)}</span>
+                </div>
+              ))}
+            </div>
+            {selectedCr.reason && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>Reason</div>
+                <div style={{ fontSize: 13, color: "#374151" }}>{selectedCr.reason}</div>
+              </div>
+            )}
+            {selectedCr.status === "pending" && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>Admin Note (optional)</div>
+                <InputTextarea
+                  value={adminNote}
+                  onChange={e => setAdminNote(e.target.value)}
+                  rows={2}
+                  style={{ width: "100%", fontSize: 13 }}
+                  placeholder="Add a note for the member..."
+                />
+              </div>
+            )}
+            {selectedCr.status !== "pending" && selectedCr.admin_note && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>Admin Note</div>
+                <div style={{ fontSize: 13, color: "#374151" }}>{selectedCr.admin_note}</div>
+              </div>
+            )}
+          </div>
+        )}
+      </Dialog>
+      {/* Family CR Review Dialog */}
+      <Dialog
+        header="Review Family Change Request"
+        visible={familyCrOpen}
+        onHide={() => { setFamilyCrOpen(false); setSelectedFamilyCr(null); }}
+        style={{ width: "480px" }}
+        footer={
+          selectedFamilyCr?.status === "pending" ? (
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <Button label="Reject" severity="danger" outlined
+                loading={rejectFamilyCrMutation.isPending}
+                onClick={() => rejectFamilyCrMutation.mutate({ crId: selectedFamilyCr.id, note: familyCrNote })} />
+              <Button label="Approve & Apply" severity="success"
+                loading={approveFamilyCrMutation.isPending}
+                onClick={() => approveFamilyCrMutation.mutate({ crId: selectedFamilyCr.id, note: familyCrNote })} />
+            </div>
+          ) : null
+        }
+      >
+        {selectedFamilyCr && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {selectedFamilyCr.family_member_name && (
+              <div style={{ fontSize: 13, color: "#374151", fontWeight: 600 }}>
+                Family member: {selectedFamilyCr.family_member_name}
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 6 }}>Requested Changes</div>
+              {Object.entries(selectedFamilyCr.requested_fields ?? {}).map(([k, v]: any) => (
+                <div key={k} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #f3f4f6", fontSize: 13 }}>
+                  <span style={{ color: "#6b7280", fontWeight: 600 }}>{k}</span>
+                  <span style={{ color: "#111827", fontWeight: 500 }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            {selectedFamilyCr.reason && (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>Reason</div>
+                <div style={{ fontSize: 13, color: "#374151" }}>{selectedFamilyCr.reason}</div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", marginBottom: 4 }}>Admin Note (optional)</div>
+              <InputTextarea value={familyCrNote} onChange={e => setFamilyCrNote(e.target.value)}
+                rows={2} style={{ width: "100%", fontSize: 13 }} placeholder="Note for the member..." />
+            </div>
+          </div>
+        )}
       </Dialog>
     </div>
   );

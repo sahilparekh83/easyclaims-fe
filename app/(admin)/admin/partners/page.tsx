@@ -195,6 +195,14 @@ const GhostBtn = styled.button`
   &:hover { background: #f1f5f9; color: #0f172a; }
 `;
 
+const OutlineBtn = styled.button`
+  background: #fff; color: #0a2257; border: 1.5px solid #0a2257;
+  cursor: pointer; font-size: 12.5px; font-weight: 700;
+  padding: 7px 14px; border-radius: 10px;
+  display: inline-flex; align-items: center; gap: 6px;
+  &:hover { background: #f0f4ff; }
+`;
+
 const AccentBtn = styled.button`
   background: #0a2257; color: #fff; border: none; cursor: pointer;
   font-size: 13px; font-weight: 700; padding: 9px 18px; border-radius: 10px;
@@ -285,15 +293,90 @@ const FooterRow = styled.div`
   display: flex; justify-content: flex-end; gap: 0.5rem;
 `;
 
+const SectionDivider = styled.div`
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #6b7a8c;
+  padding: 14px 0 8px;
+  border-bottom: 1px solid #f1f2f6;
+  margin-bottom: 12px;
+`;
+
+const FormGrid2Col = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 4px;
+`;
+
+const Required = styled.span`color: #dc2626;`;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface PartnerFormValues { name: string; email: string; mobile_no: string; city: string; partner_type: string; }
-interface EditFormValues { name: string; mobile_no: string; city: string; partner_type: string; status: string; }
+interface PartnerFormValues {
+  name: string;
+  email: string;
+  mobile_no: string;
+  partner_type: string;
+  legal_company_name: string;
+  trade_name: string;
+  registered_address: string;
+  city: string;
+  state: string;
+  pin_code: string;
+  gstin: string;
+  pan: string;
+  authorized_signatory_name: string;
+  designation: string;
+  data_1?: string;
+  data_2?: string;
+  data_3?: string;
+}
+
+interface EditFormValues {
+  name: string;
+  mobile_no: string;
+  partner_type: string;
+  city: string;
+  state: string;
+  status: string;
+  legal_company_name: string;
+  trade_name: string;
+  registered_address: string;
+  pin_code: string;
+  gstin: string;
+  pan: string;
+  authorized_signatory_name: string;
+  designation: string;
+  data_1?: string;
+  data_2?: string;
+  data_3?: string;
+}
 
 interface Partner {
-  id: string; name: string; email?: string; mobile_no?: string;
-  city?: string; partner_type?: string; status: string;
-  api_key?: string; member_count?: number; created_at: string;
+  id: string;
+  user_id?: string;
+  name: string;
+  partner_type?: string | null;
+  city?: string | null;
+  state?: string | null;
+  legal_company_name?: string | null;
+  trade_name?: string | null;
+  registered_address?: string | null;
+  pin_code?: string | null;
+  gstin?: string | null;
+  pan?: string | null;
+  authorized_signatory_name?: string | null;
+  designation?: string | null;
+  data_1?: string | null;
+  data_2?: string | null;
+  data_3?: string | null;
+  status: string;
+  email?: string | null;
+  mobile_no?: string | null;
+  api_key?: string | null;
+  api_rate_limit?: number;
+  member_count?: number;
+  created_at?: string | null;
   [key: string]: unknown;
 }
 
@@ -314,9 +397,30 @@ const STATUS_OPTIONS = [
 
 const MOBILE_PATTERN = /^\+?[\d\s\-()]{7,15}$/;
 const EMAIL_PATTERN = /^\S+@\S+\.\S+$/;
+const GSTIN_PATTERN = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+const PAN_PATTERN   = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+const PIN_PATTERN   = /^\d{6}$/;
 const ROWS = 20;
 const QUERY_KEY = ["admin", "partners"];
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function applyServerErrors(
+  err: any,
+  setError: (name: string, error: { message: string }) => void,
+  fieldMap: Record<string, string> = {}
+) {
+  const detail = err?.response?.data?.detail;
+  if (Array.isArray(detail)) {
+    detail.forEach((d: any) => {
+      const fieldName = d.loc?.[d.loc.length - 1];
+      if (fieldName) {
+        const mapped = fieldMap[fieldName] ?? fieldName;
+        setError(mapped, { message: d.msg ?? "Invalid value" });
+      }
+    });
+  }
+}
 
 function initials(name: string) {
   return (name || "P").split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
@@ -354,11 +458,23 @@ export default function PartnersPage() {
   const [keyRevealed, setKeyRevealed] = useState(false);
 
   const createForm = useForm<PartnerFormValues>({
-    defaultValues: { name: "", email: "", mobile_no: "", city: "", partner_type: "Broker" },
+    defaultValues: {
+      name: "", email: "", mobile_no: "", partner_type: "Broker",
+      legal_company_name: "", trade_name: "", registered_address: "",
+      city: "", state: "", pin_code: "", gstin: "", pan: "",
+      authorized_signatory_name: "", designation: "",
+      data_1: "", data_2: "", data_3: "",
+    },
   });
 
   const editForm = useForm<EditFormValues>({
-    defaultValues: { name: "", mobile_no: "", city: "", partner_type: "Broker", status: "Active" },
+    defaultValues: {
+      name: "", mobile_no: "", partner_type: "Broker", city: "", state: "", status: "Active",
+      legal_company_name: "", trade_name: "", registered_address: "",
+      pin_code: "", gstin: "", pan: "",
+      authorized_signatory_name: "", designation: "",
+      data_1: "", data_2: "", data_3: "",
+    },
   });
 
   const { data, isLoading } = useQuery({
@@ -380,24 +496,67 @@ export default function PartnersPage() {
   const createMutation = useMutation({
     mutationFn: (values: PartnerFormValues) =>
       adminCreatePartner({
-        name: values.name, email: values.email,
-        mobile_no: values.mobile_no || undefined,
-        city: values.city || undefined,
-        partner_type: values.partner_type,
+        name: values.authorized_signatory_name,
+        email: values.email,
+        mobile_no: values.mobile_no,
+        partner_type: values.partner_type || "Broker",
+        legal_company_name: values.legal_company_name,
+        trade_name: values.trade_name,
+        registered_address: values.registered_address,
+        city: values.city,
+        state: values.state,
+        pin_code: values.pin_code,
+        gstin: values.gstin.toUpperCase(),
+        pan: values.pan.toUpperCase(),
+        authorized_signatory_name: values.authorized_signatory_name,
+        designation: values.designation,
+        data_1: values.data_1 || undefined,
+        data_2: values.data_2 || undefined,
+        data_3: values.data_3 || undefined,
       }),
     onSuccess: () => { invalidate(); toast.success("Partner created"); setCreateOpen(false); createForm.reset(); },
-    onError: (err: any) => { toast.error(getApiError(err, "Failed to create partner")); },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        applyServerErrors(err, createForm.setError as (name: string, error: { message: string }) => void);
+        toast.error("Please fix the validation errors below");
+      } else {
+        toast.error(getApiError(err, "Failed to create partner"));
+      }
+    },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, values }: { id: string; values: EditFormValues }) =>
       adminUpdatePartner(id, {
-        name: values.name || undefined, mobile_no: values.mobile_no || undefined,
-        city: values.city || undefined, partner_type: values.partner_type || undefined,
+        name: values.name || undefined,
+        mobile_no: values.mobile_no || undefined,
+        city: values.city || undefined,
+        state: values.state || undefined,
+        partner_type: values.partner_type || undefined,
         status: values.status || undefined,
+        legal_company_name: values.legal_company_name || undefined,
+        trade_name: values.trade_name || undefined,
+        registered_address: values.registered_address || undefined,
+        pin_code: values.pin_code || undefined,
+        gstin: values.gstin ? values.gstin.toUpperCase() : undefined,
+        pan: values.pan ? values.pan.toUpperCase() : undefined,
+        authorized_signatory_name: values.authorized_signatory_name || undefined,
+        designation: values.designation || undefined,
+        data_1: values.data_1 || undefined,
+        data_2: values.data_2 || undefined,
+        data_3: values.data_3 || undefined,
       }),
     onSuccess: () => { invalidate(); toast.success("Partner updated"); setEditOpen(false); setEditPartner(null); editForm.reset(); },
-    onError: (err: any) => { toast.error(getApiError(err, "Failed to update partner")); },
+    onError: (err: any) => {
+      const detail = err?.response?.data?.detail;
+      if (Array.isArray(detail)) {
+        applyServerErrors(err, editForm.setError as (name: string, error: { message: string }) => void);
+        toast.error("Please fix the validation errors below");
+      } else {
+        toast.error(getApiError(err, "Failed to update partner"));
+      }
+    },
   });
 
   const regenMutation = useMutation({
@@ -406,7 +565,16 @@ export default function PartnersPage() {
     onError: () => toast.error("Failed to regenerate API key"),
   });
 
-  const openCreate = () => { createForm.reset({ name: "", email: "", mobile_no: "", city: "", partner_type: "Broker" }); setCreateOpen(true); };
+  const openCreate = () => {
+    createForm.reset({
+      name: "", email: "", mobile_no: "", partner_type: "Broker",
+      legal_company_name: "", trade_name: "", registered_address: "",
+      city: "", state: "", pin_code: "", gstin: "", pan: "",
+      authorized_signatory_name: "", designation: "",
+      data_1: "", data_2: "", data_3: "",
+    });
+    setCreateOpen(true);
+  };
 
   const openEdit = async (partner: Partner) => {
     setEditLoading(true);
@@ -415,10 +583,27 @@ export default function PartnersPage() {
       const res = await adminGetPartner(partner.id);
       const p: Partner = res?.data ?? partner;
       setEditPartner(p);
-      editForm.reset({ name: p.name ?? "", mobile_no: (p.mobile_no as string) ?? "", city: (p.city as string) ?? "", partner_type: (p.partner_type as string) ?? "Broker", status: p.status ?? "Active" });
+      editForm.reset({
+        name: p.name ?? "",
+        mobile_no: (p.mobile_no as string) ?? "",
+        partner_type: (p.partner_type as string) ?? "Broker",
+        city: (p.city as string) ?? "",
+        state: (p.state as string) ?? "",
+        status: p.status ?? "Active",
+        legal_company_name: (p.legal_company_name as string) ?? "",
+        trade_name: (p.trade_name as string) ?? "",
+        registered_address: (p.registered_address as string) ?? "",
+        pin_code: (p.pin_code as string) ?? "",
+        gstin: (p.gstin as string) ?? "",
+        pan: (p.pan as string) ?? "",
+        authorized_signatory_name: (p.authorized_signatory_name as string) ?? "",
+        designation: (p.designation as string) ?? "",
+        data_1: (p.data_1 as string) ?? "",
+        data_2: (p.data_2 as string) ?? "",
+        data_3: (p.data_3 as string) ?? "",
+      });
     } catch {
       setEditPartner(partner);
-      editForm.reset({ name: partner.name ?? "", mobile_no: (partner.mobile_no as string) ?? "", city: (partner.city as string) ?? "", partner_type: (partner.partner_type as string) ?? "Broker", status: partner.status ?? "Active" });
     } finally {
       setEditLoading(false);
     }
@@ -457,6 +642,12 @@ export default function PartnersPage() {
               <CardSub>Brokers &amp; channel partners driving acquisition</CardSub>
             </div>
             <div style={{ display: "flex", gap: 8 }}>
+              <OutlineBtn
+                onClick={() => { window.location.href = "/admin/partners/bulk-upload"; }}
+                style={{ fontSize: 12.5 }}
+              >
+                ↑ Bulk Upload
+              </OutlineBtn>
               <AccentBtn onClick={openCreate} style={{ fontSize: 12.5, padding: "7px 14px" }}>
                 + Add partner
               </AccentBtn>
@@ -636,7 +827,7 @@ export default function PartnersPage() {
                 </p>
                 <CodeBlock>
                   <span style={{ color: "#4ade80" }}>POST</span> https://api.easyclaims.in/v1/customers<br />
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Authorization:</span> Bearer {MASKED_KEY}<br />
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Authorization:</span> Bearer {"{MASKED_KEY}"}<br />
                   <span style={{ color: "rgba(255,255,255,0.5)" }}>Content-Type:</span> application/json<br /><br />
                   {'{ "name": "Neha Verma", "mobile": "+919812345678", "plan": "secure" }'}
                 </CodeBlock>
@@ -674,7 +865,7 @@ export default function PartnersPage() {
         header="New Partner"
         visible={createOpen}
         onHide={() => { setCreateOpen(false); createForm.reset(); }}
-        style={{ width: "500px" }}
+        style={{ width: "680px", maxHeight: "90vh" }}
         footer={
           <FooterRow>
             <Button label="Cancel" severity="secondary" onClick={() => { setCreateOpen(false); createForm.reset(); }} />
@@ -682,47 +873,168 @@ export default function PartnersPage() {
           </FooterRow>
         }
       >
-        <FormStack>
-          <FormField>
-            <Lbl htmlFor="c-name">Name <span style={{ color: "#dc2626" }}>*</span></Lbl>
-            <Controller name="name" control={createForm.control} rules={{ required: "Name is required", minLength: { value: 2, message: "Min 2 characters" } }}
-              render={({ field, fieldState }) => (
-                <><InputText id="c-name" {...field} className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} placeholder="Organisation name" />
-                {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
-              )}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="c-email">Email <span style={{ color: "#dc2626" }}>*</span></Lbl>
-            <Controller name="email" control={createForm.control} rules={{ required: "Email is required", pattern: { value: EMAIL_PATTERN, message: "Invalid email address" } }}
-              render={({ field, fieldState }) => (
-                <><InputText id="c-email" type="email" {...field} className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} placeholder="contact@partner.com" />
-                {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
-              )}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="c-mobile">Mobile</Lbl>
-            <Controller name="mobile_no" control={createForm.control} rules={{ pattern: { value: MOBILE_PATTERN, message: "Invalid mobile number (7–15 digits)" } }}
-              render={({ field, fieldState }) => (
-                <><InputText id="c-mobile" {...field} className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} placeholder="+91 98765 43210" />
-                {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
-              )}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="c-city">City</Lbl>
-            <Controller name="city" control={createForm.control}
-              render={({ field }) => <InputText id="c-city" {...field} style={{ width: "100%" }} placeholder="Mumbai" />}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="c-type">Partner Type</Lbl>
-            <Controller name="partner_type" control={createForm.control}
-              render={({ field }) => <Dropdown id="c-type" value={field.value} options={PARTNER_TYPES} onChange={(e) => field.onChange(e.value)} style={{ width: "100%" }} />}
-            />
-          </FormField>
-        </FormStack>
+        <div style={{ overflowY: "auto", maxHeight: "calc(90vh - 140px)", padding: "4px 0" }}>
+          {/* Section: Company */}
+          <SectionDivider>Company Information</SectionDivider>
+          <FormGrid2Col>
+            <FormField style={{ gridColumn: "1 / -1" }}>
+              <Lbl>Legal Company Name <Required>*</Required></Lbl>
+              <Controller name="legal_company_name" control={createForm.control}
+                rules={{ required: "Legal Company Name is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="ABC Insurance Brokers Pvt Ltd" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Trade Name / Brand Name <Required>*</Required></Lbl>
+              <Controller name="trade_name" control={createForm.control}
+                rules={{ required: "Trade Name is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="ABC Brokers" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Partner Type <Required>*</Required></Lbl>
+              <Controller name="partner_type" control={createForm.control}
+                rules={{ required: "Partner Type is required" }}
+                render={({ field, fieldState }) => (
+                  <><Dropdown value={field.value} options={PARTNER_TYPES} onChange={e => field.onChange(e.value)}
+                    invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>GSTIN <Required>*</Required></Lbl>
+              <Controller name="gstin" control={createForm.control}
+                rules={{ required: "GSTIN is required", pattern: { value: GSTIN_PATTERN, message: "Invalid GSTIN — e.g. 27AAPFU0939F1ZV" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} onChange={e => field.onChange(e.target.value.toUpperCase())}
+                    invalid={!!fieldState.error} style={{ width: "100%", fontFamily: "monospace" }} placeholder="27AAPFU0939F1ZV" maxLength={15} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>PAN <Required>*</Required></Lbl>
+              <Controller name="pan" control={createForm.control}
+                rules={{ required: "PAN is required", pattern: { value: PAN_PATTERN, message: "Invalid PAN — e.g. AAPFU0939F" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} onChange={e => field.onChange(e.target.value.toUpperCase())}
+                    invalid={!!fieldState.error} style={{ width: "100%", fontFamily: "monospace" }} placeholder="AAPFU0939F" maxLength={10} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+          </FormGrid2Col>
+
+          {/* Section: Address */}
+          <SectionDivider>Registered Office Address</SectionDivider>
+          <FormGrid2Col>
+            <FormField style={{ gridColumn: "1 / -1" }}>
+              <Lbl>Address <Required>*</Required></Lbl>
+              <Controller name="registered_address" control={createForm.control}
+                rules={{ required: "Registered address is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="123 Business Park, Andheri East" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>City <Required>*</Required></Lbl>
+              <Controller name="city" control={createForm.control}
+                rules={{ required: "City is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Mumbai" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>State <Required>*</Required></Lbl>
+              <Controller name="state" control={createForm.control}
+                rules={{ required: "State is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Maharashtra" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Pin Code <Required>*</Required></Lbl>
+              <Controller name="pin_code" control={createForm.control}
+                rules={{ required: "Pin Code is required", pattern: { value: PIN_PATTERN, message: "Must be exactly 6 digits" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%", fontFamily: "monospace" }} placeholder="400001" maxLength={6} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+          </FormGrid2Col>
+
+          {/* Section: Signatory */}
+          <SectionDivider>Authorized Signatory &amp; Contact</SectionDivider>
+          <FormGrid2Col>
+            <FormField>
+              <Lbl>Signatory Name <Required>*</Required></Lbl>
+              <Controller name="authorized_signatory_name" control={createForm.control}
+                rules={{ required: "Signatory name is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="John Doe" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Designation <Required>*</Required></Lbl>
+              <Controller name="designation" control={createForm.control}
+                rules={{ required: "Designation is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Director" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Email ID <Required>*</Required></Lbl>
+              <Controller name="email" control={createForm.control}
+                rules={{ required: "Email is required", pattern: { value: EMAIL_PATTERN, message: "Invalid email address" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} type="email" invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="partner@company.com" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Mobile Number <Required>*</Required></Lbl>
+              <Controller name="mobile_no" control={createForm.control}
+                rules={{ required: "Mobile number is required", pattern: { value: MOBILE_PATTERN, message: "Invalid mobile number (7–15 digits)" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="9876543210" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+          </FormGrid2Col>
+
+          {/* Section: Additional Data */}
+          <SectionDivider>Additional Data (Optional)</SectionDivider>
+          <FormGrid2Col>
+            {(["data_1", "data_2", "data_3"] as const).map((f, i) => (
+              <FormField key={f}>
+                <Lbl>Data {i + 1}</Lbl>
+                <Controller name={f} control={createForm.control}
+                  render={({ field }) => <InputText {...field} value={field.value ?? ""} style={{ width: "100%" }} placeholder={`Data ${i + 1}`} />}
+                />
+              </FormField>
+            ))}
+          </FormGrid2Col>
+        </div>
       </Dialog>
 
       {/* ── Edit Partner Dialog ───────────────────────────────────────────── */}
@@ -730,7 +1042,7 @@ export default function PartnersPage() {
         header={editLoading ? "Loading…" : `Edit Partner — ${editPartner?.name ?? ""}`}
         visible={editOpen}
         onHide={() => { setEditOpen(false); setEditPartner(null); setEditLoading(false); editForm.reset(); }}
-        style={{ width: "500px" }}
+        style={{ width: "680px", maxHeight: "90vh" }}
         footer={
           <FooterRow>
             <Button label="Cancel" severity="secondary" onClick={() => { setEditOpen(false); setEditPartner(null); editForm.reset(); }} />
@@ -738,50 +1050,178 @@ export default function PartnersPage() {
           </FooterRow>
         }
       >
-        <FormStack>
+        <div style={{ overflowY: "auto", maxHeight: "calc(90vh - 140px)", padding: "4px 0" }}>
+          {/* Read-only email */}
           {editPartner?.email && (
-            <FormField>
+            <FormField style={{ marginBottom: 12 }}>
               <Lbl>Email (read-only)</Lbl>
-              <InputText value={editPartner.email} disabled style={{ width: "100%", opacity: 0.7 }} />
+              <InputText value={editPartner.email as string} disabled style={{ width: "100%", opacity: 0.7 }} />
             </FormField>
           )}
-          <FormField>
-            <Lbl htmlFor="e-name">Name <span style={{ color: "#dc2626" }}>*</span></Lbl>
-            <Controller name="name" control={editForm.control} rules={{ required: "Name is required" }}
-              render={({ field, fieldState }) => (
-                <><InputText id="e-name" {...field} className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} />
-                {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
-              )}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="e-mobile">Mobile</Lbl>
-            <Controller name="mobile_no" control={editForm.control} rules={{ pattern: { value: MOBILE_PATTERN, message: "Invalid mobile number (7–15 digits)" } }}
-              render={({ field, fieldState }) => (
-                <><InputText id="e-mobile" {...field} className={fieldState.error ? "p-invalid" : ""} style={{ width: "100%" }} />
-                {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
-              )}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="e-city">City</Lbl>
-            <Controller name="city" control={editForm.control}
-              render={({ field }) => <InputText id="e-city" {...field} style={{ width: "100%" }} />}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="e-type">Partner Type</Lbl>
-            <Controller name="partner_type" control={editForm.control}
-              render={({ field }) => <Dropdown id="e-type" value={field.value} options={PARTNER_TYPES} onChange={(e) => field.onChange(e.value)} style={{ width: "100%" }} />}
-            />
-          </FormField>
-          <FormField>
-            <Lbl htmlFor="e-status">Status</Lbl>
-            <Controller name="status" control={editForm.control}
-              render={({ field }) => <Dropdown id="e-status" value={field.value} options={STATUS_OPTIONS} onChange={(e) => field.onChange(e.value)} style={{ width: "100%" }} />}
-            />
-          </FormField>
-        </FormStack>
+
+          {/* Section: Company */}
+          <SectionDivider>Company Information</SectionDivider>
+          <FormGrid2Col>
+            <FormField style={{ gridColumn: "1 / -1" }}>
+              <Lbl>Legal Company Name</Lbl>
+              <Controller name="legal_company_name" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="ABC Insurance Brokers Pvt Ltd" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Trade Name / Brand Name</Lbl>
+              <Controller name="trade_name" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="ABC Brokers" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Partner Type</Lbl>
+              <Controller name="partner_type" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><Dropdown value={field.value} options={PARTNER_TYPES} onChange={e => field.onChange(e.value)}
+                    invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>GSTIN</Lbl>
+              <Controller name="gstin" control={editForm.control}
+                rules={{ pattern: { value: GSTIN_PATTERN, message: "Invalid GSTIN — e.g. 27AAPFU0939F1ZV" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} onChange={e => field.onChange(e.target.value.toUpperCase())}
+                    invalid={!!fieldState.error} style={{ width: "100%", fontFamily: "monospace" }} placeholder="27AAPFU0939F1ZV" maxLength={15} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>PAN</Lbl>
+              <Controller name="pan" control={editForm.control}
+                rules={{ pattern: { value: PAN_PATTERN, message: "Invalid PAN — e.g. AAPFU0939F" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} onChange={e => field.onChange(e.target.value.toUpperCase())}
+                    invalid={!!fieldState.error} style={{ width: "100%", fontFamily: "monospace" }} placeholder="AAPFU0939F" maxLength={10} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+          </FormGrid2Col>
+
+          {/* Section: Address */}
+          <SectionDivider>Registered Office Address</SectionDivider>
+          <FormGrid2Col>
+            <FormField style={{ gridColumn: "1 / -1" }}>
+              <Lbl>Address</Lbl>
+              <Controller name="registered_address" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="123 Business Park, Andheri East" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>City</Lbl>
+              <Controller name="city" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Mumbai" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>State</Lbl>
+              <Controller name="state" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Maharashtra" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Pin Code</Lbl>
+              <Controller name="pin_code" control={editForm.control}
+                rules={{ pattern: { value: PIN_PATTERN, message: "Must be exactly 6 digits" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%", fontFamily: "monospace" }} placeholder="400001" maxLength={6} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+          </FormGrid2Col>
+
+          {/* Section: Signatory & Contact */}
+          <SectionDivider>Authorized Signatory &amp; Contact</SectionDivider>
+          <FormGrid2Col>
+            <FormField>
+              <Lbl>Name <Required>*</Required></Lbl>
+              <Controller name="name" control={editForm.control}
+                rules={{ required: "Name is required" }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Mobile</Lbl>
+              <Controller name="mobile_no" control={editForm.control}
+                rules={{ pattern: { value: MOBILE_PATTERN, message: "Invalid mobile number (7–15 digits)" } }}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Signatory Name</Lbl>
+              <Controller name="authorized_signatory_name" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="John Doe" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Designation</Lbl>
+              <Controller name="designation" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Director" />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Status</Lbl>
+              <Controller name="status" control={editForm.control}
+                render={({ field, fieldState }) => (
+                  <><Dropdown value={field.value} options={STATUS_OPTIONS} onChange={e => field.onChange(e.value)}
+                    invalid={!!fieldState.error} style={{ width: "100%" }} />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+          </FormGrid2Col>
+
+          {/* Section: Additional Data */}
+          <SectionDivider>Additional Data (Optional)</SectionDivider>
+          <FormGrid2Col>
+            {(["data_1", "data_2", "data_3"] as const).map((f, i) => (
+              <FormField key={f}>
+                <Lbl>Data {i + 1}</Lbl>
+                <Controller name={f} control={editForm.control}
+                  render={({ field }) => <InputText {...field} value={field.value ?? ""} style={{ width: "100%" }} placeholder={`Data ${i + 1}`} />}
+                />
+              </FormField>
+            ))}
+          </FormGrid2Col>
+        </div>
       </Dialog>
 
       {/* ── Regen Key Result Dialog ───────────────────────────────────────── */}

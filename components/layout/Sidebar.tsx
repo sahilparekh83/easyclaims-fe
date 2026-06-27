@@ -7,7 +7,7 @@ import styled from "styled-components";
 import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
-  BadgeCheck, Mail, Briefcase, BarChart2,
+  BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList,
 } from "lucide-react";
 
 interface NavItem {
@@ -22,6 +22,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Membership plans", href: "/admin/plans",         icon: <CreditCard size={18} /> },
   { label: "Partners",       href: "/admin/partners",        icon: <Briefcase size={18} /> },
   { label: "Members",        href: "/admin/members",         icon: <Users size={18} /> },
+  { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} /> },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, badge: 7 },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} /> },
   { label: "Policy Types",   href: "/admin/policy-types",    icon: <Package size={18} /> },
@@ -43,6 +44,7 @@ const MEMBER_NAV: NavItem[] = [
   { label: "Dashboard",    href: "/member/dashboard",     icon: <LayoutDashboard size={18} /> },
   { label: "My Plan",      href: "/member/plan",          icon: <BadgeCheck size={18} /> },
   { label: "Profile",      href: "/member/profile",       icon: <UserCheck size={18} /> },
+  { label: "Change Requests", href: "/member/change-requests", icon: <ClipboardList size={18} /> },
   { label: "Family",       href: "/member/family",        icon: <Heart size={18} /> },
   { label: "Nominees",     href: "/member/nominees",      icon: <Users size={18} /> },
   { label: "Policies",     href: "/member/policies",      icon: <FileText size={18} /> },

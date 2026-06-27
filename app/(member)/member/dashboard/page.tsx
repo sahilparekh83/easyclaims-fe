@@ -226,8 +226,9 @@ export default function MemberDashboardPage() {
     policiesData?.data?.items?.length ??
     policiesData?.data?.data?.length ?? 0;
 
-  const totalFamily: number = Array.isArray(familyData?.data)
-    ? familyData.data.length : 0;
+  const totalFamily: number = Array.isArray((familyData as any)?.data?.family)
+    ? (familyData as any).data.family.length
+    : Array.isArray(familyData?.data) ? (familyData as any).data.length : 0;
 
   const allPolicies: any[] =
     policiesData?.data?.items ?? policiesData?.data?.data ?? [];

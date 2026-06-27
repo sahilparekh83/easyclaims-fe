@@ -234,8 +234,10 @@ export const memberUpdateProfile = (data: object) =>
 // ─────────────────────────────────────────────
 // MEMBER — FAMILY
 // ─────────────────────────────────────────────
-export const memberListFamily = () =>
+export const memberGetFamily = () =>
   apiClient.get("/member/family").then((r) => r.data);
+
+export const memberListFamily = memberGetFamily;  // backward-compat alias
 
 export const memberCreateFamily = (data: object) =>
   apiClient.post("/member/family", data).then((r) => r.data);
@@ -245,6 +247,12 @@ export const memberUpdateFamily = (id: string, data: object) =>
 
 export const memberDeleteFamily = (id: string) =>
   apiClient.delete(`/member/family/${id}`).then((r) => r.data);
+
+export const memberCreateFamilyChangeRequest = (
+  familyMemberId: string,
+  data: { requested_fields: object; reason?: string }
+) =>
+  apiClient.post(`/member/family/${familyMemberId}/change-request`, data).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — NOMINEES
@@ -409,17 +417,43 @@ export const adminBulkUploadMembers = (file: File, partnerId: string, planId?: s
   }).then((r) => r.data);
 };
 
+export async function adminBulkUploadPartners(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiClient.post("/admin/partners/bulk-upload", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return res.data;
+}
+
+export async function adminDownloadPartnerBulkReport(file: File): Promise<Blob> {
+  const form = new FormData();
+  form.append("file", file);
+  const res = await apiClient.post("/admin/partners/bulk-upload/report", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+    responseType: "blob",
+  });
+  return res.data as Blob;
+}
+
+export async function adminDownloadPartnerSample(): Promise<Blob> {
+  const res = await apiClient.get("/admin/partners/bulk-upload/sample", {
+    responseType: "blob",
+  });
+  return res.data as Blob;
+}
+
 // ─────────────────────────────────────────────
 // ADMIN — CHANGE REQUESTS
 // ─────────────────────────────────────────────
-export const adminListChangeRequests = (params?: { status?: string; skip?: number; limit?: number }) =>
+export const adminListChangeRequests = (params?: { status?: string; member_id?: string; entity_type?: string; skip?: number; limit?: number }) =>
   apiClient.get("/admin/members/change-requests", { params }).then((r) => r.data);
 
 export const adminApproveChangeRequest = (id: string, admin_note?: string) =>
-  apiClient.patch(`/admin/members/change-requests/${id}/approve`, { admin_note }).then((r) => r.data);
+  apiClient.post(`/admin/members/change-requests/${id}/approve`, { admin_note }).then((r) => r.data);
 
 export const adminRejectChangeRequest = (id: string, admin_note?: string) =>
-  apiClient.patch(`/admin/members/change-requests/${id}/reject`, { admin_note }).then((r) => r.data);
+  apiClient.post(`/admin/members/change-requests/${id}/reject`, { admin_note }).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — AUDIT LOGS

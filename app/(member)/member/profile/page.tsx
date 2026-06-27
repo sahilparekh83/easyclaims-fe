@@ -1,17 +1,12 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import styled from "styled-components";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm, Controller } from "react-hook-form";
-import { memberGetProfile, memberUpdateProfile, memberListPartners } from "@/imports/core/api";
-import { InputText } from "primereact/inputtext";
-import { Dropdown } from "primereact/dropdown";
-import { Checkbox } from "primereact/checkbox";
+import { useQuery } from "@tanstack/react-query";
+import { memberGetProfile, memberListPartners } from "@/imports/core/api";
 import { Button } from "primereact/button";
-import { Calendar } from "primereact/calendar";
-import { toast } from "react-toastify";
 import dayjs from "dayjs";
-import { Building2, CalendarDays, CreditCard, ShieldCheck } from "lucide-react";
+import { Building2, Edit3, Info } from "lucide-react";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -29,6 +24,7 @@ const SectionCard = styled.div`
 
 const CardHeader = styled.div`
   padding: 18px 22px; border-bottom: 1px solid #e0e6ec;
+  display: flex; align-items: center; justify-content: space-between;
 `;
 
 const CardTitle = styled.h3`
@@ -70,196 +66,146 @@ const PartnerTypeChip = styled.span`
   background: #eff6ff; color: #0050b0; border: 1px solid #bfdbfe; margin-left: 6px;
 `;
 
-const FormGrid = styled.div`
-  display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;
+const InfoNote = styled.div`
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 14px; background: #fffbeb; border: 1px solid #fde68a;
+  border-radius: 8px; font-size: 12.5px; color: #78350f; margin-bottom: 16px;
+  line-height: 1.5;
 `;
 
-const FullCol = styled.div`grid-column: 1 / -1;`;
-
-const FieldWrap = styled.div`
-  display: flex; flex-direction: column; gap: 5px;
+const InfoGrid = styled.div`
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1.5rem;
 `;
 
-const FieldLabel = styled.label`
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 12px; font-weight: 600; color: #3a4756;
+const InfoField = styled.div`
+  display: flex; flex-direction: column; gap: 2px;
 `;
 
-const Divider = styled.hr`border: none; border-top: 1px solid #e0e6ec; margin: 18px 0;`;
-
-const SectionLabel = styled.div`
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  font-size: 13px; font-weight: 700; color: #161d26; margin-bottom: 12px;
+const FieldLabel = styled.span`
+  font-size: 0.68rem; font-weight: 700; color: #9ca3af;
+  text-transform: uppercase; letter-spacing: 0.05em;
 `;
 
-const CheckboxRow = styled.div`display: flex; gap: 20px; align-items: center; flex-wrap: wrap;`;
-
-const CheckboxLabel = styled.label`
-  display: flex; align-items: center; gap: 8px;
-  font-size: 14px; color: #3a4756; cursor: pointer;
+const FieldValue = styled.span`
+  font-size: 0.875rem; color: #111827; font-weight: 500;
 `;
 
-const SaveRow = styled.div`display: flex; justify-content: flex-end; margin-top: 18px;`;
-
-const PartnerDropdownWrap = styled.div`
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+const SectionDivider = styled.div`
+  border-top: 1px solid #f1f3f6; margin: 16px 0;
+  font-size: 0.7rem; font-weight: 700; color: #9ca3af;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  padding-top: 12px;
 `;
-
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const genderOptions = [
-  { label: "Male", value: "Male" },
-  { label: "Female", value: "Female" },
-  { label: "Other", value: "Other" },
-];
-const languageOptions = [
-  { label: "English", value: "English" }, { label: "Hindi", value: "Hindi" },
-  { label: "Marathi", value: "Marathi" }, { label: "Gujarati", value: "Gujarati" },
-  { label: "Tamil", value: "Tamil" }, { label: "Telugu", value: "Telugu" },
-  { label: "Kannada", value: "Kannada" }, { label: "Bengali", value: "Bengali" },
-];
-const MOBILE_PATTERN = /^\+?[\d\s\-()]{7,15}$/;
-const PIN_PATTERN = /^\d{6}$/;
-
-interface ProfileFormValues {
-  name: string; mobile_no: string; gender: string; dob: string;
-  address_line: string; address_city: string; address_state: string; address_pin: string;
-  preferred_language: string; channel_email: boolean; channel_whatsapp: boolean; channel_voice: boolean;
-}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MemberProfilePage() {
-  const queryClient = useQueryClient();
+  const router = useRouter();
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
 
   const { data: profileData, isLoading } = useQuery({ queryKey: ["member", "profile"], queryFn: memberGetProfile });
   const { data: partnersData } = useQuery({ queryKey: ["member", "partners"], queryFn: memberListPartners });
 
   const partners: any[] = (partnersData as any)?.data ?? [];
-  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const selectedPartner = partners.find(p => p.partner_id === selectedPartnerId) ?? partners[0] ?? null;
-  const partnerOptions = partners.map(p => ({ label: p.partner_name ?? "Unknown", value: p.partner_id }));
-
-  const { control, handleSubmit, reset, formState: { errors } } = useForm<ProfileFormValues>({
-    defaultValues: { name: "", mobile_no: "", gender: "", dob: "", address_line: "", address_city: "", address_state: "", address_pin: "", preferred_language: "", channel_email: false, channel_whatsapp: false, channel_voice: false },
-  });
-
-  useEffect(() => {
-    if (profileData?.data) {
-      const d = profileData.data;
-      reset({ name: d.name ?? "", mobile_no: d.mobile_no ?? "", gender: d.gender ?? "", dob: d.dob ?? "", address_line: d.address_line ?? "", address_city: d.address_city ?? "", address_state: d.address_state ?? "", address_pin: d.address_pin ?? "", preferred_language: d.preferred_language ?? "", channel_email: !!d.channel_email, channel_whatsapp: !!d.channel_whatsapp, channel_voice: !!d.channel_voice });
-    }
-  }, [profileData, reset]);
-
-  const mutation = useMutation({
-    mutationFn: (data: ProfileFormValues) => memberUpdateProfile(data),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["member", "profile"] }); toast.success("Profile updated!"); },
-    onError: () => { toast.error("Failed to update profile"); },
-  });
 
   const d = profileData?.data;
 
   return (
     <PageWrap>
-      {/* Left: Edit form */}
+      {/* Left: Profile details (read-only) */}
       <SectionCard>
         <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          {d && <div style={{ fontSize: 13, color: "#6b7a8c", marginTop: 4 }}>{d.name || d.email}</div>}
+          <CardTitle>My Profile</CardTitle>
+          <Button
+            label="Request Change"
+            size="small"
+            icon="pi pi-pencil"
+            outlined
+            onClick={() => router.push("/member/change-requests")}
+            style={{ fontSize: 12 }}
+          />
         </CardHeader>
         <CardBody>
           {isLoading ? (
             <p style={{ color: "#6b7a8c" }}>Loading…</p>
-          ) : (
-            <form onSubmit={handleSubmit(v => mutation.mutate(v))} noValidate>
-              <FormGrid>
-                <FieldWrap>
-                  <FieldLabel htmlFor="name">Full Name *</FieldLabel>
-                  <Controller name="name" control={control} rules={{ required: "Name is required" }} render={({ field }) => (
-                    <InputText id="name" {...field} className={errors.name ? "p-invalid" : ""} style={{ width: "100%" }} />
-                  )} />
-                  {errors.name && <small style={{ color: "#ef4444" }}>{errors.name.message}</small>}
-                </FieldWrap>
+          ) : d ? (
+            <>
+              <InfoNote>
+                <Info size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                <div>
+                  Your profile is managed by your administrator. To update any details,
+                  use <strong>Request Change</strong> — an admin will review and apply the changes.
+                </div>
+              </InfoNote>
 
-                <FieldWrap>
-                  <FieldLabel htmlFor="mobile_no">Mobile Number</FieldLabel>
-                  <Controller name="mobile_no" control={control} rules={{ pattern: { value: MOBILE_PATTERN, message: "Invalid mobile number" } }} render={({ field }) => (
-                    <InputText id="mobile_no" {...field} className={errors.mobile_no ? "p-invalid" : ""} style={{ width: "100%" }} placeholder="+91 98765 43210" />
-                  )} />
-                  {errors.mobile_no && <small style={{ color: "#ef4444" }}>{errors.mobile_no.message}</small>}
-                </FieldWrap>
+              <InfoGrid>
+                <InfoField>
+                  <FieldLabel>Full Name</FieldLabel>
+                  <FieldValue>{d.name || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Email</FieldLabel>
+                  <FieldValue style={{ fontSize: "0.78rem" }}>{d.email || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Mobile No.</FieldLabel>
+                  <FieldValue>{d.mobile_no || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Gender</FieldLabel>
+                  <FieldValue>{d.gender || "—"}</FieldValue>
+                </InfoField>
+                <InfoField style={{ gridColumn: "1 / -1" }}>
+                  <FieldLabel>Address</FieldLabel>
+                  <FieldValue style={{ fontSize: "0.85rem" }}>
+                    {[d.address_line, d.address_city, d.address_state, d.address_pin ? `PIN ${d.address_pin}` : ""].filter(Boolean).join(", ") || "—"}
+                  </FieldValue>
+                </InfoField>
+              </InfoGrid>
 
-                <FieldWrap>
-                  <FieldLabel htmlFor="gender">Gender</FieldLabel>
-                  <Controller name="gender" control={control} render={({ field }) => (
-                    <Dropdown id="gender" value={field.value} onChange={e => field.onChange(e.value)} options={genderOptions} placeholder="Select gender" style={{ width: "100%" }} />
-                  )} />
-                </FieldWrap>
-
-                <FieldWrap>
-                  <FieldLabel htmlFor="dob">Date of Birth</FieldLabel>
-                  <Controller name="dob" control={control} render={({ field }) => (
-                    <Calendar id="dob" value={field.value ? new Date(field.value) : null} onChange={e => { const v = e.value; field.onChange(v instanceof Date ? dayjs(v).format("YYYY-MM-DD") : ""); }} dateFormat="dd M yy" showIcon maxDate={new Date()} style={{ width: "100%" }} inputStyle={{ width: "100%" }} placeholder="Select date" />
-                  )} />
-                </FieldWrap>
-
-                <FullCol>
-                  <FieldWrap>
-                    <FieldLabel htmlFor="address_line">Address</FieldLabel>
-                    <Controller name="address_line" control={control} render={({ field }) => <InputText id="address_line" {...field} style={{ width: "100%" }} />} />
-                  </FieldWrap>
-                </FullCol>
-
-                <FieldWrap>
-                  <FieldLabel htmlFor="address_city">City</FieldLabel>
-                  <Controller name="address_city" control={control} render={({ field }) => <InputText id="address_city" {...field} style={{ width: "100%" }} />} />
-                </FieldWrap>
-
-                <FieldWrap>
-                  <FieldLabel htmlFor="address_state">State</FieldLabel>
-                  <Controller name="address_state" control={control} render={({ field }) => <InputText id="address_state" {...field} style={{ width: "100%" }} />} />
-                </FieldWrap>
-
-                <FieldWrap>
-                  <FieldLabel htmlFor="address_pin">PIN Code</FieldLabel>
-                  <Controller name="address_pin" control={control} rules={{ pattern: { value: PIN_PATTERN, message: "PIN must be 6 digits" } }} render={({ field }) => (
-                    <InputText id="address_pin" {...field} className={errors.address_pin ? "p-invalid" : ""} style={{ width: "100%" }} placeholder="400001" maxLength={6} />
-                  )} />
-                  {errors.address_pin && <small style={{ color: "#ef4444" }}>{errors.address_pin.message}</small>}
-                </FieldWrap>
-
-                <FieldWrap>
-                  <FieldLabel htmlFor="preferred_language">Preferred Language</FieldLabel>
-                  <Controller name="preferred_language" control={control} render={({ field }) => (
-                    <Dropdown id="preferred_language" value={field.value} options={languageOptions} onChange={e => field.onChange(e.value)} placeholder="Select language" style={{ width: "100%" }} />
-                  )} />
-                </FieldWrap>
-              </FormGrid>
-
-              <Divider />
-              <SectionLabel>Communication Preferences</SectionLabel>
-              <CheckboxRow>
-                {(["channel_email", "channel_whatsapp", "channel_voice"] as const).map((ch, i) => (
-                  <Controller key={ch} name={ch} control={control} render={({ field }) => (
-                    <CheckboxLabel htmlFor={ch}>
-                      <Checkbox inputId={ch} checked={field.value} onChange={e => field.onChange(e.checked)} />
-                      {["Email", "WhatsApp", "Voice/Call"][i]}
-                    </CheckboxLabel>
-                  )} />
-                ))}
-              </CheckboxRow>
-
-              <SaveRow>
-                <Button type="submit" label="Save Changes" icon="pi pi-save" loading={mutation.isPending} disabled={mutation.isPending} />
-              </SaveRow>
-            </form>
-          )}
+              <SectionDivider>Onboarding &amp; Sales Details</SectionDivider>
+              <InfoGrid>
+                <InfoField>
+                  <FieldLabel>Sale Date</FieldLabel>
+                  <FieldValue>{d.sale_date ? dayjs(d.sale_date).format("DD MMM YYYY") : "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Sales Channel</FieldLabel>
+                  <FieldValue>{d.sales_channel || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Branch Code</FieldLabel>
+                  <FieldValue>{d.branch_code || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Salesperson</FieldLabel>
+                  <FieldValue>{d.salesperson_name || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Employee Code</FieldLabel>
+                  <FieldValue>{d.employee_code || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Data 1</FieldLabel>
+                  <FieldValue>{d.data1 || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Data 2</FieldLabel>
+                  <FieldValue>{d.data2 || "—"}</FieldValue>
+                </InfoField>
+                <InfoField>
+                  <FieldLabel>Data 3</FieldLabel>
+                  <FieldValue>{d.data3 || "—"}</FieldValue>
+                </InfoField>
+              </InfoGrid>
+            </>
+          ) : null}
         </CardBody>
       </SectionCard>
 
-      {/* Right: Account details */}
+      {/* Right: Account details + Partner */}
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-        {/* Account details card */}
         {d && (
           <SectionCard>
             <CardHeader><CardTitle>Account Details</CardTitle></CardHeader>
@@ -274,86 +220,81 @@ export default function MemberProfilePage() {
                   <InfoValue style={{ fontSize: 13 }}>{d.email}</InfoValue>
                 </InfoRow>
               )}
-              {d.dob && (
+            </CardBody>
+          </SectionCard>
+        )}
+
+        {partners.length > 0 && selectedPartner && (
+          <SectionCard>
+            <CardHeader>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <Building2 size={15} color="#0050b0" />
+                <CardTitle>My Partner</CardTitle>
+              </div>
+            </CardHeader>
+            <CardBody style={{ padding: "8px 22px 16px" }}>
+              <InfoRow>
+                <InfoLabel>Partner</InfoLabel>
+                <div style={{ textAlign: "right" }}>
+                  <InfoValue style={{ display: "inline" }}>{selectedPartner.partner_name ?? "—"}</InfoValue>
+                  {selectedPartner.partner_type && <PartnerTypeChip>{selectedPartner.partner_type}</PartnerTypeChip>}
+                </div>
+              </InfoRow>
+              <InfoRow>
+                <InfoLabel>Status</InfoLabel>
+                <EnrollBadge $status={selectedPartner.enrollment_status ?? ""}>{selectedPartner.enrollment_status ?? "—"}</EnrollBadge>
+              </InfoRow>
+              {selectedPartner.plan && (
                 <InfoRow>
-                  <InfoLabel>Date of Birth</InfoLabel>
-                  <InfoValue>{dayjs(d.dob).format("DD MMM YYYY")}</InfoValue>
+                  <InfoLabel>Plan</InfoLabel>
+                  <div style={{ textAlign: "right" }}>
+                    <InfoValue>{selectedPartner.plan.name}</InfoValue>
+                    {selectedPartner.plan.price != null && (
+                      <div style={{ fontSize: 12, color: "#0050b0", fontWeight: 600 }}>
+                        ₹{Number(selectedPartner.plan.price).toLocaleString("en-IN")}{selectedPartner.plan.cycle ? ` / ${selectedPartner.plan.cycle}` : ""}
+                      </div>
+                    )}
+                  </div>
                 </InfoRow>
               )}
-              {d.gender && (
+              {selectedPartner.end_date && (
                 <InfoRow>
-                  <InfoLabel>Gender</InfoLabel>
-                  <InfoValue>{d.gender}</InfoValue>
-                </InfoRow>
-              )}
-              {(d.address_city || d.address_state) && (
-                <InfoRow>
-                  <InfoLabel>Location</InfoLabel>
-                  <InfoValue style={{ fontSize: 13 }}>{[d.address_city, d.address_state].filter(Boolean).join(", ")}</InfoValue>
+                  <InfoLabel>Expires</InfoLabel>
+                  <div style={{ textAlign: "right" }}>
+                    <MonoValue>{dayjs(selectedPartner.end_date).format("DD MMM YYYY")}</MonoValue>
+                    {(() => {
+                      const daysLeft = dayjs(selectedPartner.end_date).diff(dayjs(), "day");
+                      if (daysLeft < 0) return <div style={{ fontSize: 11, color: "#dc2626" }}>Expired</div>;
+                      if (daysLeft <= 7) return <div style={{ fontSize: 11, color: "#d97706" }}>Expires in {daysLeft}d</div>;
+                      return null;
+                    })()}
+                  </div>
                 </InfoRow>
               )}
             </CardBody>
           </SectionCard>
         )}
 
-        {/* Partner enrollment card */}
-        {partners.length > 0 && (
-          <SectionCard>
-            <CardHeader>
-              <PartnerDropdownWrap>
-                <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-                  <Building2 size={15} color="#0050b0" />
-                  <CardTitle>My Partner</CardTitle>
+        <SectionCard>
+          <CardBody>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Edit3 size={18} color="#7c3aed" />
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>Need to update your details?</div>
+                <div style={{ fontSize: 12.5, color: "#6b7280", marginTop: 2 }}>
+                  Submit a change request — an admin will review and apply it.
                 </div>
-                {partners.length > 1 && (
-                  <Dropdown value={selectedPartnerId ?? partners[0]?.partner_id} options={partnerOptions} onChange={e => setSelectedPartnerId(e.value)} style={{ width: "180px", fontSize: "0.8rem" }} />
-                )}
-              </PartnerDropdownWrap>
-            </CardHeader>
-            {selectedPartner && (
-              <CardBody style={{ padding: "8px 22px 16px" }}>
-                <InfoRow>
-                  <InfoLabel>Partner</InfoLabel>
-                  <div style={{ textAlign: "right" }}>
-                    <InfoValue style={{ display: "inline" }}>{selectedPartner.partner_name ?? "—"}</InfoValue>
-                    {selectedPartner.partner_type && <PartnerTypeChip>{selectedPartner.partner_type}</PartnerTypeChip>}
-                  </div>
-                </InfoRow>
-                <InfoRow>
-                  <InfoLabel>Status</InfoLabel>
-                  <EnrollBadge $status={selectedPartner.enrollment_status ?? ""}>{selectedPartner.enrollment_status ?? "—"}</EnrollBadge>
-                </InfoRow>
-                {selectedPartner.plan && (
-                  <InfoRow>
-                    <InfoLabel>Plan</InfoLabel>
-                    <div style={{ textAlign: "right" }}>
-                      <InfoValue>{selectedPartner.plan.name}</InfoValue>
-                      {selectedPartner.plan.price != null && (
-                        <div style={{ fontSize: 12, color: "#0050b0", fontWeight: 600 }}>
-                          ₹{Number(selectedPartner.plan.price).toLocaleString("en-IN")}{selectedPartner.plan.cycle ? ` / ${selectedPartner.plan.cycle}` : ""}
-                        </div>
-                      )}
-                    </div>
-                  </InfoRow>
-                )}
-                {selectedPartner.end_date && (
-                  <InfoRow>
-                    <InfoLabel>Expires</InfoLabel>
-                    <div style={{ textAlign: "right" }}>
-                      <MonoValue>{dayjs(selectedPartner.end_date).format("DD MMM YYYY")}</MonoValue>
-                      {(() => {
-                        const daysLeft = dayjs(selectedPartner.end_date).diff(dayjs(), "day");
-                        if (daysLeft < 0) return <div style={{ fontSize: 11, color: "#dc2626" }}>Expired</div>;
-                        if (daysLeft <= 7) return <div style={{ fontSize: 11, color: "#d97706" }}>Expires in {daysLeft}d</div>;
-                        return null;
-                      })()}
-                    </div>
-                  </InfoRow>
-                )}
-              </CardBody>
-            )}
-          </SectionCard>
-        )}
+              </div>
+            </div>
+            <Button
+              label="Raise a Change Request"
+              icon="pi pi-send"
+              size="small"
+              style={{ marginTop: 14, width: "100%" }}
+              onClick={() => router.push("/member/change-requests")}
+            />
+          </CardBody>
+        </SectionCard>
       </div>
     </PageWrap>
   );

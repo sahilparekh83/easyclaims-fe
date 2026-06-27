@@ -259,7 +259,7 @@ interface Policy {
   id: string; policy_number: string; insurer: string; policy_type?: string;
   sum_insured?: number | null; premium_amount?: number | null;
   start_date: string; end_date: string; status: string; file_name?: string | null;
-  linked_family_members: LinkedMember[];
+  linked_family_members: LinkedMember[] | null | undefined;
 }
 interface FamilyMember { id: string; name: string; relation: string; }
 interface PolicyType { id: string; name: string; }
@@ -310,6 +310,9 @@ export default function MemberPoliciesPage() {
   const [editFamilyIds, setEditFamilyIds] = useState<string[]>([]);
   const [editSelf, setEditSelf] = useState(false);
 
+  // View linked members dialog state
+  const [viewLinkedPolicy, setViewLinkedPolicy] = useState<Policy | null>(null);
+
   const { data: policiesData, isLoading } = useQuery({
     queryKey: ["member", "policies", debouncedSearch, page],
     queryFn: () => memberListPolicies({ global_filter: debouncedSearch, sort_field: "created_at", sort_order: -1, limit: ROWS, skip: page * ROWS }),
@@ -321,7 +324,7 @@ export default function MemberPoliciesPage() {
   const total: number = policiesData?.data?.total ?? 0;
   const totalPages = Math.ceil(total / ROWS);
   const policyTypes: PolicyType[] = policyTypesData?.data ?? [];
-  const familyMembers: FamilyMember[] = familyData?.data ?? [];
+  const familyMembers: FamilyMember[] = (familyData as any)?.data?.family ?? (familyData as any)?.data ?? [];
 
   const uploadMutation = useMutation({
     mutationFn: (formData: FormData) => memberUploadPolicy(formData),
@@ -365,7 +368,7 @@ export default function MemberPoliciesPage() {
 
   const openEditLinksDialog = (policy: Policy) => {
     setEditingPolicy(policy);
-    setEditFamilyIds(policy.linked_family_members.map(m => m.id));
+    setEditFamilyIds((policy.linked_family_members ?? []).map(m => m.id));
     setEditSelf(true);
     setEditLinksDialogVisible(true);
   };
@@ -458,12 +461,21 @@ export default function MemberPoliciesPage() {
                 </Td>
                 <Td><StatusBadge value={p.status} /></Td>
                 <Td>
-                  <div style={{ display: "flex", gap: 6 }}>
+                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <ActionBtn title="View PDF" onClick={() => openPdf(p.id)}><Eye size={13} /></ActionBtn>
                     <ActionBtn title="Download PDF" onClick={() => downloadPdf(p.id, p.file_name)}><Download size={13} /></ActionBtn>
-                    <ActionBtn title="Edit Family Links" onClick={() => openEditLinksDialog(p)}>
-                      <i className="pi pi-users" style={{ fontSize: 12 }} />
-                    </ActionBtn>
+                    {(p.linked_family_members ?? []).length === 0 ? (
+                      <ActionBtn title="Link Family Members" onClick={() => openEditLinksDialog(p)}>
+                        <i className="pi pi-users" style={{ fontSize: 12 }} />
+                      </ActionBtn>
+                    ) : (
+                      <span
+                        title="Click to view linked family members"
+                        onClick={() => setViewLinkedPolicy(p)}
+                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "#fef9c3", color: "#92400e", fontWeight: 600, border: "1px solid #fde68a", cursor: "pointer" }}>
+                        🔗 {p.linked_family_members!.length}
+                      </span>
+                    )}
                     <ActionBtn title="Delete" style={{ color: "#dc2626" }} onClick={() => handleDelete(p)}>
                       <i className="pi pi-trash" style={{ fontSize: 12 }} />
                     </ActionBtn>
@@ -549,12 +561,59 @@ export default function MemberPoliciesPage() {
         </Overlay>
       )}
 
-      {/* Edit Family Links Dialog */}
-      <Dialog header="Edit Family Links" visible={editLinksDialogVisible} onHide={closeEditLinksDialog} style={{ width: "400px" }}
+      {/* View Linked Members Dialog */}
+      <Dialog
+        header="Linked Family Members"
+        visible={!!viewLinkedPolicy}
+        onHide={() => setViewLinkedPolicy(null)}
+        style={{ width: "380px" }}
+        footer={
+          <DialogFooter>
+            <Button label="Close" severity="secondary" outlined onClick={() => setViewLinkedPolicy(null)} />
+          </DialogFooter>
+        }
+      >
+        {viewLinkedPolicy && (
+          <div>
+            <p style={{ marginBottom: "0.75rem", fontSize: "0.9rem", color: "#3a4756" }}>
+              Policy: <strong style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{viewLinkedPolicy.policy_number}</strong>
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {(viewLinkedPolicy.linked_family_members ?? []).map(m => (
+                <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                  <span style={{ fontSize: 18 }}>👤</span>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#161d26" }}>{m.name}</div>
+                    <div style={{ fontSize: "0.78rem", color: "#6b7a8c", textTransform: "capitalize" }}>{m.relation}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Link Family Members Dialog */}
+      <Dialog
+        header="Link Family Members to Policy"
+        visible={editLinksDialogVisible}
+        onHide={closeEditLinksDialog}
+        style={{ width: "420px" }}
+        dismissableMask={false}
         footer={
           <DialogFooter>
             <Button label="Cancel" severity="secondary" outlined onClick={closeEditLinksDialog} disabled={updateLinksMutation.isPending} />
-            <Button label="Save" icon="pi pi-check" loading={updateLinksMutation.isPending} onClick={() => { if (editingPolicy) updateLinksMutation.mutate({ id: editingPolicy.id, ids: editFamilyIds }); }} />
+            <Button
+              label="Save Links"
+              icon="pi pi-check"
+              loading={updateLinksMutation.isPending}
+              disabled={editFamilyIds.length === 0}
+              onClick={() => {
+                if (editingPolicy) {
+                  updateLinksMutation.mutate({ id: editingPolicy.id, ids: editFamilyIds });
+                }
+              }}
+            />
           </DialogFooter>
         }
       >
@@ -563,19 +622,33 @@ export default function MemberPoliciesPage() {
             <p style={{ marginBottom: "0.75rem", fontSize: "0.9rem", color: "#3a4756" }}>
               Policy: <strong style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{editingPolicy.policy_number}</strong>
             </p>
-            <FamilyScrollList>
-              <FamilyCheckRow>
-                <Checkbox inputId="edit-fm-self" checked={editSelf} onChange={() => setEditSelf(v => !v)} />
-                <label htmlFor="edit-fm-self" style={{ cursor: "pointer", fontWeight: 500 }}>Self (You)</label>
-              </FamilyCheckRow>
-              {familyMembers.map(member => (
-                <FamilyCheckRow key={member.id}>
-                  <Checkbox inputId={`edit-fm-${member.id}`} checked={editFamilyIds.includes(member.id)} onChange={() => toggleEditFamilyId(member.id)} />
-                  <label htmlFor={`edit-fm-${member.id}`} style={{ cursor: "pointer" }}>{member.name} ({member.relation})</label>
-                </FamilyCheckRow>
-              ))}
-              {familyMembers.length === 0 && <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>No family members added yet.</span>}
-            </FamilyScrollList>
+            {familyMembers.length === 0 ? (
+              <div style={{ padding: "12px", background: "#f8fafc", borderRadius: 8, fontSize: "0.85rem", color: "#9ca3af", textAlign: "center" }}>
+                No family members added yet. Add family members first from the Family Members menu.
+              </div>
+            ) : (
+              <FamilyScrollList>
+                {familyMembers.map(member => {
+                  const isChecked = editFamilyIds.includes(member.id);
+                  return (
+                    <FamilyCheckRow
+                      key={member.id}
+                      style={{ cursor: "pointer", padding: "6px 8px", borderRadius: 6, background: isChecked ? "#eff6ff" : "transparent" }}
+                      onClick={() => toggleEditFamilyId(member.id)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleEditFamilyId(member.id)}
+                        style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0050b0" }}
+                      />
+                      <span style={{ fontWeight: isChecked ? 600 : 400 }}>{member.name}</span>
+                      <span style={{ color: "#94a3b8", fontSize: 12 }}>({member.relation})</span>
+                    </FamilyCheckRow>
+                  );
+                })}
+              </FamilyScrollList>
+            )}
           </div>
         )}
       </Dialog>

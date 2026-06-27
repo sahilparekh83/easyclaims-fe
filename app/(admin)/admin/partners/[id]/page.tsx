@@ -11,7 +11,7 @@ import { Tag } from "primereact/tag";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
-import { ArrowLeft, Download, Eye, Users, FileText, User, Calendar, Phone, Mail, MapPin, Building2 } from "lucide-react";
+import { ArrowLeft, Download, Eye, Users, FileText, User, Calendar, Phone, Mail, MapPin, Building2, Upload } from "lucide-react";
 import PlanCard, { PlanData } from "@/components/ui/PlanCard";
 import {
   adminGetPartner,
@@ -41,18 +41,38 @@ const InfoCard = styled.div`
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
-  padding: 1.5rem;
+  overflow: hidden;
+`;
+
+const InfoCardHeader = styled.div`
+  padding: 1.25rem 1.25rem 1rem;
   display: flex;
-  gap: 2rem;
+  align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
+  gap: 1rem;
 `;
 
 const InfoSection = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  flex: 1;
-  min-width: 220px;
+  padding: 16px 20px;
+  border-top: 1px solid #f1f2f6;
+`;
+
+const InfoSectionTitle = styled.div`
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #6b7a8c; margin-bottom: 12px;
+`;
+
+const InfoGrid = styled.div`
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+`;
+
+const InfoFieldLabel = styled.div`
+  font-size: 11px; color: #9ca3af; margin-bottom: 2px;
+`;
+
+const InfoFieldValue = styled.div`
+  font-size: 13px; color: #161d26;
 `;
 
 const InfoRow = styled.div`
@@ -138,15 +158,40 @@ const MemberMeta = styled.div`
 
 interface Partner {
   id: string;
+  user_id: string;
   name: string;
-  email?: string;
-  mobile_no?: string;
-  city?: string;
-  partner_type?: string;
+  partner_type: string;
+  city: string | null;
+  state: string | null;
+  legal_company_name: string | null;
+  trade_name: string | null;
+  registered_address: string | null;
+  pin_code: string | null;
+  gstin: string | null;
+  pan: string | null;
+  authorized_signatory_name: string | null;
+  designation: string | null;
+  data_1: string | null;
+  data_2: string | null;
+  data_3: string | null;
+  email: string | null;
+  mobile_no: string | null;
   status: string;
-  api_key?: string;
+  api_key: string | null;
+  api_rate_limit: number;
   member_count?: number;
-  created_at?: string;
+  created_at: string | null;
+}
+
+function InfoField({ label, value, mono, fullWidth }: { label: string; value?: string | null; mono?: boolean; fullWidth?: boolean }) {
+  return (
+    <div style={fullWidth ? { gridColumn: "1 / -1" } : undefined}>
+      <InfoFieldLabel>{label}</InfoFieldLabel>
+      <InfoFieldValue style={{ fontFamily: mono ? "'IBM Plex Mono', ui-monospace, monospace" : undefined, color: value ? "#161d26" : "#d1d5db" }}>
+        {value || "—"}
+      </InfoFieldValue>
+    </div>
+  );
 }
 
 interface Member {
@@ -444,8 +489,8 @@ export default function PartnerDetailPage() {
 
   return (
     <PageWrap>
-      {/* Back */}
-      <BackRow>
+      {/* Back + Header actions */}
+      <BackRow style={{ justifyContent: "space-between" }}>
         <Button
           text
           size="small"
@@ -453,14 +498,29 @@ export default function PartnerDetailPage() {
           onClick={() => router.push("/admin/partners")}
           label="← Back to Partners"
         />
+        <Button
+          label="Bulk Upload"
+          icon="pi pi-upload"
+          severity="secondary"
+          outlined
+          size="small"
+          onClick={() => router.push("/admin/partners/bulk-upload")}
+        />
       </BackRow>
 
       {/* Partner Info */}
       <InfoCard>
-        <InfoSection>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", marginBottom: "0.25rem" }}>
+        <InfoCardHeader>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <Building2 size={20} color="#6366f1" />
-            <span style={{ fontSize: "1.15rem", fontWeight: 700, color: "#111827" }}>{partner.name}</span>
+            <div>
+              <div style={{ fontSize: "1.15rem", fontWeight: 700, color: "#111827" }}>
+                {partner.legal_company_name || partner.name}
+              </div>
+              {partner.trade_name && (
+                <div style={{ fontSize: 13, color: "#6b7a8c" }}>{partner.trade_name}</div>
+              )}
+            </div>
             <span style={{
               fontSize: "0.7rem", fontWeight: 600, padding: "2px 8px", borderRadius: "999px",
               background: partner.status === "Active" ? "#dcfce7" : "#fee2e2",
@@ -469,25 +529,6 @@ export default function PartnerDetailPage() {
               {partner.status}
             </span>
           </div>
-
-          {partner.email && (
-            <InfoRow><Mail size={14} /> <strong>{partner.email}</strong></InfoRow>
-          )}
-          {partner.mobile_no && (
-            <InfoRow><Phone size={14} /> {partner.mobile_no}</InfoRow>
-          )}
-          {partner.city && (
-            <InfoRow><MapPin size={14} /> {partner.city}</InfoRow>
-          )}
-          {partner.partner_type && (
-            <InfoRow><Building2 size={14} /> {partner.partner_type}</InfoRow>
-          )}
-          {partner.created_at && (
-            <InfoRow><Calendar size={14} /> Joined {dayjs(partner.created_at).format("DD MMM YYYY")}</InfoRow>
-          )}
-        </InfoSection>
-
-        <InfoSection>
           <div style={{ display: "flex", gap: "1.5rem" }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "1.75rem", fontWeight: 700, color: "#6366f1" }}>{members.length}</div>
@@ -500,15 +541,71 @@ export default function PartnerDetailPage() {
               <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "2px" }}>Policies</div>
             </div>
           </div>
-          {partner.api_key && (
-            <InfoRow style={{ marginTop: "0.5rem", flexDirection: "column", alignItems: "flex-start", gap: "0.25rem" }}>
-              <span style={{ fontSize: "0.72rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>API Key</span>
-              <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: "0.75rem", color: "#374151", wordBreak: "break-all" }}>
-                {partner.api_key}
-              </span>
-            </InfoRow>
-          )}
+        </InfoCardHeader>
+
+        {/* Company Details */}
+        <InfoSection>
+          <InfoSectionTitle>Company Details</InfoSectionTitle>
+          <InfoGrid>
+            <InfoField label="Legal Company Name" value={partner.legal_company_name} fullWidth />
+            <InfoField label="Trade Name / Brand" value={partner.trade_name} />
+            <InfoField label="Partner Type" value={partner.partner_type} />
+            <InfoField label="GSTIN" value={partner.gstin} mono />
+            <InfoField label="PAN" value={partner.pan} mono />
+          </InfoGrid>
         </InfoSection>
+
+        {/* Registered Address */}
+        <InfoSection>
+          <InfoSectionTitle>Registered Address</InfoSectionTitle>
+          <InfoGrid>
+            <InfoField label="Address" value={partner.registered_address} fullWidth />
+            <InfoField label="City" value={partner.city} />
+            <InfoField label="State" value={partner.state} />
+            <InfoField label="Pin Code" value={partner.pin_code} mono />
+          </InfoGrid>
+        </InfoSection>
+
+        {/* Signatory & Contact */}
+        <InfoSection>
+          <InfoSectionTitle>Authorized Signatory &amp; Contact</InfoSectionTitle>
+          <InfoGrid>
+            <InfoField label="Signatory Name" value={partner.authorized_signatory_name} />
+            <InfoField label="Designation" value={partner.designation} />
+            <InfoField label="Email" value={partner.email} />
+            <InfoField label="Mobile" value={partner.mobile_no} />
+          </InfoGrid>
+        </InfoSection>
+
+        {/* Additional Data - only if any populated */}
+        {(partner.data_1 || partner.data_2 || partner.data_3) && (
+          <InfoSection>
+            <InfoSectionTitle>Additional Data</InfoSectionTitle>
+            <InfoGrid>
+              {partner.data_1 && <InfoField label="Data 1" value={partner.data_1} />}
+              {partner.data_2 && <InfoField label="Data 2" value={partner.data_2} />}
+              {partner.data_3 && <InfoField label="Data 3" value={partner.data_3} />}
+            </InfoGrid>
+          </InfoSection>
+        )}
+
+        {/* API Key */}
+        {partner.api_key && (
+          <InfoSection>
+            <InfoSectionTitle>API Access</InfoSectionTitle>
+            <InfoGrid>
+              <InfoField label="API Key" value={partner.api_key} mono fullWidth />
+            </InfoGrid>
+          </InfoSection>
+        )}
+
+        {/* Joined date */}
+        {partner.created_at && (
+          <div style={{ padding: "10px 20px 14px", borderTop: "1px solid #f1f2f6", fontSize: 12, color: "#9ca3af" }}>
+            <Calendar size={12} style={{ display: "inline", marginRight: 4 }} />
+            Joined {dayjs(partner.created_at).format("DD MMM YYYY")}
+          </div>
+        )}
       </InfoCard>
 
       {/* Linked Plans */}
@@ -580,9 +677,20 @@ export default function PartnerDetailPage() {
             Members
             <CountBadge>{members.length}</CountBadge>
           </SectionTitle>
-          <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>
-            Click the arrow to see member policies
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>
+              Click the arrow to see member policies
+            </span>
+            <Button
+              label="Bulk Upload"
+              icon={<Upload size={13} />}
+              size="small"
+              severity="secondary"
+              outlined
+              onClick={() => router.push(`/admin/members/bulk-upload?partner_id=${id}`)}
+              style={{ fontSize: 12, height: 30 }}
+            />
+          </div>
         </SectionHeader>
 
         <DataTable

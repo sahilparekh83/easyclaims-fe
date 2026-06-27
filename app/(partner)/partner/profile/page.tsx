@@ -304,15 +304,54 @@ const Skeleton = styled.div`
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 `;
 
+const ProfileSection = styled.div`
+  padding: 16px 22px;
+  border-top: 1px solid #f1f2f6;
+`;
+
+const ProfileSectionTitle = styled.div`
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #6b7a8c; margin-bottom: 12px;
+`;
+
+const ProfileGrid = styled.div`
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  @media (max-width: 600px) { grid-template-columns: 1fr; }
+`;
+
+const ProfileFieldLabel = styled.div`
+  font-size: 11px; color: #9ca3af; margin-bottom: 2px;
+`;
+
+const ProfileFieldValue = styled.div`
+  font-size: 13px; color: #161d26;
+`;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ProfileData {
+interface PartnerProfile {
+  id: string;
+  user_id: string;
   name: string;
-  email: string;
-  mobile_no: string;
+  partner_type: string;
+  city: string | null;
+  state: string | null;
+  legal_company_name: string | null;
+  trade_name: string | null;
+  registered_address: string | null;
+  pin_code: string | null;
+  gstin: string | null;
+  pan: string | null;
+  authorized_signatory_name: string | null;
+  designation: string | null;
+  data_1: string | null;
+  data_2: string | null;
+  data_3: string | null;
+  email: string | null;
+  mobile_no: string | null;
+  status: string;
+  api_rate_limit: number;
   api_key?: string;
-  partner_type?: string;
-  city?: string;
   is_active?: boolean;
   created_at?: string;
 }
@@ -320,6 +359,19 @@ interface ProfileData {
 interface EditFormValues {
   name: string;
   mobile_no: string;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function ProfileField({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+  return (
+    <div>
+      <ProfileFieldLabel>{label}</ProfileFieldLabel>
+      <ProfileFieldValue style={{ fontFamily: mono ? "'IBM Plex Mono', ui-monospace, monospace" : undefined, color: value ? "#161d26" : "#d1d5db" }}>
+        {value || "—"}
+      </ProfileFieldValue>
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -334,7 +386,7 @@ export default function PartnerProfilePage() {
     queryFn: partnerGetProfile,
   });
 
-  const profile: ProfileData | undefined = (data as any)?.data;
+  const profile: PartnerProfile | undefined = (data as any)?.data;
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<EditFormValues>();
 
@@ -352,7 +404,7 @@ export default function PartnerProfilePage() {
   });
 
   function handleEditOpen() {
-    if (profile) reset({ name: profile.name, mobile_no: profile.mobile_no });
+    if (profile) reset({ name: profile.name, mobile_no: profile.mobile_no ?? "" });
     setEditing(true);
   }
 
@@ -399,44 +451,76 @@ export default function PartnerProfilePage() {
               <AvatarRow>
                 <Avatar>{initials(profile?.name)}</Avatar>
                 <NameBlock>
-                  <PartnerName>{profile?.name || "—"}</PartnerName>
+                  <PartnerName>{profile?.legal_company_name || profile?.name || "—"}</PartnerName>
+                  {profile?.trade_name && (
+                    <div style={{ fontSize: 13, color: "#6b7a8c", marginTop: 2 }}>{profile.trade_name}</div>
+                  )}
                   <TypeBadge $type={partnerType}>{partnerType}</TypeBadge>
                 </NameBlock>
+                <StatusPill $active={profile?.is_active !== false}>
+                  {profile?.status || (profile?.is_active !== false ? "Active" : "Inactive")}
+                </StatusPill>
               </AvatarRow>
-              <Divider />
-              <InfoGrid>
-                <InfoRow>
-                  <InfoLabel>Email</InfoLabel>
-                  <InfoValue>{profile?.email || "—"}</InfoValue>
-                </InfoRow>
-                <InfoRow>
-                  <InfoLabel>Mobile</InfoLabel>
-                  <InfoValue>{profile?.mobile_no || "—"}</InfoValue>
-                </InfoRow>
-                {profile?.city && (
-                  <InfoRow>
-                    <InfoLabel>City</InfoLabel>
-                    <InfoValue style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                      <MapPin size={13} color="#6b7a8c" />
-                      {profile.city}
-                    </InfoValue>
-                  </InfoRow>
-                )}
-                <InfoRow>
-                  <InfoLabel>Status</InfoLabel>
-                  <div>
-                    <StatusPill $active={profile?.is_active !== false}>
-                      {profile?.is_active !== false ? "Active" : "Inactive"}
-                    </StatusPill>
+
+              {/* Company Details */}
+              <ProfileSection>
+                <ProfileSectionTitle>Company Details</ProfileSectionTitle>
+                <ProfileGrid>
+                  <ProfileField label="Legal Company Name" value={profile?.legal_company_name} />
+                  <ProfileField label="Trade Name / Brand" value={profile?.trade_name} />
+                  <ProfileField label="Partner Type" value={profile?.partner_type} />
+                  <ProfileField label="GSTIN" value={profile?.gstin} mono />
+                  <ProfileField label="PAN" value={profile?.pan} mono />
+                </ProfileGrid>
+              </ProfileSection>
+
+              {/* Registered Address */}
+              <ProfileSection>
+                <ProfileSectionTitle>Registered Address</ProfileSectionTitle>
+                <ProfileGrid>
+                  <div style={{ gridColumn: "1 / -1" }}>
+                    <ProfileFieldLabel>Address</ProfileFieldLabel>
+                    <ProfileFieldValue>{profile?.registered_address || "—"}</ProfileFieldValue>
                   </div>
-                </InfoRow>
-                {profile?.created_at && (
-                  <InfoRow>
-                    <InfoLabel>Partner since</InfoLabel>
-                    <InfoValue>{dayjs(profile.created_at).format("DD MMM YYYY")}</InfoValue>
-                  </InfoRow>
-                )}
-              </InfoGrid>
+                  <ProfileField label="City" value={profile?.city} />
+                  <ProfileField label="State" value={profile?.state} />
+                  <ProfileField label="Pin Code" value={profile?.pin_code} mono />
+                </ProfileGrid>
+              </ProfileSection>
+
+              {/* Authorized Signatory & Contact */}
+              <ProfileSection>
+                <ProfileSectionTitle>Authorized Signatory &amp; Contact</ProfileSectionTitle>
+                <ProfileGrid>
+                  <ProfileField label="Signatory Name" value={profile?.authorized_signatory_name} />
+                  <ProfileField label="Designation" value={profile?.designation} />
+                  <ProfileField label="Email ID" value={profile?.email} />
+                  <ProfileField label="Mobile Number" value={profile?.mobile_no} />
+                </ProfileGrid>
+              </ProfileSection>
+
+              {/* Additional Data (only if any populated) */}
+              {(profile?.data_1 || profile?.data_2 || profile?.data_3) && (
+                <ProfileSection>
+                  <ProfileSectionTitle>Additional Information</ProfileSectionTitle>
+                  <ProfileGrid>
+                    {profile?.data_1 && <ProfileField label="Data 1" value={profile.data_1} />}
+                    {profile?.data_2 && <ProfileField label="Data 2" value={profile.data_2} />}
+                    {profile?.data_3 && <ProfileField label="Data 3" value={profile.data_3} />}
+                  </ProfileGrid>
+                </ProfileSection>
+              )}
+
+              {profile?.created_at && (
+                <ProfileSection>
+                  <ProfileGrid>
+                    <InfoRow>
+                      <InfoLabel>Partner since</InfoLabel>
+                      <InfoValue>{dayjs(profile.created_at).format("DD MMM YYYY")}</InfoValue>
+                    </InfoRow>
+                  </ProfileGrid>
+                </ProfileSection>
+              )}
             </>
           ) : (
             <FormWrap onSubmit={handleSubmit(v => updateMutation.mutate(v))} noValidate>

@@ -325,6 +325,22 @@ interface MemberEnrollment {
   start_date?: string | null;
   end_date?: string | null;
 }
+interface MemberProfile {
+  gender?: string | null;
+  dob?: string | null;
+  address_line?: string | null;
+  address_city?: string | null;
+  address_state?: string | null;
+  address_pin?: string | null;
+  sale_date?: string | null;
+  sales_channel?: string | null;
+  branch_code?: string | null;
+  salesperson_name?: string | null;
+  employee_code?: string | null;
+  data1?: string | null;
+  data2?: string | null;
+  data3?: string | null;
+}
 interface MemberDetail {
   id: string;
   name: string;
@@ -336,6 +352,7 @@ interface MemberDetail {
   last_login_at?: string | null;
   login_count?: number | null;
   enrollment?: MemberEnrollment | null;
+  profile?: MemberProfile | null;
   family?: any[];
   policies?: MemberPolicy[];
 }
@@ -370,7 +387,7 @@ async function downloadPdf(memberId: string, policyId: string, fileName?: string
   }
 }
 
-const TABS = ["Profile", "Policies", "History"] as const;
+const TABS = ["Profile", "Policies", "Family", "History"] as const;
 type TabKey = (typeof TABS)[number];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -527,83 +544,63 @@ export default function MemberDetailPage() {
 
       {/* Profile Tab */}
       {activeTab === "Profile" && (
-        <ProfileLayout>
-          <Card>
-            <CardTitle>Personal information</CardTitle>
-            <InfoGrid>
-              <InfoField>
-                <InfoLabel>Full Name</InfoLabel>
-                <InfoValue>{member.name || "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Email</InfoLabel>
-                <InfoValue>{member.email || "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Mobile No</InfoLabel>
-                <InfoValue>{member.mobile_no || "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Has Logged In</InfoLabel>
-                <InfoValue>{member.has_logged_in ? "Yes" : "No"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Login Count</InfoLabel>
-                <InfoValue>{member.login_count ?? "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Last Login</InfoLabel>
-                <InfoValue>
-                  {member.last_login_at
-                    ? dayjs(member.last_login_at).format("DD MMM YYYY HH:mm")
-                    : "Never"}
-                </InfoValue>
-              </InfoField>
-            </InfoGrid>
-          </Card>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          <ProfileLayout>
+            <Card>
+              <CardTitle>Personal Information</CardTitle>
+              <InfoGrid>
+                <InfoField><InfoLabel>Full Name</InfoLabel><InfoValue>{member.name || "—"}</InfoValue></InfoField>
+                <InfoField><InfoLabel>Email</InfoLabel><InfoValue style={{ fontSize: "0.82rem" }}>{member.email || "—"}</InfoValue></InfoField>
+                <InfoField><InfoLabel>Mobile No.</InfoLabel><InfoValue>{member.mobile_no || "—"}</InfoValue></InfoField>
+                <InfoField><InfoLabel>Gender</InfoLabel><InfoValue>{member.profile?.gender || "—"}</InfoValue></InfoField>
+                {member.profile?.dob && (
+                  <InfoField><InfoLabel>Date of Birth</InfoLabel><InfoValue>{dayjs(member.profile.dob).format("DD MMM YYYY")}</InfoValue></InfoField>
+                )}
+                <InfoField><InfoLabel>Last Login</InfoLabel><InfoValue>{member.last_login_at ? dayjs(member.last_login_at).format("DD MMM YYYY HH:mm") : "Never"}</InfoValue></InfoField>
+              </InfoGrid>
+              {(member.profile?.address_line || member.profile?.address_city) && (
+                <>
+                  <div style={{ borderTop: "1px solid #f3f4f6", margin: "12px 0 10px", fontSize: "0.68rem", fontWeight: 700, color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Address</div>
+                  <InfoValue style={{ fontSize: "0.875rem", lineHeight: 1.6 }}>
+                    {[member.profile.address_line, member.profile.address_city, member.profile.address_state, member.profile.address_pin ? `PIN ${member.profile.address_pin}` : ""].filter(Boolean).join(", ")}
+                  </InfoValue>
+                </>
+              )}
+            </Card>
+
+            <Card>
+              <CardTitle>Enrollment Details</CardTitle>
+              {enrollment ? (
+                <InfoGrid>
+                  <InfoField><InfoLabel>Plan</InfoLabel><InfoValue>{enrollment.plan_name ?? "—"}</InfoValue></InfoField>
+                  <InfoField><InfoLabel>Plan Type</InfoLabel><InfoValue style={{ textTransform: "capitalize" }}>{enrollment.plan_type ?? "—"}</InfoValue></InfoField>
+                  <InfoField>
+                    <InfoLabel>Status</InfoLabel>
+                    <StatusBadge value={enrollment.status === "Active"} trueLabel="Active" falseLabel={enrollment.status ?? "Inactive"} />
+                  </InfoField>
+                  <InfoField><InfoLabel>Start Date</InfoLabel><InfoValue>{enrollment.start_date ? dayjs(enrollment.start_date).format("DD MMM YYYY") : "—"}</InfoValue></InfoField>
+                  <InfoField><InfoLabel>End Date</InfoLabel><InfoValue>{enrollment.end_date ? dayjs(enrollment.end_date).format("DD MMM YYYY") : "—"}</InfoValue></InfoField>
+                </InfoGrid>
+              ) : (
+                <EmptyMsg>No plan enrolled</EmptyMsg>
+              )}
+            </Card>
+          </ProfileLayout>
 
           <Card>
-            <CardTitle>Enrollment details</CardTitle>
-            {enrollment ? (
-              <InfoGrid>
-                <InfoField>
-                  <InfoLabel>Plan</InfoLabel>
-                  <InfoValue>{enrollment.plan_name ?? "—"}</InfoValue>
-                </InfoField>
-                <InfoField>
-                  <InfoLabel>Plan Type</InfoLabel>
-                  <InfoValue style={{ textTransform: "capitalize" }}>{enrollment.plan_type ?? "—"}</InfoValue>
-                </InfoField>
-                <InfoField>
-                  <InfoLabel>Status</InfoLabel>
-                  <StatusBadge
-                    value={enrollment.status === "Active"}
-                    trueLabel="Active"
-                    falseLabel={enrollment.status ?? "Inactive"}
-                  />
-                </InfoField>
-                <InfoField>
-                  <InfoLabel>Start Date</InfoLabel>
-                  <InfoValue>
-                    {enrollment.start_date
-                      ? dayjs(enrollment.start_date).format("DD MMM YYYY")
-                      : "—"}
-                  </InfoValue>
-                </InfoField>
-                <InfoField>
-                  <InfoLabel>End Date</InfoLabel>
-                  <InfoValue>
-                    {enrollment.end_date
-                      ? dayjs(enrollment.end_date).format("DD MMM YYYY")
-                      : "—"}
-                  </InfoValue>
-                </InfoField>
-              </InfoGrid>
-            ) : (
-              <EmptyMsg>No plan enrolled</EmptyMsg>
-            )}
+            <CardTitle>Onboarding &amp; Sales Details</CardTitle>
+            <InfoGrid>
+              <InfoField><InfoLabel>Sale Date</InfoLabel><InfoValue>{member.profile?.sale_date ? dayjs(member.profile.sale_date).format("DD MMM YYYY") : "—"}</InfoValue></InfoField>
+              <InfoField><InfoLabel>Sales Channel</InfoLabel><InfoValue>{member.profile?.sales_channel || "—"}</InfoValue></InfoField>
+              <InfoField><InfoLabel>Branch Code</InfoLabel><InfoValue>{member.profile?.branch_code || "—"}</InfoValue></InfoField>
+              <InfoField><InfoLabel>Salesperson</InfoLabel><InfoValue>{member.profile?.salesperson_name || "—"}</InfoValue></InfoField>
+              <InfoField><InfoLabel>Employee Code</InfoLabel><InfoValue>{member.profile?.employee_code || "—"}</InfoValue></InfoField>
+              <InfoField><InfoLabel>Data 1</InfoLabel><InfoValue>{member.profile?.data1 || "—"}</InfoValue></InfoField>
+              <InfoField><InfoLabel>Data 2</InfoLabel><InfoValue>{member.profile?.data2 || "—"}</InfoValue></InfoField>
+              <InfoField><InfoLabel>Data 3</InfoLabel><InfoValue>{member.profile?.data3 || "—"}</InfoValue></InfoField>
+            </InfoGrid>
           </Card>
-        </ProfileLayout>
+        </div>
       )}
 
       {/* Policies Tab */}
@@ -687,6 +684,41 @@ export default function MemberDetailPage() {
             </PolicyTable>
           </PolicySection>
         )
+      )}
+
+      {/* Family Tab */}
+      {activeTab === "Family" && (
+        <Card>
+          <CardTitle>Family Members</CardTitle>
+          {(member.family ?? []).length === 0 ? (
+            <EmptyMsg>No family members added.</EmptyMsg>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {(member.family ?? []).map((f: any) => (
+                <div key={f.id} style={{
+                  border: "1px solid #e9e8f4", borderRadius: 10, padding: "12px 16px",
+                  background: f.policy_count > 0 ? "#fffbeb" : "#fff",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>{f.name}</span>
+                    <span style={{ fontSize: 11, background: "#f1f5f9", color: "#374151", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{f.relation}</span>
+                    {f.coverage_type && <span style={{ fontSize: 11, background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{f.coverage_type}</span>}
+                    {f.policy_count > 0 && (
+                      <span style={{ fontSize: 11, background: "#fef9c3", color: "#92400e", padding: "2px 8px", borderRadius: 999, fontWeight: 700, border: "1px solid #fde68a" }}>
+                        Linked to {f.policy_count} {f.policy_count > 1 ? "policies" : "policy"}
+                      </span>
+                    )}
+                  </div>
+                  {(f.gender || f.dob) && (
+                    <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
+                      {f.gender}{f.gender && f.dob ? " · " : ""}{f.dob ? dayjs(f.dob).format("DD MMM YYYY") : ""}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       )}
 
       {/* History Tab */}
