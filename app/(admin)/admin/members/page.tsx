@@ -338,6 +338,14 @@ export default function MembersPage() {
               />
             </SearchWrap>
             <Button
+              label="Bulk Upload"
+              icon="pi pi-upload"
+              size="small"
+              severity="secondary"
+              onClick={() => router.push("/admin/members/bulk-upload")}
+              style={{ height: 34, fontSize: 13 }}
+            />
+            <Button
               label="Add member"
               icon="pi pi-plus"
               size="small"

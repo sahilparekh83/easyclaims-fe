@@ -3,13 +3,18 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm, Controller } from "react-hook-form";
 import { Button } from "primereact/button";
-import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck } from "lucide-react";
+import { Dialog } from "primereact/dialog";
+import { InputText } from "primereact/inputtext";
+import { Dropdown } from "primereact/dropdown";
+import { InputSwitch } from "primereact/inputswitch";
+import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck, Briefcase } from "lucide-react";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminGetMember, adminRenewMemberEnrollment } from "@/imports/core/api";
+import { adminGetMember, adminRenewMemberEnrollment, adminUpdateMember } from "@/imports/core/api";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -267,16 +272,73 @@ const ConsentAlert = styled.div`
   line-height: 1.5;
 `;
 
+const FormGrid = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 0.5rem;
+`;
+
+const FormRow = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+`;
+
+const Field = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+`;
+
+const FieldLabel = styled.label`
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+`;
+
+const FooterRow = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+`;
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const TABS = ["Profile", "Family", "Policies", "Communication"] as const;
 type TabKey = (typeof TABS)[number];
+
+const GENDER_OPTIONS = [
+  { label: "Male", value: "Male" },
+  { label: "Female", value: "Female" },
+  { label: "Other", value: "Other" },
+];
+
+interface EditFormValues {
+  name: string;
+  mobile_no: string;
+  gender: string;
+  address_line: string;
+  address_city: string;
+  address_state: string;
+  address_pin: string;
+  sale_date: string;
+  sales_channel: string;
+  branch_code: string;
+  salesperson_name: string;
+  employee_code: string;
+  data1: string;
+  data2: string;
+  data3: string;
+  is_active: boolean;
+}
 
 export default function MemberDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("Profile");
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "member", id],
@@ -286,6 +348,27 @@ export default function MemberDetailPage() {
 
   const member = data?.data;
 
+  const editForm = useForm<EditFormValues>({
+    defaultValues: {
+      name: "",
+      mobile_no: "",
+      gender: "",
+      address_line: "",
+      address_city: "",
+      address_state: "",
+      address_pin: "",
+      sale_date: "",
+      sales_channel: "",
+      branch_code: "",
+      salesperson_name: "",
+      employee_code: "",
+      data1: "",
+      data2: "",
+      data3: "",
+      is_active: true,
+    },
+  });
+
   const renewMutation = useMutation({
     mutationFn: () => adminRenewMemberEnrollment(id),
     onSuccess: () => {
@@ -294,6 +377,62 @@ export default function MemberDetailPage() {
     },
     onError: () => toast.error("Renewal failed"),
   });
+
+  const updateMutation = useMutation({
+    mutationFn: (v: EditFormValues) => {
+      const payload: Record<string, any> = {
+        name: v.name || undefined,
+        mobile_no: v.mobile_no || undefined,
+        is_active: v.is_active,
+        profile: {
+          gender: v.gender || undefined,
+          address_line: v.address_line || undefined,
+          address_city: v.address_city || undefined,
+          address_state: v.address_state || undefined,
+          address_pin: v.address_pin || undefined,
+          sale_date: v.sale_date || undefined,
+          sales_channel: v.sales_channel || undefined,
+          branch_code: v.branch_code || undefined,
+          salesperson_name: v.salesperson_name || undefined,
+          employee_code: v.employee_code || undefined,
+          data1: v.data1 || undefined,
+          data2: v.data2 || undefined,
+          data3: v.data3 || undefined,
+        },
+      };
+      return adminUpdateMember(id, payload);
+    },
+    onSuccess: () => {
+      toast.success("Member updated successfully");
+      setEditOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
+    },
+    onError: () => toast.error("Failed to update member"),
+  });
+
+  const openEdit = () => {
+    if (!member) return;
+    const profile = member.profile ?? {};
+    editForm.reset({
+      name: member.name || "",
+      mobile_no: member.mobile_no || "",
+      gender: profile.gender || "",
+      address_line: profile.address_line || "",
+      address_city: profile.address_city || "",
+      address_state: profile.address_state || "",
+      address_pin: profile.address_pin || "",
+      sale_date: profile.sale_date || "",
+      sales_channel: profile.sales_channel || "",
+      branch_code: profile.branch_code || "",
+      salesperson_name: profile.salesperson_name || "",
+      employee_code: profile.employee_code || "",
+      data1: profile.data1 || "",
+      data2: profile.data2 || "",
+      data3: profile.data3 || "",
+      is_active: member.is_active ?? true,
+    });
+    setEditOpen(true);
+  };
 
   if (isLoading) {
     return <div style={{ padding: "2rem", color: "#6b7280" }}>Loading member...</div>;
@@ -325,6 +464,17 @@ export default function MemberDetailPage() {
   const profile = member.profile ?? {};
   const hasAddress =
     profile.address_line || profile.address_city || profile.address_state;
+
+  const editFooter = (
+    <FooterRow>
+      <Button label="Cancel" severity="secondary" onClick={() => setEditOpen(false)} />
+      <Button
+        label="Save changes"
+        loading={updateMutation.isPending}
+        onClick={editForm.handleSubmit((v) => updateMutation.mutate(v))}
+      />
+    </FooterRow>
+  );
 
   return (
     <div style={{ maxWidth: "1100px" }}>
@@ -368,7 +518,12 @@ export default function MemberDetailPage() {
             onClick={() => renewMutation.mutate()}
             icon="pi pi-refresh"
           />
-          <Button label="Edit" size="small" disabled icon="pi pi-pencil" />
+          <Button
+            label="Edit Member"
+            size="small"
+            icon="pi pi-pencil"
+            onClick={openEdit}
+          />
         </HeroActions>
       </HeroCard>
 
@@ -383,39 +538,83 @@ export default function MemberDetailPage() {
       {/* Profile Tab */}
       {activeTab === "Profile" && (
         <ProfileLayout>
-          <Card>
-            <CardTitle>
-              <User size={14} /> Personal information
-            </CardTitle>
-            <InfoGrid>
-              <InfoField>
-                <InfoLabel>Full Name</InfoLabel>
-                <InfoValue>{member.name || "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Date of Birth</InfoLabel>
-                <InfoValue>
-                  {profile.dob ? dayjs(profile.dob).format("DD MMM YYYY") : "—"}
-                </InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Gender</InfoLabel>
-                <InfoValue>{profile.gender || "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Mobile Number</InfoLabel>
-                <InfoValue>{member.mobile_no || "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Email Address</InfoLabel>
-                <InfoValue>{member.email || "—"}</InfoValue>
-              </InfoField>
-              <InfoField>
-                <InfoLabel>Acquired By</InfoLabel>
-                <InfoValue>{enrollment?.partner_name || "—"}</InfoValue>
-              </InfoField>
-            </InfoGrid>
-          </Card>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+            <Card>
+              <CardTitle>
+                <User size={14} /> Personal information
+              </CardTitle>
+              <InfoGrid>
+                <InfoField>
+                  <InfoLabel>Full Name</InfoLabel>
+                  <InfoValue>{member.name || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Date of Birth</InfoLabel>
+                  <InfoValue>
+                    {profile.dob ? dayjs(profile.dob).format("DD MMM YYYY") : "—"}
+                  </InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Gender</InfoLabel>
+                  <InfoValue>{profile.gender || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Mobile Number</InfoLabel>
+                  <InfoValue>{member.mobile_no || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Email Address</InfoLabel>
+                  <InfoValue>{member.email || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Acquired By</InfoLabel>
+                  <InfoValue>{enrollment?.partner_name || "—"}</InfoValue>
+                </InfoField>
+              </InfoGrid>
+            </Card>
+
+            <Card>
+              <CardTitle>
+                <Briefcase size={14} /> Onboarding &amp; Sales
+              </CardTitle>
+              <InfoGrid>
+                <InfoField>
+                  <InfoLabel>Sale Date</InfoLabel>
+                  <InfoValue>
+                    {profile.sale_date ? dayjs(profile.sale_date).format("DD MMM YYYY") : "—"}
+                  </InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Sales Channel</InfoLabel>
+                  <InfoValue>{profile.sales_channel || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Branch Code</InfoLabel>
+                  <InfoValue>{profile.branch_code || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Salesperson Name</InfoLabel>
+                  <InfoValue>{profile.salesperson_name || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Employee Code</InfoLabel>
+                  <InfoValue>{profile.employee_code || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Data 1</InfoLabel>
+                  <InfoValue>{profile.data1 || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Data 2</InfoLabel>
+                  <InfoValue>{profile.data2 || "—"}</InfoValue>
+                </InfoField>
+                <InfoField>
+                  <InfoLabel>Data 3</InfoLabel>
+                  <InfoValue>{profile.data3 || "—"}</InfoValue>
+                </InfoField>
+              </InfoGrid>
+            </Card>
+          </div>
 
           <RightCol>
             <Card>
@@ -651,6 +850,225 @@ export default function MemberDetailPage() {
           </Card>
         </div>
       )}
+
+      {/* Edit Member Dialog */}
+      <Dialog
+        header="Edit Member"
+        visible={editOpen}
+        onHide={() => setEditOpen(false)}
+        style={{ width: "640px" }}
+        footer={editFooter}
+        maximizable
+      >
+        <FormGrid>
+          {/* Basic info */}
+          <FormRow>
+            <Field>
+              <FieldLabel>Full Name</FieldLabel>
+              <Controller
+                name="name"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>Mobile No</FieldLabel>
+              <Controller
+                name="mobile_no"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+          </FormRow>
+
+          <FormRow>
+            <Field>
+              <FieldLabel>Gender</FieldLabel>
+              <Controller
+                name="gender"
+                control={editForm.control}
+                render={({ field }) => (
+                  <Dropdown
+                    value={field.value}
+                    options={GENDER_OPTIONS}
+                    onChange={(e) => field.onChange(e.value)}
+                    placeholder="Select gender"
+                    showClear
+                    style={{ width: "100%" }}
+                  />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel style={{ marginBottom: "0.5rem" }}>Active</FieldLabel>
+              <Controller
+                name="is_active"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputSwitch
+                    checked={field.value}
+                    onChange={(e) => field.onChange(e.value)}
+                  />
+                )}
+              />
+            </Field>
+          </FormRow>
+
+          {/* Address */}
+          <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: "0.75rem" }}>
+            <FieldLabel style={{ fontSize: "0.75rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Address
+            </FieldLabel>
+          </div>
+
+          <Field>
+            <FieldLabel>Address Line</FieldLabel>
+            <Controller
+              name="address_line"
+              control={editForm.control}
+              render={({ field }) => (
+                <InputText {...field} style={{ width: "100%" }} />
+              )}
+            />
+          </Field>
+
+          <FormRow>
+            <Field>
+              <FieldLabel>City</FieldLabel>
+              <Controller
+                name="address_city"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>State</FieldLabel>
+              <Controller
+                name="address_state"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+          </FormRow>
+
+          <Field>
+            <FieldLabel>PIN Code</FieldLabel>
+            <Controller
+              name="address_pin"
+              control={editForm.control}
+              render={({ field }) => (
+                <InputText {...field} style={{ width: "100%" }} />
+              )}
+            />
+          </Field>
+
+          {/* Onboarding / Sales fields */}
+          <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: "0.75rem" }}>
+            <FieldLabel style={{ fontSize: "0.75rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              Onboarding &amp; Sales
+            </FieldLabel>
+          </div>
+
+          <FormRow>
+            <Field>
+              <FieldLabel>Sale Date</FieldLabel>
+              <Controller
+                name="sale_date"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} placeholder="YYYY-MM-DD" style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>Sales Channel</FieldLabel>
+              <Controller
+                name="sales_channel"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+          </FormRow>
+
+          <FormRow>
+            <Field>
+              <FieldLabel>Branch Code</FieldLabel>
+              <Controller
+                name="branch_code"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>Salesperson Name</FieldLabel>
+              <Controller
+                name="salesperson_name"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+          </FormRow>
+
+          <Field>
+            <FieldLabel>Employee Code</FieldLabel>
+            <Controller
+              name="employee_code"
+              control={editForm.control}
+              render={({ field }) => (
+                <InputText {...field} style={{ width: "100%" }} />
+              )}
+            />
+          </Field>
+
+          <FormRow>
+            <Field>
+              <FieldLabel>Data 1</FieldLabel>
+              <Controller
+                name="data1"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+            <Field>
+              <FieldLabel>Data 2</FieldLabel>
+              <Controller
+                name="data2"
+                control={editForm.control}
+                render={({ field }) => (
+                  <InputText {...field} style={{ width: "100%" }} />
+                )}
+              />
+            </Field>
+          </FormRow>
+
+          <Field>
+            <FieldLabel>Data 3</FieldLabel>
+            <Controller
+              name="data3"
+              control={editForm.control}
+              render={({ field }) => (
+                <InputText {...field} style={{ width: "100%" }} />
+              )}
+            />
+          </Field>
+        </FormGrid>
+      </Dialog>
     </div>
   );
 }

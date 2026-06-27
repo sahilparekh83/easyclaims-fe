@@ -392,3 +392,46 @@ export const partnerRenewMemberEnrollment = (memberId: string) =>
 
 export const partnerGetMemberEnrollmentHistory = (memberId: string) =>
   apiClient.get(`/partner/members/${memberId}/enrollment/history`).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — MEMBER UPDATES
+// ─────────────────────────────────────────────
+export const adminUpdateMember = (id: string, data: object) =>
+  apiClient.patch(`/admin/members/${id}`, data).then((r) => r.data);
+
+export const adminBulkUploadMembers = (file: File, partnerId: string, planId?: string) => {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("partner_id", partnerId);
+  if (planId) form.append("plan_id", planId);
+  return apiClient.post("/admin/members/bulk-upload", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  }).then((r) => r.data);
+};
+
+// ─────────────────────────────────────────────
+// ADMIN — CHANGE REQUESTS
+// ─────────────────────────────────────────────
+export const adminListChangeRequests = (params?: { status?: string; skip?: number; limit?: number }) =>
+  apiClient.get("/admin/members/change-requests", { params }).then((r) => r.data);
+
+export const adminApproveChangeRequest = (id: string, admin_note?: string) =>
+  apiClient.patch(`/admin/members/change-requests/${id}/approve`, { admin_note }).then((r) => r.data);
+
+export const adminRejectChangeRequest = (id: string, admin_note?: string) =>
+  apiClient.patch(`/admin/members/change-requests/${id}/reject`, { admin_note }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — AUDIT LOGS
+// ─────────────────────────────────────────────
+export const adminListAuditLogs = (params?: { entity_type?: string; entity_id?: string; skip?: number; limit?: number }) =>
+  apiClient.get("/admin/audit-logs", { params }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// MEMBER — CHANGE REQUESTS
+// ─────────────────────────────────────────────
+export const memberListChangeRequests = (params?: { skip?: number; limit?: number }) =>
+  apiClient.get("/member/change-requests", { params }).then((r) => r.data);
+
+export const memberCreateChangeRequest = (data: { requested_fields: object; reason?: string }) =>
+  apiClient.post("/member/change-requests", data).then((r) => r.data);
