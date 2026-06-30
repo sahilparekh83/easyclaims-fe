@@ -2,13 +2,17 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { partnerGetProfile, partnerUpdateProfile } from "@/imports/core/api";
+import { partnerGetProfile, partnerSubmitChangeRequest, partnerListChangeRequests } from "@/imports/core/api";
 import { InputText } from "primereact/inputtext";
-import { useForm } from "react-hook-form";
-import { Eye, EyeOff, Copy, MapPin } from "lucide-react";
+import { InputTextarea } from "primereact/inputtextarea";
+import { Button } from "primereact/button";
+import { Dialog } from "primereact/dialog";
+import { Tag } from "primereact/tag";
+import { Eye, EyeOff, Copy } from "lucide-react";
 import { toast } from "react-toastify";
 import styled from "styled-components";
 import dayjs from "dayjs";
+import { getApiError } from "@/imports/core/errors";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -96,39 +100,6 @@ const TypeBadge = styled.span<{ $type: string }>`
   color: ${p => p.$type === 'Broker' ? '#1d4ed8' : '#15803d'};
 `;
 
-const Divider = styled.div`
-  height: 1px;
-  background: #e0e6ec;
-  margin-bottom: 20px;
-`;
-
-const InfoGrid = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-`;
-
-const InfoRow = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-`;
-
-const InfoLabel = styled.div`
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: #6b7a8c;
-`;
-
-const InfoValue = styled.div`
-  font-size: 14px;
-  font-weight: 600;
-  color: #161d26;
-`;
-
 const StatusPill = styled.span<{ $active: boolean }>`
   display: inline-flex;
   align-items: center;
@@ -149,21 +120,19 @@ const StatusPill = styled.span<{ $active: boolean }>`
   }
 `;
 
-const EditBtn = styled.button`
-  height: 32px;
-  padding: 0 14px;
-  border-radius: 8px;
-  border: 1px solid #e0e6ec;
-  background: #fff;
+const InfoLabel = styled.div`
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 13px;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7a8c;
+`;
+
+const InfoValue = styled.div`
+  font-size: 14px;
   font-weight: 600;
-  color: #3a4756;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  &:hover { background: #f7f9fb; }
+  color: #161d26;
 `;
 
 const RightCol = styled.div`
@@ -239,62 +208,6 @@ const ApiBadge = styled.span`
   padding: 2px 9px;
 `;
 
-const FormWrap = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const Field = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const FieldLabel = styled.label`
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #6b7a8c;
-`;
-
-const Err = styled.small`
-  color: #dc2626;
-  font-size: 0.75rem;
-`;
-
-const SaveBtn = styled.button`
-  width: 100%;
-  height: 40px;
-  border-radius: 10px;
-  border: none;
-  background: #0050b0;
-  color: #fff;
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 14px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s;
-  &:hover { background: #0046a0; }
-  &:disabled { opacity: 0.6; cursor: default; }
-`;
-
-const CancelBtn = styled.button`
-  width: 100%;
-  height: 38px;
-  border-radius: 10px;
-  border: 1px solid #e0e6ec;
-  background: #fff;
-  color: #3a4756;
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  &:hover { background: #f7f9fb; }
-`;
-
 const Skeleton = styled.div`
   height: 18px;
   border-radius: 6px;
@@ -327,6 +240,61 @@ const ProfileFieldValue = styled.div`
   font-size: 13px; color: #161d26;
 `;
 
+const RequestBtn = styled.button`
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #0050b0;
+  background: #eff6ff;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0050b0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  &:hover { background: #dbeafe; }
+`;
+
+const FormGrid = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 0.25rem;
+`;
+
+const FormField = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`;
+
+const FormLabel = styled.label`
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7a8c;
+`;
+
+const CRStatusChip = styled.span<{ $status: string }>`
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: ${p => p.$status === "approved" ? "#f0fdf4" : p.$status === "rejected" ? "#fef2f2" : "#fef9c3"};
+  color: ${p => p.$status === "approved" ? "#15803d" : p.$status === "rejected" ? "#b91c1c" : "#854d0e"};
+`;
+
+const FooterRow = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+`;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PartnerProfile {
@@ -356,9 +324,14 @@ interface PartnerProfile {
   created_at?: string;
 }
 
-interface EditFormValues {
-  name: string;
-  mobile_no: string;
+interface ChangeRequest {
+  id: string;
+  requested_fields: Record<string, string>;
+  reason: string | null;
+  status: string;
+  admin_note: string | null;
+  reviewed_at: string | null;
+  created_at: string | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -374,38 +347,70 @@ function ProfileField({ label, value, mono }: { label: string; value?: string | 
   );
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  name: "Name",
+  city: "City",
+  state: "State",
+  legal_company_name: "Legal Company Name",
+  trade_name: "Trade Name / Brand",
+  registered_address: "Registered Address",
+  pin_code: "Pin Code",
+  gstin: "GSTIN",
+  pan: "PAN",
+  authorized_signatory_name: "Authorized Signatory Name",
+  designation: "Designation",
+  data_1: "Data 1",
+  data_2: "Data 2",
+  data_3: "Data 3",
+};
+
+const CHANGEABLE_FIELDS = Object.keys(FIELD_LABELS);
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PartnerProfilePage() {
   const queryClient = useQueryClient();
-  const [editing, setEditing] = useState(false);
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
+  const [showCRDialog, setShowCRDialog] = useState(false);
+  const [crFields, setCrFields] = useState<Record<string, string>>({});
+  const [crReason, setCrReason] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["partner", "profile"],
     queryFn: partnerGetProfile,
   });
 
+  const { data: crData } = useQuery({
+    queryKey: ["partner", "change-requests"],
+    queryFn: () => partnerListChangeRequests({ limit: 20 }),
+    enabled: showHistory,
+  });
+
   const profile: PartnerProfile | undefined = (data as any)?.data;
+  const changeRequests: ChangeRequest[] = (crData as any)?.data?.data ?? [];
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<EditFormValues>();
-
-  const updateMutation = useMutation({
-    mutationFn: (values: EditFormValues) =>
-      partnerUpdateProfile({ name: values.name, mobile_no: values.mobile_no }),
+  const submitCRMutation = useMutation({
+    mutationFn: () => partnerSubmitChangeRequest({
+      requested_fields: crFields,
+      reason: crReason.trim() || undefined,
+    }),
     onSuccess: () => {
-      toast.success("Profile updated");
-      queryClient.invalidateQueries({ queryKey: ["partner", "profile"] });
-      setEditing(false);
+      toast.success("Change request submitted. Admin will review and apply the changes.");
+      queryClient.invalidateQueries({ queryKey: ["partner", "change-requests"] });
+      setShowCRDialog(false);
+      setCrFields({});
+      setCrReason("");
     },
-    onError: () => {
-      toast.error("Failed to update profile");
+    onError: (err: any) => {
+      toast.error(getApiError(err, "Failed to submit change request"));
     },
   });
 
-  function handleEditOpen() {
-    if (profile) reset({ name: profile.name, mobile_no: profile.mobile_no ?? "" });
-    setEditing(true);
+  function openCRDialog() {
+    setCrFields({});
+    setCrReason("");
+    setShowCRDialog(true);
   }
 
   function maskApiKey(key: string) {
@@ -428,25 +433,25 @@ export default function PartnerProfilePage() {
 
   const partnerType = profile?.partner_type || "Partner";
 
+  const hasCRFields = Object.values(crFields).some(v => v.trim() !== "");
+
   return (
     <Page>
       {/* ── Left: Profile card ── */}
       <Card>
         <CardHeader>
           <CardTitle>Partner profile</CardTitle>
-          {!editing && (
-            <EditBtn onClick={handleEditOpen}>
-              <i className="pi pi-pencil" style={{ fontSize: 12 }} />
-              Edit
-            </EditBtn>
-          )}
+          <RequestBtn onClick={openCRDialog}>
+            <i className="pi pi-send" style={{ fontSize: 12 }} />
+            Request Change
+          </RequestBtn>
         </CardHeader>
         <CardBody>
           {isLoading ? (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
               {[...Array(4)].map((_, i) => <Skeleton key={i} style={{ width: i === 0 ? "60%" : "100%" }} />)}
             </div>
-          ) : !editing ? (
+          ) : (
             <>
               <AvatarRow>
                 <Avatar>{initials(profile?.name)}</Avatar>
@@ -514,51 +519,31 @@ export default function PartnerProfilePage() {
               {profile?.created_at && (
                 <ProfileSection>
                   <ProfileGrid>
-                    <InfoRow>
+                    <div>
                       <InfoLabel>Partner since</InfoLabel>
                       <InfoValue>{dayjs(profile.created_at).format("DD MMM YYYY")}</InfoValue>
-                    </InfoRow>
+                    </div>
                   </ProfileGrid>
                 </ProfileSection>
               )}
+
+              {/* Notice about read-only */}
+              <div style={{
+                margin: "0 22px 18px",
+                padding: "10px 14px",
+                background: "#f0f9ff",
+                border: "1px solid #bae6fd",
+                borderRadius: 8,
+                fontSize: 12,
+                color: "#0369a1",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}>
+                <i className="pi pi-info-circle" style={{ fontSize: 13 }} />
+                To update your details, use the <strong>&nbsp;Request Change&nbsp;</strong> button. An admin will review and apply the changes.
+              </div>
             </>
-          ) : (
-            <FormWrap onSubmit={handleSubmit(v => updateMutation.mutate(v))} noValidate>
-              <Field>
-                <FieldLabel htmlFor="p-name">Name *</FieldLabel>
-                <InputText
-                  id="p-name"
-                  placeholder="Full name"
-                  {...register("name", { required: "Name is required" })}
-                  className={errors.name ? "p-invalid" : ""}
-                  style={{ width: "100%" }}
-                />
-                {errors.name && <Err>{errors.name.message}</Err>}
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="p-mobile">Mobile</FieldLabel>
-                <InputText
-                  id="p-mobile"
-                  placeholder="+91 98765 43210"
-                  {...register("mobile_no", {
-                    pattern: { value: /^\+?[\d\s\-()]{7,15}$/, message: "Invalid mobile (7–15 digits)" },
-                  })}
-                  className={errors.mobile_no ? "p-invalid" : ""}
-                  style={{ width: "100%" }}
-                />
-                {errors.mobile_no && <Err>{errors.mobile_no.message}</Err>}
-              </Field>
-              <Field>
-                <FieldLabel>Email (read-only)</FieldLabel>
-                <InputText value={profile?.email ?? ""} disabled style={{ width: "100%" }} />
-              </Field>
-              <SaveBtn type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Saving…" : "Save changes"}
-              </SaveBtn>
-              <CancelBtn type="button" onClick={() => { setEditing(false); reset(); }}>
-                Cancel
-              </CancelBtn>
-            </FormWrap>
           )}
         </CardBody>
       </Card>
@@ -601,7 +586,122 @@ export default function PartnerProfilePage() {
             </CardBody>
           </Card>
         )}
+
+        {/* Change Request History */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Change Requests</CardTitle>
+            <button
+              style={{ fontSize: 12, color: "#6b7a8c", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+              onClick={() => setShowHistory(v => !v)}
+            >
+              {showHistory ? "Hide" : "Show history"}
+            </button>
+          </CardHeader>
+          {showHistory && (
+            <CardBody>
+              {changeRequests.length === 0 ? (
+                <div style={{ color: "#9ca3af", fontSize: 13 }}>No change requests submitted yet.</div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {changeRequests.map((cr) => (
+                    <div key={cr.id} style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      background: "#fafafa",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                        <CRStatusChip $status={cr.status}>
+                          {cr.status.charAt(0).toUpperCase() + cr.status.slice(1)}
+                        </CRStatusChip>
+                        <span style={{ fontSize: 11, color: "#9ca3af" }}>
+                          {cr.created_at ? dayjs(cr.created_at).format("DD MMM YYYY") : ""}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#374151" }}>
+                        {Object.entries(cr.requested_fields).map(([k, v]) => (
+                          <div key={k}>
+                            <span style={{ color: "#6b7280" }}>{FIELD_LABELS[k] ?? k}:</span>{" "}
+                            <span style={{ fontWeight: 600 }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {cr.reason && (
+                        <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>
+                          Reason: {cr.reason}
+                        </div>
+                      )}
+                      {cr.admin_note && (
+                        <div style={{ fontSize: 11, color: "#0369a1", marginTop: 4 }}>
+                          Admin note: {cr.admin_note}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          )}
+        </Card>
       </RightCol>
+
+      {/* ── Request Change Dialog ── */}
+      <Dialog
+        visible={showCRDialog}
+        onHide={() => setShowCRDialog(false)}
+        header="Request Profile Change"
+        style={{ width: "560px" }}
+        modal
+        draggable={false}
+        footer={
+          <FooterRow>
+            <Button
+              label="Cancel"
+              severity="secondary"
+              outlined
+              onClick={() => setShowCRDialog(false)}
+              disabled={submitCRMutation.isPending}
+            />
+            <Button
+              label="Submit Request"
+              icon="pi pi-send"
+              loading={submitCRMutation.isPending}
+              disabled={!hasCRFields}
+              onClick={() => submitCRMutation.mutate()}
+            />
+          </FooterRow>
+        }
+      >
+        <div style={{ marginBottom: 12, fontSize: 13, color: "#6b7280", lineHeight: 1.5 }}>
+          Fill in only the fields you want to change. Leave others blank.
+        </div>
+        <FormGrid>
+          {CHANGEABLE_FIELDS.map((field) => (
+            <FormField key={field}>
+              <FormLabel htmlFor={`cr-${field}`}>{FIELD_LABELS[field]}</FormLabel>
+              <InputText
+                id={`cr-${field}`}
+                value={crFields[field] ?? ""}
+                onChange={(e) => setCrFields(prev => ({ ...prev, [field]: e.target.value }))}
+                placeholder={`New ${FIELD_LABELS[field].toLowerCase()}`}
+                style={{ width: "100%" }}
+              />
+            </FormField>
+          ))}
+          <FormField>
+            <FormLabel htmlFor="cr-reason">Reason (optional)</FormLabel>
+            <InputTextarea
+              id="cr-reason"
+              value={crReason}
+              onChange={(e) => setCrReason(e.target.value)}
+              rows={2}
+              placeholder="Why are you requesting this change?"
+              style={{ width: "100%", resize: "vertical" }}
+            />
+          </FormField>
+        </FormGrid>
+      </Dialog>
     </Page>
   );
 }

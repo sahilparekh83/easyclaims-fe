@@ -1,14 +1,14 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import styled from "styled-components";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import {
   memberGetFamily, memberCreateFamily, memberUpdateFamily, memberDeleteFamily,
   memberCreateFamilyChangeRequest,
 } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
-import { Users, Pencil, Trash2, Lock, AlertCircle } from "lucide-react";
+import { Users, Pencil, Trash2, Lock, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
@@ -33,7 +33,12 @@ interface CrFormValues {
 }
 
 const GENDER_OPTIONS = [{ label: "Male", value: "Male" }, { label: "Female", value: "Female" }, { label: "Other", value: "Other" }];
-const RELATION_OPTIONS = [{ label: "Spouse", value: "Spouse" }, { label: "Child", value: "Child" }, { label: "Parent", value: "Parent" }, { label: "Sibling", value: "Sibling" }, { label: "In-Law", value: "In-Law" }, { label: "Other", value: "Other" }];
+const RELATION_OPTIONS = [
+  { label: "Spouse", value: "Spouse" },
+  { label: "Child", value: "Child" },
+  { label: "Parent", value: "Parent" },
+  { label: "Other", value: "Other" },
+];
 const COVERAGE_OPTIONS = [{ label: "Health", value: "Health" }, { label: "Life", value: "Life" }, { label: "Accident", value: "Accident" }, { label: "Critical Illness", value: "Critical Illness" }];
 const QUERY_KEY = ["member", "family"];
 const DEFAULT_FORM: FamilyFormValues = { name: "", relation: "", gender: "", dob: "", coverage_type: "Health" };
@@ -100,6 +105,46 @@ const FormField = styled.div`display: flex; flex-direction: column; gap: 4px;`;
 const FormLabel = styled.label`font-size: 0.875rem; font-weight: 500; color: #3a4756;`;
 const FieldError = styled.small`color: #ef4444; font-size: 0.75rem;`;
 const DialogFooterRow = styled.div`display: flex; justify-content: flex-end; gap: 0.5rem;`;
+const AgeBanner = styled.div<{ $ok: boolean }>`
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 8px; font-size: 12.5px; font-weight: 600;
+  background: ${p => p.$ok ? "#f0fdf4" : "#fef2f2"};
+  border: 1px solid ${p => p.$ok ? "#bbf7d0" : "#fecaca"};
+  color: ${p => p.$ok ? "#166534" : "#dc2626"};
+`;
+
+// ─── Age helpers ──────────────────────────────────────────────────────────────
+
+function calcAge(dob: string): number {
+  return dayjs().diff(dayjs(dob), "year");
+}
+
+// ─── Inner component that watches form fields ─────────────────────────────────
+
+function ChildAgeCheck({ control, childAgeLimit }: { control: any; childAgeLimit: number }) {
+  const relation = useWatch({ control, name: "relation" });
+  const dob = useWatch({ control, name: "dob" });
+
+  if (relation !== "Child" || !dob) return null;
+
+  const age = calcAge(dob);
+  const today = dayjs().format("DD MMM YYYY");
+  const ok = age <= childAgeLimit;
+
+  return (
+    <AgeBanner $ok={ok}>
+      {ok
+        ? <CheckCircle size={15} />
+        : <AlertCircle size={15} />}
+      <span>
+        Age: <strong>{age} years</strong> as of {today}
+        {ok
+          ? ` — within limit (≤ ${childAgeLimit} years)`
+          : ` — exceeds child age limit of ${childAgeLimit} years`}
+      </span>
+    </AgeBanner>
+  );
+}
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -118,7 +163,16 @@ export default function MemberFamilyPage() {
   const { data, isLoading } = useQuery({ queryKey: QUERY_KEY, queryFn: memberGetFamily });
   const familyMembers: FamilyMember[] = (data as any)?.data?.family ?? [];
   const planLimit: number | null = (data as any)?.data?.plan_family_limit ?? null;
+  const childAgeLimit: number = (data as any)?.data?.child_age_limit ?? 21;
   const atLimit = planLimit !== null && familyMembers.length >= planLimit;
+
+  // Watch relation + dob in add/edit form to determine if save should be blocked
+  const watchedRelation = useWatch({ control: form.control, name: "relation" });
+  const watchedDob = useWatch({ control: form.control, name: "dob" });
+  const isChildOverLimit =
+    watchedRelation === "Child" &&
+    !!watchedDob &&
+    calcAge(watchedDob) > childAgeLimit;
 
   const createMutation = useMutation({
     mutationFn: (values: FamilyFormValues) => memberCreateFamily(values),
@@ -204,6 +258,10 @@ export default function MemberFamilyPage() {
         </EmptyState>
       ) : familyMembers.map(member => {
         const locked = member.policy_count > 0;
+        const isChild = member.relation === "Child";
+        const childAge = isChild && member.dob ? calcAge(member.dob) : null;
+        const childOverLimit = childAge !== null && childAge > childAgeLimit;
+
         return (
           <MemberCard key={member.id} $locked={locked}>
             <Avatar>{initials(member.name)}</Avatar>
@@ -215,7 +273,14 @@ export default function MemberFamilyPage() {
                 {locked && <PolicyChip><Lock size={9} style={{ display: "inline", marginRight: 3 }} />Linked to {member.policy_count} policy{member.policy_count > 1 ? "ies" : ""}</PolicyChip>}
               </div>
               <MemberMeta>
-                {member.dob ? dayjs(member.dob).format("DD MMM YYYY") : "—"}
+                {member.dob ? (
+                  <span style={{ color: isChild ? (childOverLimit ? "#dc2626" : "#16a34a") : undefined, fontWeight: isChild ? 600 : undefined }}>
+                    {dayjs(member.dob).format("DD MMM YYYY")}
+                    {isChild && childAge !== null && ` (${childAge} yrs)`}
+                    {isChild && childOverLimit && " · Over age limit"}
+                    {isChild && !childOverLimit && " · Within age limit"}
+                  </span>
+                ) : "—"}
                 {member.gender ? ` · ${member.gender}` : ""}
               </MemberMeta>
               {locked && (
@@ -254,7 +319,17 @@ export default function MemberFamilyPage() {
       <Dialog
         header={editingMember ? "Edit Family Member" : "Add Family Member"}
         visible={dialogVisible} onHide={closeDialog} style={{ width: "480px" }} closable={!isSaving}
-        footer={<DialogFooterRow><Button label="Cancel" severity="secondary" onClick={closeDialog} disabled={isSaving} /><Button label="Save" loading={isSaving} onClick={form.handleSubmit(onSubmit)} /></DialogFooterRow>}
+        footer={
+          <DialogFooterRow>
+            <Button label="Cancel" severity="secondary" onClick={closeDialog} disabled={isSaving} />
+            <Button
+              label="Save"
+              loading={isSaving}
+              disabled={isChildOverLimit}
+              onClick={form.handleSubmit(onSubmit)}
+            />
+          </DialogFooterRow>
+        }
       >
         <FormBody>
           <FormField>
@@ -286,6 +361,7 @@ export default function MemberFamilyPage() {
                   placeholder="Select date" maxDate={new Date()} />
               )} />
           </FormField>
+          <ChildAgeCheck control={form.control} childAgeLimit={childAgeLimit} />
           <FormField>
             <FormLabel>Coverage Type</FormLabel>
             <Controller name="coverage_type" control={form.control}

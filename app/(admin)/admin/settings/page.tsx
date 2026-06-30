@@ -116,6 +116,10 @@ export default function SettingsPage() {
   const [edited,  setEdited]  = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
 
+  const [childAgeLimit, setChildAgeLimit] = useState<number>(21);
+  const [childAgeEdited, setChildAgeEdited] = useState(false);
+  const [childAgeUpdatedAt, setChildAgeUpdatedAt] = useState<string | null>(null);
+
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "settings"],
     queryFn: adminListSettings,
@@ -131,6 +135,11 @@ export default function SettingsPage() {
       setMins(parsed.minutes);
       setUpdatedAt(s.updated_at);
     }
+    const cal = settings.find((x: any) => x.key === "child_age_limit");
+    if (cal?.value != null) {
+      setChildAgeLimit(parseInt(cal.value, 10) || 21);
+      setChildAgeUpdatedAt(cal.updated_at);
+    }
   }, [data]);
 
   const totalMinutes = toTotalMinutes(days, hours, mins);
@@ -145,12 +154,57 @@ export default function SettingsPage() {
     onError: (err: any) => toast.error(getApiError(err, "Failed to save")),
   });
 
+  const saveChildAgeMutation = useMutation({
+    mutationFn: () => adminUpdateSetting("child_age_limit", String(childAgeLimit)),
+    onSuccess: () => {
+      toast.success("Child age limit saved");
+      setChildAgeEdited(false);
+      queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to save")),
+  });
+
   return (
     <div>
       <PageHeader
         title="System Settings"
         subtitle="Control system-wide configuration from the admin dashboard."
       />
+
+      <Card>
+        <SettingLabel>Child Age Limit</SettingLabel>
+        <SettingHint>
+          Maximum age (in completed years) allowed for a Child family member. Members adding a child whose age exceeds this limit will be blocked.
+        </SettingHint>
+        {isLoading ? (
+          <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>Loading…</p>
+        ) : (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <InputNumber
+                value={childAgeLimit}
+                onValueChange={(e) => { setChildAgeLimit(e.value ?? 21); setChildAgeEdited(true); }}
+                min={1} max={100}
+                useGrouping={false}
+                suffix=" years"
+                inputStyle={{ width: "110px", textAlign: "center", padding: "6px 8px" }}
+              />
+            </div>
+            <SaveRow>
+              <Button
+                label="Save"
+                icon="pi pi-check"
+                disabled={!childAgeEdited || childAgeLimit < 1}
+                loading={saveChildAgeMutation.isPending}
+                onClick={() => saveChildAgeMutation.mutate()}
+              />
+            </SaveRow>
+            {childAgeUpdatedAt && (
+              <LastUpdated>Last updated: {new Date(childAgeUpdatedAt).toLocaleString("en-IN")}</LastUpdated>
+            )}
+          </>
+        )}
+      </Card>
 
       <Card>
         {isLoading ? (

@@ -14,9 +14,6 @@ import StatusBadge from "@/components/ui/StatusBadge";
 import { getApiError } from "@/imports/core/errors";
 import {
   partnerGetMember,
-  partnerListPlans,
-  partnerSwitchMemberPlan,
-  partnerRenewMemberEnrollment,
   partnerGetMemberEnrollmentHistory,
   partnerViewMemberPolicyPdf,
   partnerDownloadMemberPolicyPdf,
@@ -397,18 +394,11 @@ export default function MemberDetailPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("Profile");
-  const [switchPlanOpen, setSwitchPlanOpen] = useState(false);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
   const { data: memberData, isLoading } = useQuery({
     queryKey: ["partner", "members", id],
     queryFn: () => partnerGetMember(id),
     enabled: !!id,
-  });
-
-  const { data: plansData } = useQuery({
-    queryKey: ["partner", "plans"],
-    queryFn: partnerListPlans,
   });
 
   const { data: historyData } = useQuery({
@@ -418,31 +408,7 @@ export default function MemberDetailPage() {
   });
 
   const member: MemberDetail | undefined = (memberData as any)?.data;
-  const plans: Plan[] = (plansData as any)?.data ?? [];
   const enrollmentHistory: any[] = (historyData as any)?.data ?? [];
-  const planOptions = plans
-    .filter(p => p.status === "Active")
-    .map(p => ({ label: p.name, value: p.id }));
-
-  const renewMutation = useMutation({
-    mutationFn: () => partnerRenewMemberEnrollment(id),
-    onSuccess: () => {
-      toast.success("Enrollment renewed for 1 year!");
-      queryClient.invalidateQueries({ queryKey: ["partner", "members", id] });
-    },
-    onError: (err: any) => toast.error(getApiError(err, "Failed to renew enrollment")),
-  });
-
-  const switchPlanMutation = useMutation({
-    mutationFn: (plan_id: string) => partnerSwitchMemberPlan(id, plan_id),
-    onSuccess: () => {
-      toast.success("Plan switched successfully");
-      setSwitchPlanOpen(false);
-      setSelectedPlanId(null);
-      queryClient.invalidateQueries({ queryKey: ["partner", "members", id] });
-    },
-    onError: (err: any) => toast.error(getApiError(err, "Failed to switch plan")),
-  });
 
   if (isLoading) return <div style={{ padding: "2rem", color: "#64748b" }}>Loading member…</div>;
   if (!member) return <div style={{ padding: "2rem", color: "#ef4444" }}>Member not found.</div>;
@@ -492,8 +458,7 @@ export default function MemberDetailPage() {
           <i className="pi pi-times-circle" style={{ fontSize: "1.1rem" }} />
           <span>
             <strong>Plan Expired</strong> — Expired on{" "}
-            {dayjs(enrollment?.end_date).format("DD MMM YYYY")}. Use{" "}
-            <strong>Renew Enrollment</strong> to restore access.
+            {dayjs(enrollment?.end_date).format("DD MMM YYYY")}. Contact admin to renew.
           </span>
         </Banner>
       )}
@@ -502,36 +467,10 @@ export default function MemberDetailPage() {
           <i className="pi pi-exclamation-triangle" style={{ fontSize: "1.1rem" }} />
           <span>
             <strong>Plan expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? "s" : ""}</strong>
-            {" "}— on {dayjs(enrollment?.end_date).format("DD MMM YYYY")}. Consider renewing now.
+            {" "}— on {dayjs(enrollment?.end_date).format("DD MMM YYYY")}.
           </span>
         </Banner>
       )}
-
-      {/* Actions */}
-      <ActionsCard>
-        <Button
-          label="Switch Plan"
-          icon="pi pi-refresh"
-          severity="secondary"
-          size="small"
-          onClick={() => {
-            setSelectedPlanId(enrollment?.plan_id ?? null);
-            setSwitchPlanOpen(true);
-          }}
-        />
-        <Button
-          label="Renew Enrollment"
-          icon="pi pi-calendar-plus"
-          severity="success"
-          size="small"
-          loading={renewMutation.isPending}
-          onClick={() => {
-            if (window.confirm("Renew this member's enrollment for 1 more year?")) {
-              renewMutation.mutate();
-            }
-          }}
-        />
-      </ActionsCard>
 
       {/* Tabs */}
       <TabBar>
@@ -755,38 +694,6 @@ export default function MemberDetailPage() {
         )
       )}
 
-      {/* Switch Plan Dialog */}
-      <Dialog
-        header="Switch Plan"
-        visible={switchPlanOpen}
-        onHide={() => setSwitchPlanOpen(false)}
-        style={{ width: "400px" }}
-        footer={
-          <DialogFooter>
-            <Button label="Cancel" severity="secondary" onClick={() => setSwitchPlanOpen(false)} />
-            <Button
-              label="Switch Plan"
-              loading={switchPlanMutation.isPending}
-              onClick={() => {
-                if (!selectedPlanId) { toast.error("Please select a plan"); return; }
-                switchPlanMutation.mutate(selectedPlanId);
-              }}
-            />
-          </DialogFooter>
-        }
-      >
-        <FormField>
-          <FormLabel htmlFor="switch-plan-dropdown">Select Plan</FormLabel>
-          <Dropdown
-            id="switch-plan-dropdown"
-            value={selectedPlanId}
-            onChange={e => setSelectedPlanId(e.value)}
-            options={planOptions}
-            placeholder="Choose a plan"
-            style={{ width: "100%" }}
-          />
-        </FormField>
-      </Dialog>
     </div>
   );
 }

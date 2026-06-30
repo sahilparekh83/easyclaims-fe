@@ -58,13 +58,27 @@ const FooterRow = styled.div`
   gap: 0.5rem;
 `;
 
+const TypeChip = styled.span<{ $type: "email" | "whatsapp" }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: ${p => p.$type === "whatsapp" ? "#f0fdf4" : "#eff6ff"};
+  color: ${p => p.$type === "whatsapp" ? "#15803d" : "#1d4ed8"};
+  border: 1px solid ${p => p.$type === "whatsapp" ? "#bbf7d0" : "#bfdbfe"};
+`;
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-interface EmailTemplate {
+interface MessageTemplate {
   id: string;
   slug: string;
+  channel_type: "email" | "whatsapp";
   description?: string | null;
-  subject: string;
+  subject?: string | null;
   html_body: string;
   is_active: boolean;
   updated_at?: string | null;
@@ -74,7 +88,7 @@ interface EmailTemplate {
 
 export default function EmailTemplatesPage() {
   const queryClient = useQueryClient();
-  const [editTemplate, setEditTemplate] = useState<EmailTemplate | null>(null);
+  const [editTemplate, setEditTemplate] = useState<MessageTemplate | null>(null);
   const [subject, setSubject] = useState("");
   const [htmlBody, setHtmlBody] = useState("");
   const [description, setDescription] = useState("");
@@ -84,7 +98,7 @@ export default function EmailTemplatesPage() {
     queryFn: adminListEmailTemplates,
   });
 
-  const templates: EmailTemplate[] = (data as any)?.data ?? [];
+  const templates: MessageTemplate[] = (data as any)?.data ?? [];
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: object }) =>
@@ -99,36 +113,58 @@ export default function EmailTemplatesPage() {
     },
   });
 
-  const openEdit = (t: EmailTemplate) => {
+  const openEdit = (t: MessageTemplate) => {
     setEditTemplate(t);
-    setSubject(t.subject);
+    setSubject(t.subject ?? "");
     setHtmlBody(t.html_body);
     setDescription(t.description ?? "");
   };
 
   const onSave = () => {
     if (!editTemplate) return;
-    if (!subject.trim()) { toast.error("Subject is required"); return; }
+    if (editTemplate.channel_type === "email" && !subject.trim()) {
+      toast.error("Subject is required for email templates");
+      return;
+    }
     if (!htmlBody.trim()) { toast.error("Body is required"); return; }
-    updateMutation.mutate({
-      id: editTemplate.id,
-      payload: { subject: subject.trim(), html_body: htmlBody.trim(), description: description.trim() || null },
-    });
+    const payload: Record<string, any> = {
+      html_body: htmlBody.trim(),
+      description: description.trim() || null,
+    };
+    if (editTemplate.channel_type === "email") {
+      payload.subject = subject.trim();
+    }
+    updateMutation.mutate({ id: editTemplate.id, payload });
   };
 
   // ─── Column renderers ──────────────────────────────────────────────────────
 
-  const slugBody = (row: EmailTemplate) => <SlugChip>{row.slug}</SlugChip>;
+  const typeBody = (row: MessageTemplate) => {
+    const type = (row.channel_type ?? "email") as "email" | "whatsapp";
+    return (
+      <TypeChip $type={type}>
+        {type === "whatsapp" ? (
+          <><i className="pi pi-whatsapp" style={{ fontSize: 11 }} /> WhatsApp</>
+        ) : (
+          <><i className="pi pi-envelope" style={{ fontSize: 11 }} /> Email</>
+        )}
+      </TypeChip>
+    );
+  };
 
-  const subjectBody = (row: EmailTemplate) => (
-    <span style={{ fontSize: "0.875rem", color: "#111827" }}>{row.subject}</span>
+  const slugBody = (row: MessageTemplate) => <SlugChip>{row.slug}</SlugChip>;
+
+  const subjectBody = (row: MessageTemplate) => (
+    <span style={{ fontSize: "0.875rem", color: row.subject ? "#111827" : "#9ca3af" }}>
+      {row.subject ?? (row.channel_type === "whatsapp" ? "— (WhatsApp)" : "—")}
+    </span>
   );
 
-  const descBody = (row: EmailTemplate) => (
+  const descBody = (row: MessageTemplate) => (
     <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>{row.description ?? "—"}</span>
   );
 
-  const statusBody = (row: EmailTemplate) => (
+  const statusBody = (row: MessageTemplate) => (
     <Tag
       severity={row.is_active ? "success" : "secondary"}
       value={row.is_active ? "Active" : "Inactive"}
@@ -136,10 +172,10 @@ export default function EmailTemplatesPage() {
     />
   );
 
-  const updatedBody = (row: EmailTemplate) =>
+  const updatedBody = (row: MessageTemplate) =>
     row.updated_at ? dayjs(row.updated_at).format("DD MMM YYYY HH:mm") : "—";
 
-  const actionsBody = (row: EmailTemplate) => (
+  const actionsBody = (row: MessageTemplate) => (
     <Button
       label="Edit"
       icon="pi pi-pencil"
@@ -150,13 +186,15 @@ export default function EmailTemplatesPage() {
     />
   );
 
+  const isWA = editTemplate?.channel_type === "whatsapp";
+
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div>
       <PageHeader
-        title="Email Templates"
-        subtitle="Manage all system email templates. Templates use Jinja2 syntax ({{ variable }})."
+        title="Message Templates"
+        subtitle="Manage all system email and WhatsApp message templates. Templates use Jinja2 syntax ({{ variable }})."
       />
 
       <div style={{ marginTop: "1.5rem" }}>
@@ -168,9 +206,12 @@ export default function EmailTemplatesPage() {
             stripedRows
             emptyMessage="No templates found."
             style={{ fontSize: "0.875rem" }}
+            sortField="channel_type"
+            sortOrder={1}
           >
+            <Column header="Type" body={typeBody} style={{ width: "120px" }} sortable field="channel_type" />
             <Column header="Slug" body={slugBody} style={{ minWidth: "200px" }} />
-            <Column header="Subject" body={subjectBody} style={{ minWidth: "220px" }} />
+            <Column header="Subject / Title" body={subjectBody} style={{ minWidth: "200px" }} />
             <Column header="Description" body={descBody} style={{ minWidth: "200px" }} />
             <Column header="Status" body={statusBody} style={{ width: "90px" }} />
             <Column header="Last Updated" body={updatedBody} style={{ minWidth: "150px" }} />
@@ -183,7 +224,18 @@ export default function EmailTemplatesPage() {
       <Dialog
         header={
           <div>
-            <div style={{ fontSize: "1rem", fontWeight: 600 }}>Edit Template</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: "1rem", fontWeight: 600 }}>Edit Template</span>
+              {editTemplate && (
+                <TypeChip $type={(editTemplate.channel_type ?? "email") as "email" | "whatsapp"}>
+                  {isWA ? (
+                    <><i className="pi pi-whatsapp" style={{ fontSize: 11 }} /> WhatsApp</>
+                  ) : (
+                    <><i className="pi pi-envelope" style={{ fontSize: 11 }} /> Email</>
+                  )}
+                </TypeChip>
+              )}
+            </div>
             {editTemplate && (
               <div style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: "2px" }}>
                 Slug: <SlugChip>{editTemplate.slug}</SlugChip>
@@ -213,31 +265,40 @@ export default function EmailTemplatesPage() {
             />
           </Field>
 
-          <Field>
-            <Label htmlFor="et-subject">Subject *</Label>
-            <InputText
-              id="et-subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Email subject line"
-              style={{ width: "100%" }}
-            />
-            <Hint>Supports Jinja2 variables, e.g. {"{{ member_name }}"}</Hint>
-          </Field>
+          {!isWA && (
+            <Field>
+              <Label htmlFor="et-subject">Subject *</Label>
+              <InputText
+                id="et-subject"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Email subject line"
+                style={{ width: "100%" }}
+              />
+              <Hint>Supports Jinja2 variables, e.g. {"{{ member_name }}"}</Hint>
+            </Field>
+          )}
 
           <Field>
-            <Label htmlFor="et-body">HTML Body *</Label>
+            <Label htmlFor="et-body">{isWA ? "Message Body *" : "HTML Body *"}</Label>
             <InputTextarea
               id="et-body"
               value={htmlBody}
               onChange={(e) => setHtmlBody(e.target.value)}
-              rows={16}
-              style={{ width: "100%", fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: "0.8rem" }}
-              placeholder="<p>Hello {{ member_name }},</p>"
+              rows={isWA ? 10 : 16}
+              style={{
+                width: "100%",
+                fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
+                fontSize: "0.8rem",
+              }}
+              placeholder={isWA
+                ? "Hi {{ member_name }}! 👋\n\nYour message here..."
+                : "<p>Hello {{ member_name }},</p>"}
             />
             <Hint>
-              Full HTML supported. Variables use Jinja2 syntax: {"{{ variable_name }}"}.
-              Check the slug description for available variables.
+              {isWA
+                ? "Plain text with WhatsApp formatting (*bold*, _italic_). Variables use Jinja2 syntax: {{ variable_name }}."
+                : "Full HTML supported. Variables use Jinja2 syntax: {{ variable_name }}. Check the slug description for available variables."}
             </Hint>
           </Field>
         </FormGrid>

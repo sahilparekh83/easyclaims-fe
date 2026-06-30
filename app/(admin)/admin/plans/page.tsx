@@ -6,11 +6,11 @@ import { toast } from "react-toastify";
 import styled from "styled-components";
 import {
   Check, Minus, Plus, ChevronLeft, Sparkles, Users,
-  Shield, FileText, MessageSquare, Phone, Globe, Heart, User,
+  Shield, FileText, MessageSquare, Phone, Globe, Heart, User, Trash2,
 } from "lucide-react";
 import { getApiError } from "@/imports/core/errors";
 import {
-  adminListPlans, adminCreatePlan, adminUpdatePlan, adminActivatePlan, adminArchivePlan,
+  adminListPlans, adminCreatePlan, adminUpdatePlan, adminActivatePlan, adminArchivePlan, adminDeletePlan,
 } from "@/imports/core/api";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -410,7 +410,8 @@ interface Plan {
   plan_type?: string;
   popular?: boolean;
   status: string;
-  members_count?: number;
+  member_count?: number;
+  partner_count?: number;
   benefits?: Partial<Benefits>;
   benefits_json?: Partial<Benefits>;
 }
@@ -435,7 +436,7 @@ const BLANK_BENEFITS: Benefits = {
 
 const BLANK_DRAFT: Draft = {
   name: "New plan", tagline: "Describe this tier",
-  price: 1999, cycle: "Annual", status: "Draft", popular: false, plan_type: "global",
+  price: 1999, cycle: "Annual", status: "Draft", popular: false, plan_type: "partner",
   benefits: { ...BLANK_BENEFITS },
 };
 
@@ -497,18 +498,18 @@ function planColor(index: number) {
 // ─── PlanCardDisplay ──────────────────────────────────────────────────────────
 
 function PlanCardDisplay({
-  plan, color, onEdit, onActivate, onArchive,
+  plan, color, onEdit, onActivate, onArchive, onDelete,
 }: {
   plan: Plan;
   color: string;
   onEdit?: () => void;
   onActivate?: () => void;
   onArchive?: () => void;
+  onDelete?: () => void;
 }) {
   const price = plan.price ?? 0;
   const cycle = plan.cycle ?? plan.billing_cycle ?? "Annual";
   const tagline = plan.tagline ?? plan.description ?? "";
-  const memberCount = plan.members_count ?? 0;
   const benefits = plan.benefits ?? plan.benefits_json ?? {};
   const lines = benefitLines(benefits);
   const status = plan.status ?? "Draft";
@@ -530,7 +531,7 @@ function PlanCardDisplay({
         </PriceRow>
         <MembersRow>
           <Users size={13} />
-          <span>{memberCount.toLocaleString("en-IN")} members</span>
+          <span>{(plan.member_count ?? 0).toLocaleString("en-IN")} members</span>
         </MembersRow>
       </CardBody>
       <BenefitsList>
@@ -547,11 +548,38 @@ function PlanCardDisplay({
       </BenefitsList>
       <CardFooter>
         <StatusPill $s={status}>{status}</StatusPill>
-        {onEdit && (
-          <SecondaryBtn onClick={onEdit} style={{ fontSize: 12.5, padding: "6px 13px" }}>
-            Edit plan
-          </SecondaryBtn>
-        )}
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {onEdit && (
+            <SecondaryBtn onClick={onEdit} style={{ fontSize: 12.5, padding: "6px 13px" }}>
+              Edit plan
+            </SecondaryBtn>
+          )}
+          {onDelete !== undefined && (() => {
+            const isLinked = (plan.member_count ?? 0) > 0 || (plan.partner_count ?? 0) > 0;
+            return (
+              <button
+                onClick={!isLinked ? onDelete : undefined}
+                disabled={isLinked}
+                title={isLinked
+                  ? `Cannot delete — ${plan.member_count ?? 0} member(s), ${plan.partner_count ?? 0} partner(s) linked`
+                  : "Delete plan permanently"}
+                style={{
+                  background: "none",
+                  border: "1px solid #fecaca",
+                  borderRadius: 8,
+                  padding: "6px 9px",
+                  cursor: isLinked ? "not-allowed" : "pointer",
+                  color: isLinked ? "#fca5a5" : "#dc2626",
+                  opacity: isLinked ? 0.5 : 1,
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                <Trash2 size={13} />
+              </button>
+            );
+          })()}
+        </div>
       </CardFooter>
     </CardWrap>
   );
@@ -590,7 +618,7 @@ export default function PlansPage() {
       adminUpdatePlan(id, {
         name: d.name, tagline: d.tagline, price: d.price,
         cycle: d.cycle, billing_cycle: d.cycle, plan_type: d.plan_type,
-        popular: d.popular, benefits: d.benefits, benefits_json: d.benefits,
+        status: d.status, popular: d.popular, benefits: d.benefits, benefits_json: d.benefits,
       }),
     onSuccess: () => { toast.success("Plan updated"); invalidatePlans(); setMode("list"); },
     onError: (err: any) => toast.error(getApiError(err, "Failed to update plan")),
@@ -606,6 +634,12 @@ export default function PlansPage() {
     mutationFn: (id: string) => adminArchivePlan(id),
     onSuccess: () => { toast.success("Plan archived"); invalidatePlans(); },
     onError: (err: any) => toast.error(getApiError(err, "Failed to archive")),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminDeletePlan(id),
+    onSuccess: () => { toast.success("Plan permanently deleted"); invalidatePlans(); },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to delete plan")),
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -626,7 +660,7 @@ export default function PlansPage() {
       cycle: plan.cycle ?? plan.billing_cycle ?? "Annual",
       status: plan.status ?? "Draft",
       popular: plan.popular ?? false,
-      plan_type: plan.plan_type ?? "global",
+      plan_type: plan.plan_type ?? "partner",
       benefits: { ...BLANK_BENEFITS, ...b },
     });
     setMode("builder");
@@ -716,6 +750,11 @@ export default function PlansPage() {
                 onEdit={() => openEdit(plan)}
                 onActivate={plan.status !== "Active" ? () => activateMutation.mutate(plan.id) : undefined}
                 onArchive={plan.status === "Active" ? () => archiveMutation.mutate(plan.id) : undefined}
+                onDelete={() => {
+                  if (window.confirm(`Permanently delete "${plan.name}"? This cannot be undone.`)) {
+                    deleteMutation.mutate(plan.id);
+                  }
+                }}
               />
             ))}
           </PlanGrid>
@@ -775,11 +814,31 @@ export default function PlansPage() {
                 </FieldWrap>
                 <FieldWrap>
                   <FieldLabel>Status</FieldLabel>
-                  <StyledSelect value={draft.status} onChange={e => setDraftField("status", e.target.value)}>
-                    <option>Active</option>
-                    <option>Draft</option>
-                    <option>Archived</option>
-                  </StyledSelect>
+                  {(() => {
+                    const memberCount = editingPlan?.member_count ?? 0;
+                    const partnerCount = editingPlan?.partner_count ?? 0;
+                    const isLinked = memberCount > 0 || partnerCount > 0;
+                    const originalStatus = editingPlan?.status ?? "Draft";
+                    // Active → Draft is blocked when linked; Draft → Active is always allowed
+                    const blockDowngrade = isLinked && originalStatus === "Active";
+                    return (
+                      <>
+                        <StyledSelect
+                          value={draft.status}
+                          onChange={e => setDraftField("status", e.target.value)}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Draft" disabled={blockDowngrade}>Draft{blockDowngrade ? " (linked — not allowed)" : ""}</option>
+                          <option value="Archived" disabled={blockDowngrade}>Archived{blockDowngrade ? " (linked — not allowed)" : ""}</option>
+                        </StyledSelect>
+                        {blockDowngrade && (
+                          <div style={{ fontSize: 11.5, color: "#92400e", marginTop: 4, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 6, padding: "4px 8px" }}>
+                            {memberCount} member(s), {partnerCount} partner(s) linked — unlink all to change status
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </FieldWrap>
               </ThreeCol>
             </FieldGrid>

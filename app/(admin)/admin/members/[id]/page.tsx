@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "primereact/button";
@@ -9,12 +9,12 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { InputSwitch } from "primereact/inputswitch";
-import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck, Briefcase, Users } from "lucide-react";
+import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck, Briefcase, Users, CheckCircle2, AlertCircle, FileSearch, Download } from "lucide-react";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminGetMember, adminRenewMemberEnrollment, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest } from "@/imports/core/api";
+import { adminGetMember, adminRenewMemberEnrollment, adminSwitchMemberPlan, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminListPlans, adminViewPolicyPdf, adminDownloadPolicyPdf } from "@/imports/core/api";
 import { InputTextarea } from "primereact/inputtextarea";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
@@ -383,8 +383,12 @@ interface EditFormValues {
 export default function MemberDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("Profile");
+
+  const fromPartnerId = searchParams.get("partner_id") ?? "";
+  const fromPartnerName = searchParams.get("partner_name") ? decodeURIComponent(searchParams.get("partner_name")!) : "";
   const [editOpen, setEditOpen] = useState(false);
   const [crStatusFilter, setCrStatusFilter] = useState<string>("pending");
   const [crDetailOpen, setCrDetailOpen] = useState(false);
@@ -393,6 +397,8 @@ export default function MemberDetailPage() {
   const [familyCrOpen, setFamilyCrOpen] = useState(false);
   const [selectedFamilyCr, setSelectedFamilyCr] = useState<any>(null);
   const [familyCrNote, setFamilyCrNote] = useState("");
+  const [switchPlanOpen, setSwitchPlanOpen] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "member", id],
@@ -453,6 +459,16 @@ export default function MemberDetailPage() {
     },
   });
 
+  const { data: plansData } = useQuery({
+    queryKey: ["admin", "plans"],
+    queryFn: () => adminListPlans({ limit: 200 }),
+  });
+  const allPlans: any[] = (plansData as any)?.data?.data ?? [];
+  const activePlanOptions = allPlans
+    .filter((p: any) => p.status === "Active")
+    .map((p: any) => ({ label: p.name, value: p.id }));
+
+
   const renewMutation = useMutation({
     mutationFn: () => adminRenewMemberEnrollment(id),
     onSuccess: () => {
@@ -460,6 +476,17 @@ export default function MemberDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
     },
     onError: () => toast.error("Renewal failed"),
+  });
+
+  const switchPlanMutation = useMutation({
+    mutationFn: (planId: string) => adminSwitchMemberPlan(id, planId),
+    onSuccess: () => {
+      toast.success("Plan switched successfully");
+      setSwitchPlanOpen(false);
+      setSelectedPlanId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
+    },
+    onError: () => toast.error("Failed to switch plan"),
   });
 
   const updateMutation = useMutation({
@@ -582,12 +609,29 @@ export default function MemberDetailPage() {
     </FooterRow>
   );
 
+  const memberPolicies: any[] = member?.policies ?? [];
+  const totalPolicies = memberPolicies.length;
+  const activePolicies = memberPolicies.filter((p: any) => p.status?.toLowerCase() === "active").length;
+  const expiredPolicies = memberPolicies.filter((p: any) => p.status?.toLowerCase() === "expired").length;
+
   return (
     <div style={{ maxWidth: "1100px" }}>
-      <Breadcrumb onClick={() => router.push("/admin/members")}>
-        <ChevronLeft size={15} />
-        Members
-      </Breadcrumb>
+      {fromPartnerId ? (
+        <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.875rem", color: "#6b7280", marginBottom: "1.25rem", flexWrap: "wrap" }}>
+          <span style={{ cursor: "pointer" }} onClick={() => router.push("/admin/partners")}>Partners</span>
+          <ChevronLeft size={13} style={{ transform: "rotate(180deg)" }} />
+          <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/partners/${fromPartnerId}?tab=members`)}>{fromPartnerName || "Partner"}</span>
+          <ChevronLeft size={13} style={{ transform: "rotate(180deg)" }} />
+          <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/partners/${fromPartnerId}?tab=members`)}>Members</span>
+          <ChevronLeft size={13} style={{ transform: "rotate(180deg)" }} />
+          <span style={{ color: "#374151", fontWeight: 600 }}>{member?.name || "Member"}</span>
+        </div>
+      ) : (
+        <Breadcrumb onClick={() => router.push("/admin/members")}>
+          <ChevronLeft size={15} />
+          Members
+        </Breadcrumb>
+      )}
 
       <HeroCard>
         <Avatar>{initials}</Avatar>
@@ -616,6 +660,17 @@ export default function MemberDetailPage() {
           )}
         </HeroInfo>
         <HeroActions>
+          <Button
+            label="Switch Plan"
+            outlined
+            size="small"
+            icon="pi pi-arrows-h"
+            severity="secondary"
+            onClick={() => {
+              setSelectedPlanId((member as any)?.enrollment?.plan_id ?? null);
+              setSwitchPlanOpen(true);
+            }}
+          />
           <Button
             label="Renew"
             outlined
@@ -865,55 +920,110 @@ export default function MemberDetailPage() {
 
       {/* Policies Tab */}
       {activeTab === "Policies" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {policyCount === 0 ? (
-            <Card>
-              <p style={{ color: "#9ca3af" }}>No policies uploaded.</p>
-            </Card>
-          ) : (
-            (member.policies ?? []).map((p: any) => (
-              <PolicyRow key={p.id}>
-                <div style={{ flex: 1, minWidth: 160 }}>
-                  <div
-                    style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}
-                  >
-                    {p.policy_number}
-                  </div>
-                  <div style={{ fontSize: "0.75rem", color: "#6b7280" }}>
-                    {p.policy_type || "—"} · {p.insurer || "—"}
-                  </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+          {/* Stats */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "1rem" }}>
+            {[
+              { label: "Total policies", value: totalPolicies, icon: <Shield size={18} />, bg: "#eff6ff", color: "#2563eb" },
+              { label: "Active policies", value: activePolicies, icon: <CheckCircle2 size={18} />, bg: "#f0fdf4", color: "#16a34a" },
+              { label: "Expired policies", value: expiredPolicies, icon: <AlertCircle size={18} />, bg: "#fef9c3", color: "#854d0e" },
+            ].map(s => (
+              <div key={s.label} style={{ background: "#fff", border: "1px solid #e9e8f4", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 12, boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                <div style={{ width: 38, height: 38, borderRadius: 10, background: s.bg, color: s.color, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {s.icon}
                 </div>
-                <StatusBadge
-                  value={
-                    p.status?.toLowerCase() === "active"
-                  }
-                  trueLabel={p.status}
-                  falseLabel={p.status}
-                />
-                <div style={{ fontSize: "0.8rem", color: "#374151" }}>
-                  {p.sum_insured
-                    ? `₹${Number(p.sum_insured).toLocaleString("en-IN")}`
-                    : "—"}
+                <div>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>{s.label}</div>
                 </div>
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "#6b7280",
-                    textAlign: "right",
-                  }}
-                >
-                  {p.start_date ? dayjs(p.start_date).format("DD MMM YY") : "—"}
-                  {" → "}
-                  {p.end_date ? dayjs(p.end_date).format("DD MMM YY") : "—"}
-                </div>
-                {(p.linked_family_members ?? []).length > 0 && (
-                  <div style={{ fontSize: "0.72rem", color: "#7c3aed" }}>
-                    +{p.linked_family_members.length} family
-                  </div>
-                )}
-              </PolicyRow>
-            ))
-          )}
+              </div>
+            ))}
+          </div>
+
+          {/* Table */}
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #f3f4f6" }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>All Policies</span>
+              <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748b" }}>{totalPolicies} total</span>
+            </div>
+            {totalPolicies === 0 ? (
+              <div style={{ padding: "2rem", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No policies uploaded.</div>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+                  <thead>
+                    <tr>
+                      {["Policy Number", "Type · Insurer", "Sum Insured", "Period", "Family", "Status", "Actions"].map(h => (
+                        <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", background: "#f8f9fb", borderBottom: "1px solid #f1f2f6", whiteSpace: "nowrap" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {memberPolicies.map((p: any) => (
+                      <tr key={p.id} style={{ borderTop: "1px solid #f1f2f6" }}>
+                        <td style={{ padding: "11px 16px" }}>
+                          <div style={{ fontFamily: "monospace", fontWeight: 600, color: "#0f172a", fontSize: 13 }}>{p.policy_number || "—"}</div>
+                        </td>
+                        <td style={{ padding: "11px 16px" }}>
+                          <div style={{ fontWeight: 600, color: "#374151", fontSize: 13 }}>{p.policy_type || "—"}</div>
+                          <div style={{ fontSize: 12, color: "#64748b" }}>{p.insurer || "—"}</div>
+                        </td>
+                        <td style={{ padding: "11px 16px", fontWeight: 600, color: "#374151" }}>
+                          {p.sum_insured ? `₹${Number(p.sum_insured).toLocaleString("en-IN")}` : "—"}
+                        </td>
+                        <td style={{ padding: "11px 16px", fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
+                          {p.start_date ? dayjs(p.start_date).format("DD MMM YY") : "—"}
+                          {" → "}
+                          {p.end_date ? dayjs(p.end_date).format("DD MMM YY") : "—"}
+                        </td>
+                        <td style={{ padding: "11px 16px" }}>
+                          {(p.linked_family_members ?? []).length > 0
+                            ? <span style={{ fontSize: 12, background: "#f5f3ff", color: "#7c3aed", borderRadius: 999, padding: "2px 8px", fontWeight: 600 }}>+{p.linked_family_members.length}</span>
+                            : <span style={{ color: "#9ca3af" }}>—</span>}
+                        </td>
+                        <td style={{ padding: "11px 16px" }}>
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", fontSize: 11.5, fontWeight: 700,
+                            padding: "3px 10px", borderRadius: 999,
+                            background: p.status?.toLowerCase() === "active" ? "#f0fdf4" : p.status?.toLowerCase() === "expired" ? "#fef9c3" : "#f8fafc",
+                            color: p.status?.toLowerCase() === "active" ? "#16a34a" : p.status?.toLowerCase() === "expired" ? "#854d0e" : "#64748b",
+                          }}>
+                            {p.status || "—"}
+                          </span>
+                        </td>
+                        <td style={{ padding: "11px 16px" }}>
+                          <div style={{ display: "flex", gap: 2 }}>
+                            {p.has_file && (
+                              <>
+                                <button
+                                  title="View PDF"
+                                  onClick={async () => { const blob = await adminViewPolicyPdf(p.id); window.open(URL.createObjectURL(blob)); }}
+                                  style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}
+                                  onMouseOver={e => (e.currentTarget.style.background = "#f1f5f9")}
+                                  onMouseOut={e => (e.currentTarget.style.background = "transparent")}
+                                >
+                                  <FileSearch size={15} />
+                                </button>
+                                <button
+                                  title="Download PDF"
+                                  onClick={async () => { const blob = await adminDownloadPolicyPdf(p.id); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `policy_${p.policy_number}.pdf`; a.click(); URL.revokeObjectURL(url); }}
+                                  style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}
+                                  onMouseOver={e => (e.currentTarget.style.background = "#f1f5f9")}
+                                  onMouseOut={e => (e.currentTarget.style.background = "transparent")}
+                                >
+                                  <Download size={15} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
       )}
 
@@ -1351,6 +1461,48 @@ export default function MemberDetailPage() {
             </div>
           </div>
         )}
+      </Dialog>
+
+      {/* Switch Plan Dialog */}
+      <Dialog
+        header="Switch Member Plan"
+        visible={switchPlanOpen}
+        onHide={() => { setSwitchPlanOpen(false); setSelectedPlanId(null); }}
+        style={{ width: "420px" }}
+        modal
+        draggable={false}
+        footer={
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+            <Button label="Cancel" severity="secondary" outlined onClick={() => { setSwitchPlanOpen(false); setSelectedPlanId(null); }} disabled={switchPlanMutation.isPending} />
+            <Button
+              label="Switch Plan"
+              icon="pi pi-check"
+              loading={switchPlanMutation.isPending}
+              disabled={!selectedPlanId}
+              onClick={() => { if (selectedPlanId) switchPlanMutation.mutate(selectedPlanId); }}
+            />
+          </div>
+        }
+      >
+        <div style={{ paddingTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {(member as any)?.enrollment?.plan_name && (
+            <div style={{ fontSize: 13, color: "#6b7280" }}>
+              Current plan: <strong style={{ color: "#111827" }}>{(member as any).enrollment.plan_name}</strong>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6b7a8c" }}>
+              Select New Plan *
+            </label>
+            <Dropdown
+              value={selectedPlanId}
+              onChange={e => setSelectedPlanId(e.value)}
+              options={activePlanOptions}
+              placeholder="Choose a plan"
+              style={{ width: "100%" }}
+            />
+          </div>
+        </div>
       </Dialog>
     </div>
   );
