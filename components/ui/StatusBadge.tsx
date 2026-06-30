@@ -19,7 +19,13 @@ const STATUS_MAP: Record<string, Variant> = {
   inactive: "danger", Inactive: "danger", INACTIVE: "danger",
   false: "danger", no: "danger", No: "danger",
   archived: "danger", Archived: "danger", ARCHIVED: "danger",
+  expired: "danger", Expired: "danger", EXPIRED: "danger",
+  rejected: "danger", Rejected: "danger", REJECTED: "danger",
   pending: "warning", Pending: "warning", PENDING: "warning",
+  need_review: "warning",
+  renewal_pending: "warning",
+  renewed: "success",
+  processing: "info", Processing: "info",
   draft: "info", Draft: "info", DRAFT: "info",
   global: "info",
 };
@@ -53,9 +59,17 @@ interface StatusBadgeProps {
   falseLabel?: string;
 }
 
+const DISPLAY_LABEL: Record<string, string> = {
+  need_review:      "Pending Review",
+  renewal_pending:  "Renewal?",
+  renewed:          "Renewed",
+};
+
 export default function StatusBadge({ value, trueLabel = "Active", falseLabel = "Inactive" }: StatusBadgeProps) {
   const str = typeof value === "boolean" ? String(value) : value;
   const variant = STATUS_MAP[str] || "neutral";
-  const label = typeof value === "boolean" ? (value ? trueLabel : falseLabel) : value;
+  const label = typeof value === "boolean"
+    ? (value ? trueLabel : falseLabel)
+    : (DISPLAY_LABEL[str] ?? value);
   return <Chip $variant={variant}>{label}</Chip>;
 }
