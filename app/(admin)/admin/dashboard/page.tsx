@@ -1,15 +1,15 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
 import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { adminGetDashboard, adminListMembers, adminListPlans } from "@/imports/core/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Users, FileText, CreditCard, ShieldCheck, FileSearch, Info } from "lucide-react";
+import { Users, FileText, CreditCard, ShieldCheck, Info, X, UserX, UserCheck, FileX, Calendar, ChevronDown } from "lucide-react";
 
 // ─── Styled ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +24,13 @@ const Page = styled.div`
 const KpiGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); }
+`;
+
+const KpiGrid2 = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); }
 `;
@@ -184,17 +191,6 @@ const BarFill = styled.div<{ $w: string; $color: string }>`
   height: 100%; border-radius: 99px; width: ${p => p.$w}; background: ${p => p.$color};
 `;
 
-const QueueItem = styled.div`
-  display: flex; align-items: center; gap: 12px;
-  padding: 12px 20px; border-top: 1px solid #f1f2f6; cursor: pointer;
-  &:hover { background: #f8fafc; }
-  &:first-of-type { border-top: none; }
-`;
-
-const QueueDot = styled.span`
-  width: 8px; height: 8px; border-radius: 50%;
-  background: #f59e0b; flex: none;
-`;
 
 const Skeleton = styled.div`
   height: 2rem; width: 60px;
@@ -204,25 +200,152 @@ const Skeleton = styled.div`
   @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 `;
 
+const ModalOverlay = styled.div`
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(15,23,42,0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+`;
+
+const ModalBox = styled.div`
+  background: #fff; border-radius: 16px;
+  width: 580px; max-width: 100%; max-height: 92vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+  overflow: hidden;
+`;
+
+const ModalHead = styled.div`
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid #f1f2f6; flex: none;
+`;
+
+const ModalBody = styled.div`overflow-y: auto; flex: 1;`;
+
+const ModalRow = styled.div`
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px; cursor: pointer;
+  &:hover { background: #f8f9fb; }
+`;
+
+const CloseBtn = styled.button`
+  background: none; border: none; cursor: pointer; color: #94a3b8;
+  display: flex; align-items: center; padding: 4px;
+  border-radius: 6px; &:hover { background: #f1f5f9; color: #374151; }
+`;
+
+// ─── Members Growth — Month Tiles ─────────────────────────────────────────────
+
+const GrowthHeader = styled.div`
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid #f1f2f6;
+`;
+
+const YearBtn = styled.button`
+  display: inline-flex; align-items: center; gap: 6px;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 6px 12px; font-size: 12.5px; font-weight: 600; color: #374151;
+  cursor: pointer; transition: all 0.13s;
+  &:hover { background: #f1f5f9; border-color: #cbd5e1; }
+`;
+
+const YearMenu = styled.div<{ $open: boolean }>`
+  position: absolute; top: calc(100% + 4px); right: 0; z-index: 100;
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1); min-width: 150px;
+  display: ${p => p.$open ? "flex" : "none"}; flex-direction: column; overflow: hidden;
+`;
+
+const YearOption = styled.button<{ $active: boolean }>`
+  background: ${p => p.$active ? "#eff6ff" : "none"}; border: none;
+  padding: 10px 14px; font-size: 13px; font-weight: ${p => p.$active ? 700 : 500};
+  color: ${p => p.$active ? "#2563eb" : "#374151"};
+  text-align: left; cursor: pointer; transition: background 0.1s;
+  &:hover { background: #f8fafc; }
+`;
+
+const MonthGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  padding: 16px 20px 20px;
+  @media (max-width: 900px) { grid-template-columns: repeat(4, 1fr); }
+`;
+
+const MonthTile = styled.button<{ $active: boolean; $hasMembers: boolean }>`
+  background: ${p => p.$active ? "#eff6ff" : "#fff"};
+  border: 1.5px solid ${p => p.$active ? "#93c5fd" : "#e8eaf0"};
+  border-radius: 10px; padding: 14px 8px 12px;
+  cursor: pointer; text-align: center; transition: all 0.13s;
+  &:hover { background: #eff6ff; border-color: #93c5fd; }
+`;
+
+const MonthTileLabel = styled.div`
+  font-size: 11.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #374151; margin-bottom: 2px;
+`;
+
+const MonthTileYear = styled.div`
+  font-size: 10.5px; color: #94a3b8; margin-bottom: 8px;
+`;
+
+const MonthTileCount = styled.div<{ $zero: boolean }>`
+  font-size: 1.75rem; font-weight: 800; line-height: 1;
+  color: ${p => p.$zero ? "#cbd5e1" : "#0f172a"};
+`;
+
+const MonthTileSub = styled.div`
+  font-size: 11px; color: #94a3b8; margin-top: 4px;
+`;
+
+// ─── Calendar Grid ─────────────────────────────────────────────────────────────
+
+const CalSection = styled.div`padding: 12px 18px 16px; flex: none;`;
+
+const CalDayHeaders = styled.div`
+  display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 4px;
+`;
+
+const CalDayHeader = styled.div`
+  text-align: center; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; color: #94a3b8; padding: 4px 0;
+`;
+
+const CalCells = styled.div`display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;`;
+
+const CalCell = styled.button<{ $empty: boolean; $has: boolean; $sel: boolean }>`
+  border: none; border-radius: 8px; min-height: 40px; padding: 4px 2px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-size: 12.5px; font-weight: ${p => p.$has ? 700 : 400};
+  cursor: ${p => p.$empty || !p.$has ? "default" : "pointer"};
+  background: ${p => p.$sel ? "#2563eb" : p.$has ? "#dbeafe" : "transparent"};
+  color: ${p => p.$sel ? "#fff" : p.$empty ? "transparent" : p.$has ? "#1e40af" : "#64748b"};
+  transition: all 0.12s;
+  user-select: none;
+  &:hover { background: ${p => !p.$empty && p.$has && !p.$sel ? "#bfdbfe" : undefined}; }
+`;
+
+const CalBadge = styled.span<{ $sel: boolean }>`
+  font-size: 9px; font-weight: 800; line-height: 1;
+  color: ${p => p.$sel ? "rgba(255,255,255,0.8)" : "#3b82f6"};
+  background: ${p => p.$sel ? "rgba(255,255,255,0.2)" : "#eff6ff"};
+  border-radius: 999px; padding: 1px 5px;
+`;
+
+const DayPanel = styled.div`
+  border-top: 1px solid #f1f2f6; flex: 1; overflow-y: auto; min-height: 0;
+`;
+
+const DayPanelHead = styled.div`
+  padding: 10px 20px 8px; font-size: 11.5px; font-weight: 700;
+  color: #64748b; background: #f8f9fb; border-bottom: 1px solid #f1f2f6; text-transform: uppercase;
+  letter-spacing: 0.04em;
+`;
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PLAN_COLORS = ["#3b82f6", "#22c55e", "#0a2a57", "#9333ea", "#f59e0b"];
 
-const STATUS_COLORS: Record<string, string> = {
-  active:       "#22c55e",
-  need_review:  "#f59e0b",
-  processing:   "#3b82f6",
-  rejected:     "#ef4444",
-  pending:      "#94a3b8",
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  active:      "Active",
-  need_review: "Need Review",
-  processing:  "Processing",
-  rejected:    "Rejected",
-  pending:     "Pending",
-};
 
 // ─── Custom Tooltip ───────────────────────────────────────────────────────────
 
@@ -260,10 +383,26 @@ const RECENT_PARAMS = { limit: 5, skip: 0, sort_field: "created_at", sort_order:
 
 export default function DashboardPage() {
   const router = useRouter();
+  const currentYear = new Date().getFullYear();
+  const [yearFilter, setYearFilter]    = useState<number>(currentYear);
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
+  const yearRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!yearMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (yearRef.current && !yearRef.current.contains(e.target as Node)) setYearMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [yearMenuOpen]);
+  const [selectedMonth, setSelectedMonth] = useState<{
+    month: string; year: number; month_num: number; member_list: any[];
+  } | null>(null);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const { data: dash, isLoading: dashL } = useQuery({
-    queryKey: ["admin", "dashboard"],
-    queryFn: adminGetDashboard,
+    queryKey: ["admin", "dashboard", yearFilter],
+    queryFn: () => adminGetDashboard({ year: yearFilter }),
   });
 
   const { data: recentMembersData } = useQuery({
@@ -280,16 +419,16 @@ export default function DashboardPage() {
   const recentMembers: any[] = recentMembersData?.data?.data ?? [];
   const plans: any[] = Array.isArray(plansData?.data) ? plansData.data : [];
 
-  const totalMembers  = d.total_members  ?? 0;
-  const totalPolicies = d.total_policies ?? 0;
-  const totalPartners = d.total_partners ?? 0;
-  const totalPlans    = d.active_plans   ?? 0;
+  const totalMembers         = d.total_members          ?? 0;
+  const activeMembers        = d.active_members         ?? 0;
+  const inactiveMembers      = d.inactive_members       ?? 0;
+  const membersWithoutPolicy = d.members_without_policy ?? 0;
+  const totalPolicies        = d.total_policies         ?? 0;
+  const totalPartners        = d.total_partners         ?? 0;
+  const totalPlans           = d.active_plans           ?? 0;
 
-  const membersGrowth:   any[] = d.members_growth      ?? [];
-  const policiesByStatus:any[] = d.policies_by_status  ?? [];
-  const membersByPartner:any[] = d.members_by_partner  ?? [];
-  const reviewQueue:     any[] = d.review_queue        ?? [];
-  const reviewQueueTotal: number = d.review_queue_total ?? reviewQueue.length;
+  const membersGrowth:   any[] = d.members_growth   ?? [];
+  const membersByPartner:any[] = d.members_by_partner ?? [];
 
   const maxMemberCount = Math.max(1, ...plans.map((p: any) => p.member_count ?? 0));
 
@@ -297,17 +436,20 @@ export default function DashboardPage() {
     (name || "M").split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
 
   const KPIS = [
-    { label: "Total Members",   value: totalMembers,  bg: "#eff6ff", color: "#2563eb", icon: <Users size={18} />,       href: "/admin/members" },
-    { label: "Active Partners", value: totalPartners, bg: "#f0fdf4", color: "#16a34a", icon: <ShieldCheck size={18} />, href: "/admin/partners" },
-    { label: "Total Policies",  value: totalPolicies, bg: "#fefce8", color: "#ca8a04", icon: <FileText size={18} />,    href: "/admin/policies?status=active" },
-    { label: "Active Plans",    value: totalPlans,    bg: "#fdf4ff", color: "#9333ea", icon: <CreditCard size={18} />,  href: "/admin/plans" },
+    { label: "Total Members",          value: totalMembers,         bg: "#eff6ff", color: "#2563eb", icon: <Users size={18} />,       href: "/admin/members" },
+    { label: "Active Partners",        value: totalPartners,        bg: "#f0fdf4", color: "#16a34a", icon: <ShieldCheck size={18} />, href: "/admin/partners" },
+    { label: "Total Policies",         value: totalPolicies,        bg: "#fefce8", color: "#ca8a04", icon: <FileText size={18} />,    href: "/admin/policies?status=active" },
+    { label: "Active Plans",           value: totalPlans,           bg: "#fdf4ff", color: "#9333ea", icon: <CreditCard size={18} />,  href: "/admin/plans" },
+    { label: "Active Members",         value: activeMembers,        bg: "#f0fdf4", color: "#16a34a", icon: <UserCheck size={18} />,   href: "/admin/members" },
+    { label: "Inactive Members",       value: inactiveMembers,      bg: "#fef2f2", color: "#dc2626", icon: <UserX size={18} />,       href: "/admin/members" },
+    { label: "Members Without Policy", value: membersWithoutPolicy, bg: "#fff7ed", color: "#ea580c", icon: <FileX size={18} />,       href: "/admin/members" },
   ];
 
   return (
     <Page>
-      {/* ── KPI Row ───────────────────────────────────────────────────────── */}
+      {/* ── KPI Row 1 ─────────────────────────────────────────────────────── */}
       <KpiGrid>
-        {KPIS.map(k => (
+        {KPIS.slice(0, 4).map(k => (
           <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
             <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
             {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
@@ -316,91 +458,66 @@ export default function DashboardPage() {
         ))}
       </KpiGrid>
 
-      {/* ── Charts Row: Area + Donut ──────────────────────────────────────── */}
-      <TwoCol>
-        {/* Members Growth — Area Chart */}
-        <Card>
-          <CardHeader>
+      {/* ── KPI Row 2 — Members breakdown ─────────────────────────────────── */}
+      <KpiGrid2>
+        {KPIS.slice(4).map(k => (
+          <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
+            <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
+            {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
+            <KpiLabel>{k.label}</KpiLabel>
+          </KpiCard>
+        ))}
+      </KpiGrid2>
+
+      {/* ── Members Growth — Month Tiles + Calendar Drill-down ───────────── */}
+      <Card>
+        <GrowthHeader>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <CardTitle>Members Growth</CardTitle>
-            <InfoTooltip text="New members joined each month over the last 6 months" />
-          </CardHeader>
-          <CardBody>
-            <ResponsiveContainer width="100%" height={210}>
-              <AreaChart data={membersGrowth} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="memberGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.18} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area
-                  type="monotone" dataKey="members" name="Members"
-                  stroke="#3b82f6" strokeWidth={2.5}
-                  fill="url(#memberGrad)" dot={{ r: 3, fill: "#3b82f6", strokeWidth: 0 }}
-                  activeDot={{ r: 5 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardBody>
-        </Card>
+            <InfoTooltip text="Click any month to see a date-wise calendar of members who joined" />
+          </div>
+          <div ref={yearRef} style={{ position: "relative", display: "inline-flex" }}>
+            <YearBtn onClick={() => setYearMenuOpen(o => !o)}>
+              <Calendar size={13} />
+              {yearFilter === currentYear ? "This Year" : "Last Year"} ({yearFilter})
+              <ChevronDown size={13} />
+            </YearBtn>
+            <YearMenu $open={yearMenuOpen}>
+              {[currentYear, currentYear - 1].map(y => (
+                <YearOption key={y} $active={yearFilter === y} onClick={() => { setYearFilter(y); setYearMenuOpen(false); setSelectedMonth(null); setSelectedDay(null); }}>
+                  {y === currentYear ? "This Year" : "Last Year"} ({y})
+                </YearOption>
+              ))}
+            </YearMenu>
+          </div>
+        </GrowthHeader>
+        <MonthGrid>
+          {membersGrowth.map((pt: any) => (
+            <MonthTile
+              key={`${pt.month}-${pt.year}`}
+              $active={selectedMonth?.month === pt.month && selectedMonth?.year === pt.year}
+              $hasMembers={pt.members > 0}
+              onClick={() => {
+                setSelectedDay(null);
+                setSelectedMonth({ month: pt.month, year: pt.year, month_num: pt.month_num, member_list: pt.member_list });
+                setYearMenuOpen(false);
+              }}
+            >
+              <MonthTileLabel>{pt.month}</MonthTileLabel>
+              <MonthTileYear>{pt.year}</MonthTileYear>
+              <MonthTileCount $zero={pt.members === 0}>{pt.members}</MonthTileCount>
+              <MonthTileSub>{pt.members === 1 ? "member" : "members"}</MonthTileSub>
+            </MonthTile>
+          ))}
+        </MonthGrid>
+      </Card>
 
-        {/* Policies by Status — Donut */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Policies by Status</CardTitle>
-            <InfoTooltip text="Breakdown of all policies by their current review status" />
-          </CardHeader>
-          <CardBody style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            {policiesByStatus.length === 0 ? (
-              <div style={{ padding: "40px 0", color: "#94a3b8", fontSize: 13 }}>No policies yet</div>
-            ) : (
-              <>
-                <ResponsiveContainer width="100%" height={160}>
-                  <PieChart>
-                    <Pie
-                      data={policiesByStatus}
-                      dataKey="count"
-                      nameKey="status"
-                      cx="50%" cy="50%"
-                      innerRadius={45} outerRadius={72}
-                      paddingAngle={3}
-                      style={{ cursor: "pointer" }}
-                      onClick={(entry: any) => router.push(`/admin/policies?status=${entry.status}`)}
-                    >
-                      {policiesByStatus.map((entry, i) => (
-                        <Cell key={entry.status} fill={STATUS_COLORS[entry.status] ?? PLAN_COLORS[i % PLAN_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(val: any, name: any) => [val, STATUS_LABELS[name] ?? name]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px", marginTop: 4, justifyContent: "center" }}>
-                  {policiesByStatus.map(e => (
-                    <div
-                      key={e.status}
-                      onClick={() => router.push(`/admin/policies?status=${e.status}`)}
-                      style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, cursor: "pointer" }}
-                    >
-                      <span style={{ width: 9, height: 9, borderRadius: "50%", background: STATUS_COLORS[e.status] ?? "#94a3b8", flexShrink: 0, display: "inline-block" }} />
-                      <span style={{ color: "#64748b" }}>{STATUS_LABELS[e.status] ?? e.status}</span>
-                      <span style={{ fontWeight: 700, color: "#0f172a" }}>{e.count}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </CardBody>
-        </Card>
-      </TwoCol>
+      {/* Policies by Status — Donut (commented out: auto-approve makes status breakdown misleading)
+      <Card>…</Card>
+      */}
 
-      {/* ── Data Row: Members table + AI Queue ───────────────────────────── */}
-      <TwoCol>
+      {/* ── Data Row: Recent Members ─────────────────────────────────────── */}
+      <div>
         {/* Recent Members */}
         <Card>
           <CardHeader>
@@ -448,52 +565,15 @@ export default function DashboardPage() {
           </Table>
         </Card>
 
-        {/* AI Review Queue */}
+        {/* Policy Review Queue (commented out: auto-approve makes this queue always empty)
         <Card>
           <CardHeader>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <CardTitle>Policy Review Queue</CardTitle>
-              <InfoTooltip text="Policies extracted by AI that need your approval or rejection" />
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {reviewQueueTotal > 0 && (
-                <span style={{
-                  background: "#fffbeb", color: "#b45309",
-                  fontSize: 11, fontWeight: 700, borderRadius: 999, padding: "2px 9px"
-                }}>
-                  {reviewQueueTotal} pending
-                </span>
-              )}
-              <Ghost onClick={() => router.push("/admin/policies?status=need_review")}>View all →</Ghost>
-            </div>
+            <CardTitle>Policy Review Queue</CardTitle>
+            ...
           </CardHeader>
-          {reviewQueue.length === 0 ? (
-            <div style={{ padding: "28px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
-              No policies pending review
-            </div>
-          ) : (
-            reviewQueue.map((p: any) => (
-              <QueueItem key={p.id} onClick={() => router.push(`/admin/policies/${p.id}`)}>
-                <QueueDot />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: 13, color: "#0f172a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.policy_number || p.file_name || "Unnamed policy"}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
-                    {p.created_at ? new Date(p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""}
-                  </div>
-                </div>
-                <FileSearch size={14} color="#94a3b8" />
-              </QueueItem>
-            ))
-          )}
-          <div style={{ padding: "12px 20px", borderTop: "1px solid #f1f2f6", background: "#f8f9fb" }}>
-            <Ghost style={{ width: "100%", textAlign: "center" }} onClick={() => router.push("/admin/policies")}>
-              Open policy repository →
-            </Ghost>
-          </div>
         </Card>
-      </TwoCol>
+        */}
+      </div>
 
       {/* ── Bottom Row: Bar chart + Plan distribution ─────────────────────── */}
       <ThreeCol style={{ gridTemplateColumns: "1.4fr 1fr" }}>
@@ -552,6 +632,125 @@ export default function DashboardPage() {
           </PlanBar>
         </Card>
       </ThreeCol>
+
+      {/* ── Calendar Modal ────────────────────────────────────────────────── */}
+      {selectedMonth && (() => {
+        const { month, year, month_num, member_list } = selectedMonth;
+
+        // Build day → members map  (joined = "DD MMM YYYY")
+        const dayMap: Record<number, any[]> = {};
+        member_list.forEach(m => {
+          const day = parseInt((m.joined ?? "").split(" ")[0], 10);
+          if (!day) return;
+          if (!dayMap[day]) dayMap[day] = [];
+          dayMap[day].push(m);
+        });
+
+        const firstDow  = new Date(year, month_num - 1, 1).getDay(); // 0=Sun
+        const totalDays = new Date(year, month_num, 0).getDate();     // 28–31
+        const cells: (number | null)[] = [
+          ...Array(firstDow).fill(null),
+          ...Array.from({ length: totalDays }, (_, i) => i + 1),
+        ];
+        // Pad to full weeks
+        while (cells.length % 7 !== 0) cells.push(null);
+
+        const dayMembers = selectedDay ? (dayMap[selectedDay] ?? []) : [];
+        const MONTH_FULL = ["January","February","March","April","May","June",
+                            "July","August","September","October","November","December"];
+
+        const MRow = ({ m }: { m: any }) => (
+          <ModalRow onClick={() => { router.push(`/admin/members/${m.id}`); setSelectedMonth(null); setSelectedDay(null); }}>
+            <AvatarCircle>
+              {(m.name || m.email || "M").split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
+            </AvatarCircle>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <MemberName>{m.name || m.email}</MemberName>
+              <MemberSub>{m.email}</MemberSub>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+              {m.partner_name && (
+                <span style={{
+                  fontSize: 11, fontWeight: 600, borderRadius: 999,
+                  padding: "2px 8px", background: "#eff6ff", color: "#2563eb", whiteSpace: "nowrap",
+                }}>
+                  {m.partner_name}
+                </span>
+              )}
+              <span style={{ fontSize: 11, color: "#94a3b8", whiteSpace: "nowrap" }}>{m.joined}</span>
+            </div>
+          </ModalRow>
+        );
+
+        return (
+          <ModalOverlay onClick={() => { setSelectedMonth(null); setSelectedDay(null); }}>
+            <ModalBox onClick={e => e.stopPropagation()}>
+              <ModalHead>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>
+                    {MONTH_FULL[month_num - 1]} {year}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                    {member_list.length} member{member_list.length !== 1 ? "s" : ""} joined
+                    {selectedDay ? ` — ${selectedDay} ${month} selected` : " — click a date"}
+                  </div>
+                </div>
+                <CloseBtn onClick={() => { setSelectedMonth(null); setSelectedDay(null); }}><X size={16} /></CloseBtn>
+              </ModalHead>
+
+              <ModalBody>
+                {/* Calendar Grid */}
+                <CalSection>
+                  <CalDayHeaders>
+                    {["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d => (
+                      <CalDayHeader key={d}>{d}</CalDayHeader>
+                    ))}
+                  </CalDayHeaders>
+                  <CalCells>
+                    {cells.map((day, idx) => {
+                      const has = day !== null && !!dayMap[day];
+                      const sel = day !== null && day === selectedDay;
+                      return (
+                        <CalCell
+                          key={idx}
+                          $empty={day === null}
+                          $has={has}
+                          $sel={sel}
+                          onClick={() => day && has && setSelectedDay(sel ? null : day)}
+                        >
+                          {day !== null && <span>{day}</span>}
+                          {has && <CalBadge $sel={sel}>{dayMap[day!].length}</CalBadge>}
+                        </CalCell>
+                      );
+                    })}
+                  </CalCells>
+                </CalSection>
+
+                {/* Day drill-down panel */}
+                <DayPanel>
+                  {!selectedDay ? (
+                    member_list.length === 0 ? (
+                      <div style={{ padding: "28px 20px", textAlign: "center", color: "#9ca3af", fontSize: 13 }}>
+                        No members joined this month
+                      </div>
+                    ) : (
+                      <>
+                        <DayPanelHead>All {member_list.length} members this month</DayPanelHead>
+                        {member_list.map((m: any) => <MRow key={m.id} m={m} />)}
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <DayPanelHead>{selectedDay} {MONTH_FULL[month_num - 1]} — {dayMembers.length} member{dayMembers.length !== 1 ? "s" : ""}</DayPanelHead>
+                      {dayMembers.map((m: any) => <MRow key={m.id} m={m} />)}
+                    </>
+                  )}
+                </DayPanel>
+              </ModalBody>
+            </ModalBox>
+          </ModalOverlay>
+        );
+      })()}
     </Page>
   );
 }

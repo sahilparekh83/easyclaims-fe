@@ -19,7 +19,11 @@ const STATUS_MAP: Record<string, Variant> = {
   inactive: "danger", Inactive: "danger", INACTIVE: "danger",
   false: "danger", no: "danger", No: "danger",
   archived: "danger", Archived: "danger", ARCHIVED: "danger",
+  expired: "danger", Expired: "danger", EXPIRED: "danger",
+  rejected: "danger", Rejected: "danger", REJECTED: "danger",
   pending: "warning", Pending: "warning", PENDING: "warning",
+  need_review: "warning",
+  processing: "info", Processing: "info",
   draft: "info", Draft: "info", DRAFT: "info",
   global: "info",
 };
