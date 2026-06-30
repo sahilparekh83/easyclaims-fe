@@ -11,7 +11,9 @@ import styled from "styled-components";
 import {
   adminGetPolicy, adminApprovePolicy, adminRejectPolicy,
   adminUpdatePolicyFields, adminViewPolicyPdf,
+  adminConfirmRenewal, adminDismissRenewal,
 } from "@/imports/core/api";
+import { RefreshCw } from "lucide-react";
 import { getApiError } from "@/imports/core/errors";
 
 // ─── Styled ────────────────────────────────────────────────────────────────────
@@ -217,6 +219,51 @@ function EditableField({ fieldKey, value, onChange, readOnly }: {
   );
 }
 
+const RenewalCard = styled.div`
+  margin: 12px 16px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #fdf4ff;
+  border: 1px solid #e9d5ff;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const RenewalTitle = styled.div`
+  font-size: 12px;
+  font-weight: 700;
+  color: #7c3aed;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const RenewalBody = styled.div`
+  font-size: 12px;
+  color: #4b5563;
+  line-height: 1.5;
+`;
+
+const RenewalActions = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+`;
+
+const RenewalBtn = styled.button<{ $variant: 'confirm' | 'dismiss' }>`
+  padding: 5px 14px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  background: ${p => p.$variant === 'confirm' ? '#7c3aed' : '#f1f5f9'};
+  color: ${p => p.$variant === 'confirm' ? '#fff' : '#374151'};
+  &:hover { opacity: 0.88; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function PolicyReviewPage() {
@@ -289,6 +336,27 @@ export default function PolicyReviewPage() {
   );
 
   const canAct = status === "need_review";
+  const isRenewalPending = status === "renewal_pending";
+
+  const confirmRenewalMutation = useMutation({
+    mutationFn: () => adminConfirmRenewal(id),
+    onSuccess: () => {
+      toast.success("Renewal confirmed — previous policy marked as superseded");
+      queryClient.invalidateQueries({ queryKey: ["admin", "policy", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to confirm renewal")),
+  });
+
+  const dismissRenewalMutation = useMutation({
+    mutationFn: () => adminDismissRenewal(id),
+    onSuccess: () => {
+      toast.success("Treated as a new policy");
+      queryClient.invalidateQueries({ queryKey: ["admin", "policy", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to dismiss renewal")),
+  });
 
   return (
     <PageWrap>
@@ -307,10 +375,12 @@ export default function PolicyReviewPage() {
           </div>
           {status && (
             <StatusBadge $s={status}>
-              {status === "processing"  ? "Processing" :
-               status === "need_review" ? "Need Review" :
-               status === "active"      ? "Approved" :
-               status === "rejected"    ? "Rejected" : status}
+              {status === "processing"      ? "Processing" :
+               status === "need_review"     ? "Need Review" :
+               status === "renewal_pending" ? "Renewal?" :
+               status === "active"          ? "Approved" :
+               status === "renewed"         ? "Superseded" :
+               status === "rejected"        ? "Rejected" : status}
             </StatusBadge>
           )}
         </TopLeft>
@@ -355,6 +425,40 @@ export default function PolicyReviewPage() {
         <Body>
           {/* Left — extracted fields */}
           <LeftPanel>
+            {isRenewalPending && (
+              <RenewalCard>
+                <RenewalTitle><RefreshCw size={13} /> Renewal Detected</RenewalTitle>
+                <RenewalBody>
+                  AI detected this may be a renewal of a previous policy of the same type.
+                  Confidence: <strong>Low</strong> — please confirm or dismiss.
+                  {policy?.previous_policy_id && (
+                    <> Previous policy: <a href={`/admin/policies/${policy.previous_policy_id}`} style={{ color: "#7c3aed" }}>View</a></>
+                  )}
+                </RenewalBody>
+                <RenewalActions>
+                  <RenewalBtn
+                    $variant="confirm"
+                    disabled={confirmRenewalMutation.isPending}
+                    onClick={() => confirmRenewalMutation.mutate()}
+                  >
+                    {confirmRenewalMutation.isPending ? "Confirming…" : "Yes, it's a renewal"}
+                  </RenewalBtn>
+                  <RenewalBtn
+                    $variant="dismiss"
+                    disabled={dismissRenewalMutation.isPending}
+                    onClick={() => dismissRenewalMutation.mutate()}
+                  >
+                    {dismissRenewalMutation.isPending ? "Dismissing…" : "No, new policy"}
+                  </RenewalBtn>
+                </RenewalActions>
+              </RenewalCard>
+            )}
+            {policy?.previous_policy_id && status === "active" && (
+              <div style={{ margin: "10px 16px", padding: "8px 14px", background: "#f0fdf4", borderRadius: 8, fontSize: 12, color: "#16a34a", display: "flex", alignItems: "center", gap: 6 }}>
+                <RefreshCw size={12} />
+                Renewal of previous policy — <a href={`/admin/policies/${policy.previous_policy_id}`} style={{ color: "#16a34a", marginLeft: 4 }}>View previous</a>
+              </div>
+            )}
             <PanelHeader>Extracted Fields</PanelHeader>
             {visibleFields.length === 0 ? (
               <div style={{ padding: "1.5rem", color: "#94a3b8", fontSize: "0.8rem" }}>

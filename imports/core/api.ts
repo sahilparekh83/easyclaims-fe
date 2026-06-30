@@ -369,6 +369,12 @@ export const adminRejectPolicy = (id: string) =>
 export const adminUpdatePolicyFields = (id: string, fields: object) =>
   apiClient.patch(`/admin/policies/${id}/fields`, fields).then((r) => r.data);
 
+export const adminConfirmRenewal = (id: string) =>
+  apiClient.post(`/admin/policies/${id}/confirm-renewal`, {}).then((r) => r.data);
+
+export const adminDismissRenewal = (id: string) =>
+  apiClient.post(`/admin/policies/${id}/dismiss-renewal`, {}).then((r) => r.data);
+
 // ─────────────────────────────────────────────
 // ADMIN — DASHBOARD ANALYTICS
 // ─────────────────────────────────────────────
