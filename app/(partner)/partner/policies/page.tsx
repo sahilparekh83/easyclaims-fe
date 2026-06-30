@@ -7,6 +7,8 @@ import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import { Download, FileSearch, Search, AlertTriangle, Check, X } from "lucide-react";
+import PoliciesTable from "@/components/ui/PoliciesTable";
+import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { useDebounce } from "@/hooks/useDebounce";
 import {
   partnerListPolicies,
@@ -236,88 +238,14 @@ export default function PoliciesPage() {
           </TopActions>
         </CardTop>
 
-        <Table>
-          <thead>
-            <tr>
-              <Th>Policy</Th>
-              <Th>Member</Th>
-              <Th>Type</Th>
-              <Th>Insurer</Th>
-              <Th>Sum Insured</Th>
-              <Th>AI Extraction</Th>
-              <Th>Status</Th>
-              <Th>Actions</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <EmptyRow><td colSpan={8}>Loading…</td></EmptyRow>
-            ) : policies.length === 0 ? (
-              <EmptyRow><td colSpan={8}>No policies found.</td></EmptyRow>
-            ) : policies.map((row: any) => (
-              <Tr key={row.id}>
-                <Td>
-                  <MonoText style={{ fontSize: 13 }}>{row.policy_number || "—"}</MonoText>
-                </Td>
-                <Td>
-                  <MemberName>{row.member_name || "—"}</MemberName>
-                  {row.member_email && <MemberEmail>{row.member_email}</MemberEmail>}
-                </Td>
-                <Td>
-                  {row.policy_type
-                    ? <TypeBadge $type={row.policy_type}>{row.policy_type}</TypeBadge>
-                    : <span style={{ color: "#9ca3af" }}>—</span>}
-                </Td>
-                <Td>{row.insurer || <span style={{ color: "#9ca3af" }}>—</span>}</Td>
-                <Td>
-                  {row.sum_insured != null
-                    ? <MonoText style={{ color: "#161d26", fontWeight: 600 }}>₹{Number(row.sum_insured).toLocaleString("en-IN")}</MonoText>
-                    : <span style={{ color: "#9ca3af" }}>—</span>}
-                </Td>
-                <Td>
-                  {(() => {
-                    const d = getDaysUntilExpiry(row.end_date);
-                    if (d !== null && d < 0) return <span style={{ color: "#9ca3af" }}>—</span>;
-                    if (row.status === "processing")                              return <AiBadge $s="processing">⏳ Processing</AiBadge>;
-                    if (row.status === "need_review" || row.status === "pending") return <AiBadge $s="need_review"><AlertTriangle size={11} /> Need Review</AiBadge>;
-                    if (row.status === "active")                                  return <AiBadge $s="active"><Check size={11} /> Approved</AiBadge>;
-                    if (row.status === "rejected")                                return <AiBadge $s="rejected"><X size={11} /> Rejected</AiBadge>;
-                    return <span style={{ color: "#9ca3af" }}>—</span>;
-                  })()}
-                </Td>
-                <Td>
-                  {(() => {
-                    const d = getDaysUntilExpiry(row.end_date);
-                    const isExpired = d !== null && d < 0;
-                    const effectiveStatus = isExpired ? "expired" : row.status;
-                    return (
-                      <>
-                        <StatusPill $s={effectiveStatus}>
-                          {effectiveStatus === "expired"    ? "Expired" :
-                           effectiveStatus === "active"      ? "Active" :
-                           effectiveStatus === "need_review" || effectiveStatus === "pending" ? "Pending" :
-                           effectiveStatus === "processing"  ? "Processing" :
-                           effectiveStatus === "rejected"    ? "Rejected" : effectiveStatus ?? "—"}
-                        </StatusPill>
-                        {d !== null && d >= 0 && d <= 30 && (
-                          <div><ExpiryWarning><AlertTriangle size={10} /> Expires in {d}d</ExpiryWarning></div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </Td>
-                <Td>
-                  <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-                    {row.has_file && (
-                      <ActionBtn title="Download PDF" onClick={() => downloadPdf(row.id, row.file_name)}><Download size={14} /></ActionBtn>
-                    )}
-                    <ActionBtn title="View Details" onClick={() => router.push(`/partner/policies/${row.id}`)}><FileSearch size={14} /></ActionBtn>
-                  </div>
-                </Td>
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
+        <PoliciesTable
+          policies={policies}
+          isLoading={isLoading}
+          role="partner"
+          showMemberColumn
+          onDownload={row => downloadPdf(row.id, row.file_name ?? undefined)}
+          onView={row => router.push(`/partner/policies/${row.id}`)}
+        />
 
         {total > ROWS && (
           <Pagination>

@@ -14,6 +14,7 @@ import {
   adminConfirmRenewal, adminDismissRenewal,
 } from "@/imports/core/api";
 import { RefreshCw } from "lucide-react";
+import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { getApiError } from "@/imports/core/errors";
 
 // ─── Styled ────────────────────────────────────────────────────────────────────
@@ -374,14 +375,7 @@ export default function PolicyReviewPage() {
             <MemberName>{policy?.member_name ?? ""}</MemberName>
           </div>
           {status && (
-            <StatusBadge $s={status}>
-              {status === "processing"      ? "Processing" :
-               status === "need_review"     ? "Need Review" :
-               status === "renewal_pending" ? "Renewal?" :
-               status === "active"          ? "Approved" :
-               status === "renewed"         ? "Superseded" :
-               status === "rejected"        ? "Rejected" : status}
-            </StatusBadge>
+            <PolicyStatusBadge status={status} isRenewal={!!policy?.previous_policy_id} />
           )}
         </TopLeft>
 
