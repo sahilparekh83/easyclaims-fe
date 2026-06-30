@@ -9,7 +9,9 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { InputSwitch } from "primereact/inputswitch";
-import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck, Briefcase, Users, CheckCircle2, AlertCircle, FileSearch, Download } from "lucide-react";
+import { ChevronLeft, User, MapPin, UserCheck, Shield, ShieldCheck, Briefcase, Users, CheckCircle2, AlertCircle } from "lucide-react";
+import PoliciesTable from "@/components/ui/PoliciesTable";
+import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
@@ -399,6 +401,7 @@ export default function MemberDetailPage() {
   const [familyCrNote, setFamilyCrNote] = useState("");
   const [switchPlanOpen, setSwitchPlanOpen] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [viewLinkedPolicy, setViewLinkedPolicy] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "member", id],
@@ -946,83 +949,14 @@ export default function MemberDetailPage() {
               <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>All Policies</span>
               <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748b" }}>{totalPolicies} total</span>
             </div>
-            {totalPolicies === 0 ? (
-              <div style={{ padding: "2rem", textAlign: "center", color: "#9ca3af", fontSize: 14 }}>No policies uploaded.</div>
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
-                  <thead>
-                    <tr>
-                      {["Policy Number", "Type · Insurer", "Sum Insured", "Period", "Family", "Status", "Actions"].map(h => (
-                        <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#64748b", background: "#f8f9fb", borderBottom: "1px solid #f1f2f6", whiteSpace: "nowrap" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {memberPolicies.map((p: any) => (
-                      <tr key={p.id} style={{ borderTop: "1px solid #f1f2f6" }}>
-                        <td style={{ padding: "11px 16px" }}>
-                          <div style={{ fontFamily: "monospace", fontWeight: 600, color: "#0f172a", fontSize: 13 }}>{p.policy_number || "—"}</div>
-                        </td>
-                        <td style={{ padding: "11px 16px" }}>
-                          <div style={{ fontWeight: 600, color: "#374151", fontSize: 13 }}>{p.policy_type || "—"}</div>
-                          <div style={{ fontSize: 12, color: "#64748b" }}>{p.insurer || "—"}</div>
-                        </td>
-                        <td style={{ padding: "11px 16px", fontWeight: 600, color: "#374151" }}>
-                          {p.sum_insured ? `₹${Number(p.sum_insured).toLocaleString("en-IN")}` : "—"}
-                        </td>
-                        <td style={{ padding: "11px 16px", fontSize: 12, color: "#64748b", whiteSpace: "nowrap" }}>
-                          {p.start_date ? dayjs(p.start_date).format("DD MMM YY") : "—"}
-                          {" → "}
-                          {p.end_date ? dayjs(p.end_date).format("DD MMM YY") : "—"}
-                        </td>
-                        <td style={{ padding: "11px 16px" }}>
-                          {(p.linked_family_members ?? []).length > 0
-                            ? <span style={{ fontSize: 12, background: "#f5f3ff", color: "#7c3aed", borderRadius: 999, padding: "2px 8px", fontWeight: 600 }}>+{p.linked_family_members.length}</span>
-                            : <span style={{ color: "#9ca3af" }}>—</span>}
-                        </td>
-                        <td style={{ padding: "11px 16px" }}>
-                          <span style={{
-                            display: "inline-flex", alignItems: "center", fontSize: 11.5, fontWeight: 700,
-                            padding: "3px 10px", borderRadius: 999,
-                            background: p.status?.toLowerCase() === "active" ? "#f0fdf4" : p.status?.toLowerCase() === "expired" ? "#fef9c3" : "#f8fafc",
-                            color: p.status?.toLowerCase() === "active" ? "#16a34a" : p.status?.toLowerCase() === "expired" ? "#854d0e" : "#64748b",
-                          }}>
-                            {p.status || "—"}
-                          </span>
-                        </td>
-                        <td style={{ padding: "11px 16px" }}>
-                          <div style={{ display: "flex", gap: 2 }}>
-                            {p.has_file && (
-                              <>
-                                <button
-                                  title="View PDF"
-                                  onClick={async () => { const blob = await adminViewPolicyPdf(p.id); window.open(URL.createObjectURL(blob)); }}
-                                  style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}
-                                  onMouseOver={e => (e.currentTarget.style.background = "#f1f5f9")}
-                                  onMouseOut={e => (e.currentTarget.style.background = "transparent")}
-                                >
-                                  <FileSearch size={15} />
-                                </button>
-                                <button
-                                  title="Download PDF"
-                                  onClick={async () => { const blob = await adminDownloadPolicyPdf(p.id); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `policy_${p.policy_number}.pdf`; a.click(); URL.revokeObjectURL(url); }}
-                                  style={{ width: 30, height: 30, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}
-                                  onMouseOver={e => (e.currentTarget.style.background = "#f1f5f9")}
-                                  onMouseOut={e => (e.currentTarget.style.background = "transparent")}
-                                >
-                                  <Download size={15} />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+            <PoliciesTable
+              policies={memberPolicies}
+              role="admin"
+              onDownload={async p => { const blob = await adminDownloadPolicyPdf(p.id); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `policy_${p.policy_number}.pdf`; a.click(); URL.revokeObjectURL(url); }}
+              onView={p => router.push(`/admin/policies/${p.id}`)}
+              onLinked={p => setViewLinkedPolicy(p)}
+              emptyText="No policies uploaded."
+            />
           </Card>
         </div>
       )}
@@ -1459,6 +1393,42 @@ export default function MemberDetailPage() {
               <InputTextarea value={familyCrNote} onChange={e => setFamilyCrNote(e.target.value)}
                 rows={2} style={{ width: "100%", fontSize: 13 }} placeholder="Note for the member..." />
             </div>
+          </div>
+        )}
+      </Dialog>
+
+      {/* Linked Family Members Dialog */}
+      <Dialog
+        header="Linked Family Members"
+        visible={!!viewLinkedPolicy}
+        onHide={() => setViewLinkedPolicy(null)}
+        style={{ width: "380px" }}
+        footer={
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button label="Close" severity="secondary" outlined onClick={() => setViewLinkedPolicy(null)} />
+          </div>
+        }
+      >
+        {viewLinkedPolicy && (
+          <div>
+            <p style={{ marginBottom: "0.75rem", fontSize: "0.9rem", color: "#3a4756" }}>
+              Policy: <strong style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{viewLinkedPolicy.policy_number}</strong>
+            </p>
+            {(viewLinkedPolicy.linked_family_members ?? []).length === 0 ? (
+              <div style={{ fontSize: 13, color: "#9ca3af", textAlign: "center", padding: "1rem 0" }}>No linked family members.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(viewLinkedPolicy.linked_family_members ?? []).map((m: any) => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                    <span style={{ fontSize: 18 }}>👤</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#161d26" }}>{m.name}</div>
+                      <div style={{ fontSize: "0.78rem", color: "#6b7a8c", textTransform: "capitalize" }}>{m.relation}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </Dialog>

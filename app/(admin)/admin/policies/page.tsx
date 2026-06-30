@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { Download, FileSearch, FileText, CheckCircle, AlertTriangle, Sparkles, Upload, X, ChevronRight, Check, Info, ChevronDown, Filter, Users, CheckCheck } from "lucide-react";
+import PoliciesTable from "@/components/ui/PoliciesTable";
+import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
@@ -759,134 +761,25 @@ export default function PoliciesPage() {
           )}
         </div>
 
-        <Table style={{ marginTop: 4 }}>
-          <thead>
-            <tr>
-              <Th>Policy</Th>
-              <ThSm>
-                <FilterDropdown
-                  label="Type"
-                  value={typeFilter}
-                  onChange={v => { setTypeFilter(v); setFirst(0); }}
-                  options={[
-                    { label: "Health", value: "Health" },
-                    { label: "Life",   value: "Life" },
-                    { label: "Motor",  value: "Motor" },
-                    { label: "Travel", value: "Travel" },
-                    { label: "Home",   value: "Home" },
-                  ]}
-                />
-              </ThSm>
-              <ThSm>Insurer</ThSm>
-              <ThSm>Sum Insured</ThSm>
-              <ThSm>
-                <FilterDropdown
-                  label="AI Extraction"
-                  value={aiFilter}
-                  onChange={v => { setAiFilter(v); setFirst(0); }}
-                  options={[
-                    { label: "Processing",  value: "processing" },
-                    { label: "Need Review", value: "need_review" },
-                    { label: "Approved",    value: "active" },
-                    { label: "Rejected",    value: "rejected" },
-                  ]}
-                />
-              </ThSm>
-              <Th style={{ paddingLeft: 8 }}>Status</Th>
-              <Th style={{ paddingLeft: 8 }}>Actions</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i}>
-                  <Td colSpan={7}><Skeleton /></Td>
-                </tr>
-              ))
-            ) : policies.length === 0 ? (
-              <tr>
-                <Td colSpan={7} style={{ textAlign: "center", color: "#94a3b8", padding: "32px 22px" }}>
-                  No policies found.
-                </Td>
-              </tr>
-            ) : policies.map((row: any) => {
-              const hasExtracted = row.extracted_fields && Object.keys(row.extracted_fields).length > 0;
-              const policyType: string = row.policy_type || "";
-              return (
-                <tr
-                  key={row.id}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#f8f9fb")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "")}
-                >
-                  <Td>
-                    <PolicyMono>{row.policy_number || "—"}</PolicyMono>
-                    <PolicySub>{row.member_name || ""}</PolicySub>
-                  </Td>
-                  <TdSm>
-                    {policyType
-                      ? <TypeBadge $type={policyType}>{policyType}</TypeBadge>
-                      : <span style={{ color: "#94a3b8" }}>—</span>}
-                  </TdSm>
-                  <TdSm style={{ color: "#374151" }}>{row.insurer || "—"}</TdSm>
-                  <TdSm style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontWeight: 500, color: "#0f172a" }}>
-                    {row.sum_insured != null ? `₹${Number(row.sum_insured).toLocaleString("en-IN")}` : "—"}
-                  </TdSm>
-                  <TdSm>
-                    {(() => {
-                      const d = getDaysUntilExpiry(row.end_date);
-                      if (d !== null && d < 0) return <span style={{ color: "#94a3b8" }}>—</span>;
-                      if (row.status === 'processing')                              return <AiExtractionBadge $s="processing"><span>⏳</span> Processing</AiExtractionBadge>;
-                      if (row.status === 'need_review' || row.status === 'pending') return <AiExtractionBadge $s="need_review"><AlertTriangle size={12} /> Need Review</AiExtractionBadge>;
-                      if (row.status === 'renewal_pending')                         return <AiExtractionBadge $s="renewal_pending"><AlertTriangle size={12} /> Renewal?</AiExtractionBadge>;
-                      if (row.status === 'active' && row.previous_policy_id)        return <AiExtractionBadge $s="active"><Check size={12} /> Renewed</AiExtractionBadge>;
-                      if (row.status === 'active')                                  return <AiExtractionBadge $s="active"><Check size={12} /> Approved</AiExtractionBadge>;
-                      if (row.status === 'renewed')                                 return <AiExtractionBadge $s="renewed"><Check size={12} /> Superseded</AiExtractionBadge>;
-                      if (row.status === 'rejected')                                return <AiExtractionBadge $s="rejected"><X size={12} /> Rejected</AiExtractionBadge>;
-                      return <span style={{ color: "#94a3b8" }}>—</span>;
-                    })()}
-                  </TdSm>
-                  <Td style={{ paddingLeft: 8 }}>
-                    {(() => {
-                      const d = getDaysUntilExpiry(row.end_date);
-                      const isExpired = d !== null && d < 0;
-                      const effectiveStatus = isExpired ? 'expired' : row.status;
-                      return (
-                        <>
-                          {effectiveStatus
-                            ? <StatusPill $status={effectiveStatus}>
-                                {effectiveStatus === 'expired'          ? 'Expired' :
-                                 effectiveStatus === 'processing'        ? 'Processing' :
-                                 effectiveStatus === 'need_review'       ? 'Pending' :
-                                 effectiveStatus === 'renewal_pending'   ? 'Renewal?' :
-                                 effectiveStatus === 'active'            ? 'Active' :
-                                 effectiveStatus === 'renewed'           ? 'Renewed' :
-                                 effectiveStatus === 'rejected'          ? 'Rejected' : effectiveStatus}
-                              </StatusPill>
-                            : <span style={{ color: "#94a3b8" }}>—</span>}
-                          {d !== null && d >= 0 && d <= 30 && (
-                            <div><ExpiryWarning><AlertTriangle size={10} /> Expires in {d}d</ExpiryWarning></div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </Td>
-                  <Td style={{ paddingLeft: 8 }}>
-                    <ActionBtns>
-                      {row.has_file && (
-                        <IconBtn title="Download PDF" onClick={() => downloadPdf(row.id, row.file_name)}>
-                          <Download size={14} />
-                        </IconBtn>
-                      )}
-                      <IconBtn $color="#7c3aed" title="Review Policy" onClick={() => router.push(`/admin/policies/${row.id}`)}>
-                        <FileSearch size={14} />
-                      </IconBtn>
-                    </ActionBtns>
-                  </Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
+        <PoliciesTable
+          policies={policies}
+          isLoading={isLoading}
+          role="admin"
+          showMemberSubline
+          onDownload={row => downloadPdf(row.id, row.file_name ?? undefined)}
+          onView={row => router.push(`/admin/policies/${row.id}`)}
+          typeFilter={typeFilter}
+          onTypeFilter={v => { setTypeFilter(v); setFirst(0); }}
+          aiFilter={aiFilter}
+          onAiFilter={v => { setAiFilter(v); setFirst(0); }}
+          policyTypeOptions={[
+            { label: "Health", value: "Health" },
+            { label: "Life",   value: "Life" },
+            { label: "Motor",  value: "Motor" },
+            { label: "Travel", value: "Travel" },
+            { label: "Home",   value: "Home" },
+          ]}
+        />
 
         {/* Pagination */}
         {total > ROWS && (

@@ -1,17 +1,18 @@
 "use client";
 import React, { useState, useRef } from "react";
 import styled, { keyframes } from "styled-components";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Eye, Download, Upload, CheckCircle2, X, AlertTriangle } from "lucide-react";
+import PoliciesTable from "@/components/ui/PoliciesTable";
 import {
   memberListPolicies, memberUploadPolicy, memberUpdatePolicy,
   memberDeletePolicy, memberViewPolicyPdf, memberDownloadPolicyPdf,
   listPolicyTypes, memberListFamily,
 } from "@/imports/core/api";
-import StatusBadge from "@/components/ui/StatusBadge";
+import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
-import { Checkbox } from "primereact/checkbox";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -273,6 +274,7 @@ interface Policy {
   id: string; policy_number: string; insurer: string; policy_type?: string;
   sum_insured?: number | null; premium_amount?: number | null;
   start_date: string; end_date: string; status: string; file_name?: string | null;
+  previous_policy_id?: string | null;
   linked_family_members: LinkedMember[] | null | undefined;
 }
 interface FamilyMember { id: string; name: string; relation: string; }
@@ -303,6 +305,7 @@ async function downloadPdf(policyId: string, fileName?: string | null) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MemberPoliciesPage() {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -314,8 +317,6 @@ export default function MemberPoliciesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadPolicyTypeId, setUploadPolicyTypeId] = useState("");
   const [dropActive, setDropActive] = useState(false);
-  const [uploadFamilyIds, setUploadFamilyIds] = useState<string[]>([]);
-  const [uploadSelf, setUploadSelf] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit links dialog state
@@ -365,8 +366,6 @@ export default function MemberPoliciesPage() {
   const openUpload = () => {
     setSelectedFile(null);
     setUploadPolicyTypeId("");
-    setUploadFamilyIds([]);
-    setUploadSelf(false);
     setDropActive(false);
     setUploadVisible(true);
   };
@@ -375,8 +374,6 @@ export default function MemberPoliciesPage() {
     setUploadVisible(false);
     setSelectedFile(null);
     setUploadPolicyTypeId("");
-    setUploadFamilyIds([]);
-    setUploadSelf(false);
     setDropActive(false);
   };
 
@@ -388,7 +385,6 @@ export default function MemberPoliciesPage() {
   };
   const closeEditLinksDialog = () => { setEditLinksDialogVisible(false); setEditingPolicy(null); setEditFamilyIds([]); setEditSelf(false); };
 
-  const toggleUploadFamilyId = (id: string) => setUploadFamilyIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   const toggleEditFamilyId = (id: string) => setEditFamilyIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -411,8 +407,6 @@ export default function MemberPoliciesPage() {
     const fd = new FormData();
     fd.append("file", selectedFile);
     fd.append("policy_type_id", uploadPolicyTypeId);
-    const linkedIds = [...(uploadSelf ? [] : []), ...uploadFamilyIds];
-    if (linkedIds.length > 0) fd.append("family_member_ids", linkedIds.join(","));
     uploadMutation.mutate(fd);
   };
 
@@ -435,85 +429,15 @@ export default function MemberPoliciesPage() {
           </div>
         </CardTop>
 
-        <Table>
-          <thead>
-            <tr>
-              <Th>Policy ID</Th>
-              <Th>Type</Th>
-              <Th>Insurer</Th>
-              <Th>Sum Insured</Th>
-              <Th>Period</Th>
-              <Th>Status</Th>
-              <Th>Actions</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <EmptyRow><td>Loading…</td></EmptyRow>
-            ) : policies.length === 0 ? (
-              <EmptyRow><td>No policies found.</td></EmptyRow>
-            ) : policies.map(p => (
-              <Tr key={p.id}>
-                <Td>
-                  <PolicyIdText>{p.policy_number}</PolicyIdText>
-                </Td>
-                <Td>
-                  {p.policy_type ? <TypeBadge $type={p.policy_type}>{p.policy_type}</TypeBadge> : <span style={{ color: "#9ca3af" }}>—</span>}
-                </Td>
-                <Td style={{ color: "#3a4756", fontWeight: 500 }}>{p.insurer || "—"}</Td>
-                <Td>
-                  {p.sum_insured != null
-                    ? <MonoValue>₹{Number(p.sum_insured).toLocaleString("en-IN")}</MonoValue>
-                    : <span style={{ color: "#9ca3af" }}>—</span>}
-                </Td>
-                <Td>
-                  <MonoMuted>
-                    {p.start_date ? dayjs(p.start_date).format("DD MMM YY") : "—"}
-                    {" – "}
-                    {p.end_date ? dayjs(p.end_date).format("DD MMM YY") : "—"}
-                  </MonoMuted>
-                  {(() => {
-                    const days = getDaysUntilExpiry(p.end_date);
-                    if (days === null || days < 0 || days > 30) return null;
-                    return (
-                      <ExpiryWarning>
-                        <AlertTriangle size={10} /> Expires in {days} day{days !== 1 ? "s" : ""}
-                      </ExpiryWarning>
-                    );
-                  })()}
-                </Td>
-                <Td>
-                  {(() => {
-                    const d = getDaysUntilExpiry(p.end_date);
-                    const effectiveStatus = (d !== null && d < 0) ? "expired" : p.status;
-                    return <StatusBadge value={effectiveStatus} />;
-                  })()}
-                </Td>
-                <Td>
-                  <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                    <ActionBtn title="View PDF" onClick={() => openPdf(p.id)}><Eye size={13} /></ActionBtn>
-                    <ActionBtn title="Download PDF" onClick={() => downloadPdf(p.id, p.file_name)}><Download size={13} /></ActionBtn>
-                    {(p.linked_family_members ?? []).length === 0 ? (
-                      <ActionBtn title="Link Family Members" onClick={() => openEditLinksDialog(p)}>
-                        <i className="pi pi-users" style={{ fontSize: 12 }} />
-                      </ActionBtn>
-                    ) : (
-                      <span
-                        title="Click to view linked family members"
-                        onClick={() => setViewLinkedPolicy(p)}
-                        style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "#fef9c3", color: "#92400e", fontWeight: 600, border: "1px solid #fde68a", cursor: "pointer" }}>
-                        🔗 {p.linked_family_members!.length}
-                      </span>
-                    )}
-                    <ActionBtn title="Delete" style={{ color: "#dc2626" }} onClick={() => handleDelete(p)}>
-                      <i className="pi pi-trash" style={{ fontSize: 12 }} />
-                    </ActionBtn>
-                  </div>
-                </Td>
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
+        <PoliciesTable
+          policies={policies}
+          isLoading={isLoading}
+          role="member"
+          onDownload={p => downloadPdf(p.id, p.file_name ?? undefined)}
+          onView={p => router.push(`/member/policies/${p.id}`)}
+          onDelete={p => handleDelete(p as any)}
+          onLinked={p => setViewLinkedPolicy(p as any)}
+        />
 
         {total > ROWS && (
           <Pagination>
@@ -564,24 +488,6 @@ export default function MemberPoliciesPage() {
                     <DropText style={{ fontSize: 12, marginTop: 4 }}>or click to browse</DropText>
                   </>}
             </UploadDropzone>
-
-            {(familyMembers.length > 0) && (
-              <FamilyBox>
-                <FamilyBoxLabel>Link to Family Members</FamilyBoxLabel>
-                <FamilyList>
-                  <FamilyRow>
-                    <Checkbox inputId="ul-self" checked={uploadSelf} onChange={() => setUploadSelf(v => !v)} />
-                    <label htmlFor="ul-self" style={{ fontWeight: 600 }}>Self (You)</label>
-                  </FamilyRow>
-                  {familyMembers.map(m => (
-                    <FamilyRow key={m.id}>
-                      <Checkbox inputId={`ul-fm-${m.id}`} checked={uploadFamilyIds.includes(m.id)} onChange={() => toggleUploadFamilyId(m.id)} />
-                      <label htmlFor={`ul-fm-${m.id}`}>{m.name} <span style={{ color: "#94a3b8", fontSize: 12 }}>({m.relation})</span></label>
-                    </FamilyRow>
-                  ))}
-                </FamilyList>
-              </FamilyBox>
-            )}
 
             <SubmitBtn onClick={handleUploadSubmit} disabled={uploadMutation.isPending}>
               {uploadMutation.isPending ? <Spinner /> : <><Upload size={15} /> Submit Document</>}
