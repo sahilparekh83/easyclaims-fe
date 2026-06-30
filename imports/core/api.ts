@@ -108,6 +108,11 @@ export const adminListPolicies = (params?: object) =>
 export const adminGetPolicy = (id: string) =>
   apiClient.get(`/admin/policies/${id}`).then((r) => r.data);
 
+export const adminUploadPolicy = (formData: FormData) =>
+  apiClient.post("/admin/policies/upload", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  }).then((r) => r.data);
+
 // ─────────────────────────────────────────────
 // ADMIN — POLICY TYPES
 // ─────────────────────────────────────────────
@@ -367,8 +372,8 @@ export const adminUpdatePolicyFields = (id: string, fields: object) =>
 // ─────────────────────────────────────────────
 // ADMIN — DASHBOARD ANALYTICS
 // ─────────────────────────────────────────────
-export const adminGetDashboard = () =>
-  apiClient.get("/admin/dashboard").then((r) => r.data);
+export const adminGetDashboard = (params?: { year?: number }) =>
+  apiClient.get("/admin/dashboard", { params }).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — SYSTEM SETTINGS

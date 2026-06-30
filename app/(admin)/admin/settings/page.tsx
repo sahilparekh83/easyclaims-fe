@@ -110,11 +110,18 @@ function previewText(d: number, h: number, m: number): string {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+
+  // Upload reminder state
   const [days,    setDays]    = useState<number>(0);
   const [hours,   setHours]   = useState<number>(0);
   const [mins,    setMins]    = useState<number>(1);
   const [edited,  setEdited]  = useState(false);
   const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+
+  // Policy expiry warning state
+  const [expiryDays,        setExpiryDays]        = useState<number>(7);
+  const [expiryEdited,      setExpiryEdited]      = useState(false);
+  const [expiryUpdatedAt,   setExpiryUpdatedAt]   = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "settings"],
@@ -123,6 +130,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const settings: any[] = (data as any)?.data ?? [];
+
     const s = settings.find((x: any) => x.key === "upload_reminder_delay_minutes");
     if (s?.value != null) {
       const parsed = fromTotalMinutes(Math.round(parseFloat(s.value)));
@@ -130,6 +138,12 @@ export default function SettingsPage() {
       setHours(parsed.hours);
       setMins(parsed.minutes);
       setUpdatedAt(s.updated_at);
+    }
+
+    const e = settings.find((x: any) => x.key === "policy_expiry_warning_days");
+    if (e?.value != null) {
+      setExpiryDays(Math.round(parseFloat(e.value)));
+      setExpiryUpdatedAt(e.updated_at);
     }
   }, [data]);
 
@@ -145,6 +159,16 @@ export default function SettingsPage() {
     onError: (err: any) => toast.error(getApiError(err, "Failed to save")),
   });
 
+  const saveExpiryMutation = useMutation({
+    mutationFn: () => adminUpdateSetting("policy_expiry_warning_days", String(expiryDays)),
+    onSuccess: () => {
+      toast.success("Setting saved");
+      setExpiryEdited(false);
+      queryClient.invalidateQueries({ queryKey: ["admin", "settings"] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to save")),
+  });
+
   return (
     <div>
       <PageHeader
@@ -152,6 +176,7 @@ export default function SettingsPage() {
         subtitle="Control system-wide configuration from the admin dashboard."
       />
 
+      {/* Upload Reminder */}
       <Card>
         {isLoading ? (
           <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>Loading…</p>
@@ -217,6 +242,54 @@ export default function SettingsPage() {
             {updatedAt && (
               <LastUpdated>
                 Last updated: {new Date(updatedAt).toLocaleString("en-IN")}
+              </LastUpdated>
+            )}
+          </>
+        )}
+      </Card>
+
+      {/* Policy Expiry Warning */}
+      <Card>
+        {isLoading ? (
+          <p style={{ color: "#6b7280", fontSize: "0.875rem" }}>Loading…</p>
+        ) : (
+          <>
+            <SettingLabel>Policy Expiry Warning — Days Before</SettingLabel>
+            <SettingHint>
+              How many days before a policy's end date to send an expiry alert
+              (email + WhatsApp) to the member.
+            </SettingHint>
+
+            <DurationRow>
+              <DurationField>
+                <UnitLabel>Days</UnitLabel>
+                <InputNumber
+                  value={expiryDays}
+                  onValueChange={(e) => { setExpiryDays(e.value ?? 7); setExpiryEdited(true); }}
+                  min={1} max={90}
+                  useGrouping={false}
+                  inputStyle={{ width: "80px", textAlign: "center", padding: "6px 8px" }}
+                />
+              </DurationField>
+            </DurationRow>
+
+            <Preview>
+              Alert will be sent {expiryDays} day{expiryDays !== 1 ? "s" : ""} before policy expiry
+            </Preview>
+
+            <SaveRow>
+              <Button
+                label="Save"
+                icon="pi pi-check"
+                disabled={!expiryEdited || expiryDays < 1}
+                loading={saveExpiryMutation.isPending}
+                onClick={() => saveExpiryMutation.mutate()}
+              />
+            </SaveRow>
+
+            {expiryUpdatedAt && (
+              <LastUpdated>
+                Last updated: {new Date(expiryUpdatedAt).toLocaleString("en-IN")}
               </LastUpdated>
             )}
           </>

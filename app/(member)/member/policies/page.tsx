@@ -2,7 +2,7 @@
 import React, { useState, useRef } from "react";
 import styled, { keyframes } from "styled-components";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Eye, Download, Upload, CheckCircle2, X } from "lucide-react";
+import { Eye, Download, Upload, CheckCircle2, X, AlertTriangle } from "lucide-react";
 import {
   memberListPolicies, memberUploadPolicy, memberUpdatePolicy,
   memberDeletePolicy, memberViewPolicyPdf, memberDownloadPolicyPdf,
@@ -219,6 +219,20 @@ const ActionBtn = styled.button`
 `;
 
 const EmptyRow = styled.tr`td { padding: 40px 20px; text-align: center; color: #9ca3af; }`;
+
+const ExpiryWarning = styled.span`
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  color: #b45309; background: #fef3c7;
+  border: 1px solid #fde68a; border-radius: 999px;
+  padding: 2px 7px; margin-top: 3px; white-space: nowrap;
+`;
+
+function getDaysUntilExpiry(endDate: string | null | undefined): number | null {
+  if (!endDate) return null;
+  const diff = dayjs(endDate).diff(dayjs().startOf("day"), "day");
+  return diff;
+}
 
 const Pagination = styled.div`
   display: flex; align-items: center; justify-content: space-between;
@@ -458,8 +472,23 @@ export default function MemberPoliciesPage() {
                     {" – "}
                     {p.end_date ? dayjs(p.end_date).format("DD MMM YY") : "—"}
                   </MonoMuted>
+                  {(() => {
+                    const days = getDaysUntilExpiry(p.end_date);
+                    if (days === null || days < 0 || days > 30) return null;
+                    return (
+                      <ExpiryWarning>
+                        <AlertTriangle size={10} /> Expires in {days} day{days !== 1 ? "s" : ""}
+                      </ExpiryWarning>
+                    );
+                  })()}
                 </Td>
-                <Td><StatusBadge value={p.status} /></Td>
+                <Td>
+                  {(() => {
+                    const d = getDaysUntilExpiry(p.end_date);
+                    const effectiveStatus = (d !== null && d < 0) ? "expired" : p.status;
+                    return <StatusBadge value={effectiveStatus} />;
+                  })()}
+                </Td>
                 <Td>
                   <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                     <ActionBtn title="View PDF" onClick={() => openPdf(p.id)}><Eye size={13} /></ActionBtn>

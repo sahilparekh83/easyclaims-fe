@@ -128,6 +128,20 @@ const EmptyRow = styled.tr`
   td { padding: 48px 16px; text-align: center; color: #9ca3af; font-size: 13.5px; }
 `;
 
+const ExpiryWarning = styled.span<{ $expired?: boolean }>`
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  color: ${p => p.$expired ? "#dc2626" : "#b45309"};
+  background: ${p => p.$expired ? "#fee2e2" : "#fef3c7"};
+  border: 1px solid ${p => p.$expired ? "#fca5a5" : "#fde68a"};
+  border-radius: 999px; padding: 2px 7px; margin-top: 3px; white-space: nowrap;
+`;
+
+function getDaysUntilExpiry(endDate: string | null | undefined): number | null {
+  if (!endDate) return null;
+  return dayjs(endDate).diff(dayjs().startOf("day"), "day");
+}
+
 const Pagination = styled.div`
   display: flex; align-items: center; justify-content: space-between;
   padding: 12px 18px; border-top: 1px solid #f1f2f6; font-size: 13px; color: #6b7a8c;
@@ -142,7 +156,7 @@ const PagBtn = styled.button`
 
 
 
-type TabFilter = "all" | "active" | "expired";
+type TabFilter = "active" | "expired";
 const ROWS = 20;
 
 // ─── PDF helpers ──────────────────────────────────────────────────────────────
@@ -164,7 +178,7 @@ export default function PoliciesPage() {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
-  const [tab, setTab] = useState<TabFilter>("all");
+  const [tab, setTab] = useState<TabFilter>("active");
   const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => { setPage(0); }, [debouncedSearch, tab]);
@@ -191,13 +205,14 @@ export default function PoliciesPage() {
   );
 
   const policies = allPolicies.filter(p => {
-    if (tab === "active") return p.status === "active";
-    if (tab === "expired") return p.status === "expired";
+    const d = getDaysUntilExpiry(p.end_date);
+    const isExpired = p.status === "expired" || (d !== null && d < 0);
+    if (tab === "active") return !isExpired;
+    if (tab === "expired") return isExpired;
     return true;
   });
 
   const TABS: { key: TabFilter; label: string }[] = [
-    { key: "all", label: "All" },
     { key: "active", label: "Active" },
     { key: "expired", label: "Expired" },
   ];
@@ -260,18 +275,36 @@ export default function PoliciesPage() {
                     : <span style={{ color: "#9ca3af" }}>—</span>}
                 </Td>
                 <Td>
-                  {(row.status === "processing") && <AiBadge $s="processing">⏳ Processing</AiBadge>}
-                  {(row.status === "need_review" || row.status === "pending") && <AiBadge $s="need_review"><AlertTriangle size={11} /> Need Review</AiBadge>}
-                  {row.status === "active"    && <AiBadge $s="active"><Check size={11} /> Approved</AiBadge>}
-                  {row.status === "rejected"  && <AiBadge $s="rejected"><X size={11} /> Rejected</AiBadge>}
+                  {(() => {
+                    const d = getDaysUntilExpiry(row.end_date);
+                    if (d !== null && d < 0) return <span style={{ color: "#9ca3af" }}>—</span>;
+                    if (row.status === "processing")                              return <AiBadge $s="processing">⏳ Processing</AiBadge>;
+                    if (row.status === "need_review" || row.status === "pending") return <AiBadge $s="need_review"><AlertTriangle size={11} /> Need Review</AiBadge>;
+                    if (row.status === "active")                                  return <AiBadge $s="active"><Check size={11} /> Approved</AiBadge>;
+                    if (row.status === "rejected")                                return <AiBadge $s="rejected"><X size={11} /> Rejected</AiBadge>;
+                    return <span style={{ color: "#9ca3af" }}>—</span>;
+                  })()}
                 </Td>
                 <Td>
-                  <StatusPill $s={row.status}>
-                    {row.status === "active"      ? "Active" :
-                     row.status === "need_review" || row.status === "pending" ? "Pending" :
-                     row.status === "processing"  ? "Processing" :
-                     row.status === "rejected"    ? "Rejected" : row.status ?? "—"}
-                  </StatusPill>
+                  {(() => {
+                    const d = getDaysUntilExpiry(row.end_date);
+                    const isExpired = d !== null && d < 0;
+                    const effectiveStatus = isExpired ? "expired" : row.status;
+                    return (
+                      <>
+                        <StatusPill $s={effectiveStatus}>
+                          {effectiveStatus === "expired"    ? "Expired" :
+                           effectiveStatus === "active"      ? "Active" :
+                           effectiveStatus === "need_review" || effectiveStatus === "pending" ? "Pending" :
+                           effectiveStatus === "processing"  ? "Processing" :
+                           effectiveStatus === "rejected"    ? "Rejected" : effectiveStatus ?? "—"}
+                        </StatusPill>
+                        {d !== null && d >= 0 && d <= 30 && (
+                          <div><ExpiryWarning><AlertTriangle size={10} /> Expires in {d}d</ExpiryWarning></div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </Td>
                 <Td>
                   <div style={{ display: "flex", gap: 4, alignItems: "center" }}>

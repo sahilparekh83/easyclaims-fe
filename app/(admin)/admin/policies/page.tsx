@@ -1,15 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
-import { Download, FileSearch, FileText, CheckCircle, AlertTriangle, Sparkles, Upload, X, ChevronRight, Check, Info, ChevronDown, Filter } from "lucide-react";
+import { Download, FileSearch, FileText, CheckCircle, AlertTriangle, Sparkles, Upload, X, ChevronRight, Check, Info, ChevronDown, Filter, Users, CheckCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
-import { adminListPolicies, adminViewPolicyPdf, adminDownloadPolicyPdf } from "@/imports/core/api";
+import { adminListPolicies, adminViewPolicyPdf, adminDownloadPolicyPdf, adminListMembers, listPolicyTypes, adminUploadPolicy } from "@/imports/core/api";
 import { useDebounce } from "@/hooks/useDebounce";
 
 const ROWS = 20;
@@ -412,6 +412,31 @@ const InfoNote = styled.div`
   font-size: 12px; color: #64748b; line-height: 1.5;
 `;
 
+const TabBar = styled.div`display: flex; gap: 0; border-bottom: 1px solid #e8eaf0;`;
+
+const Tab = styled.button<{ $active: boolean }>`
+  background: none; border: none;
+  border-bottom: 2px solid ${p => p.$active ? "#0a2257" : "transparent"};
+  color: ${p => p.$active ? "#0a2257" : "#64748b"};
+  font-size: 13.5px; font-weight: ${p => p.$active ? 700 : 500};
+  padding: 10px 18px 12px; cursor: pointer; transition: all 0.15s; white-space: nowrap;
+  &:hover { color: #0f172a; }
+`;
+
+const ExpiryWarning = styled.span<{ $expired?: boolean }>`
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  color: ${p => p.$expired ? "#dc2626" : "#b45309"};
+  background: ${p => p.$expired ? "#fee2e2" : "#fef3c7"};
+  border: 1px solid ${p => p.$expired ? "#fca5a5" : "#fde68a"};
+  border-radius: 999px; padding: 2px 7px; margin-top: 3px; white-space: nowrap;
+`;
+
+function getDaysUntilExpiry(endDate: string | null | undefined): number | null {
+  if (!endDate) return null;
+  return dayjs(endDate).diff(dayjs().startOf("day"), "day");
+}
+
 // ─── Ghost button ─────────────────────────────────────────────────────────────
 const GhostBtn = styled.button`
   display: inline-flex; align-items: center; gap: 6px;
@@ -545,25 +570,31 @@ export default function PoliciesPage() {
   const [detailPolicy, setDetailPolicy] = useState<any>(null);
   const [typeFilter, setTypeFilter] = useState("");
   const [aiFilter, setAiFilter] = useState("");
+  const [policyTab, setPolicyTab] = useState<"active" | "expired">("active");
   const debouncedSearch = useDebounce(search, 300);
 
   // Upload modal state
+  const queryClient = useQueryClient();
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [step, setStep] = useState<'upload' | 'extracting' | 'review' | 'summary'>('upload');
-  const [manualMode, setManualMode] = useState(false);
-  const [editedFields, setEditedFields] = useState<Record<string, string>>({});
-  const extractTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [step, setStep] = useState<'form' | 'uploading' | 'done'>('form');
+  const [memberQuery, setMemberQuery] = useState("");
+  const [memberResults, setMemberResults] = useState<any[]>([]);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [uploadPolicyTypeId, setUploadPolicyTypeId] = useState("");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadResult, setUploadResult] = useState<any>(null);
+  const memberSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setFirst(0); }, [debouncedSearch, statusFilter, typeFilter, aiFilter]);
+  useEffect(() => { setFirst(0); }, [debouncedSearch, statusFilter, typeFilter, aiFilter, policyTab]);
 
   const activeFilters = [
-    ...(statusFilter ? [{ field: "status", value: statusFilter }] : []),
-    ...(typeFilter   ? [{ field: "policy_type", value: typeFilter }] : []),
-    ...(aiFilter     ? [{ field: "status", value: aiFilter }] : []),
+    { field: "status", value: policyTab },
+    ...(typeFilter ? [{ field: "policy_type", value: typeFilter }] : []),
   ];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "policies", debouncedSearch, statusFilter, typeFilter, aiFilter, first],
+    queryKey: ["admin", "policies", debouncedSearch, policyTab, typeFilter, first],
     queryFn: () => adminListPolicies({
       global_filter: debouncedSearch,
       sort_field: "created_at",
@@ -574,36 +605,63 @@ export default function PoliciesPage() {
     }),
   });
 
+  const { data: policyTypesData } = useQuery({
+    queryKey: ["policy-types"],
+    queryFn: () => listPolicyTypes(true),
+  });
+  const policyTypes: any[] = policyTypesData?.data ?? [];
+
   const policies: any[] = data?.data?.data ?? [];
   const total: number = data?.data?.total ?? 0;
   const totalPages = Math.ceil(total / ROWS);
   const currentPage = Math.floor(first / ROWS);
 
   const openUploadModal = () => {
-    setStep('upload');
-    setManualMode(false);
-    setEditedFields({});
+    setStep('form');
+    setMemberQuery("");
+    setMemberResults([]);
+    setSelectedMember(null);
+    setUploadPolicyTypeId("");
+    setUploadFile(null);
+    setUploadResult(null);
     setUploadOpen(true);
   };
 
-  const closeUploadModal = () => {
-    setUploadOpen(false);
-    if (extractTimerRef.current) clearTimeout(extractTimerRef.current);
+  const closeUploadModal = () => setUploadOpen(false);
+
+  const handleMemberSearch = (q: string) => {
+    setMemberQuery(q);
+    setSelectedMember(null);
+    if (memberSearchRef.current) clearTimeout(memberSearchRef.current);
+    if (!q.trim()) { setMemberResults([]); return; }
+    memberSearchRef.current = setTimeout(async () => {
+      try {
+        const res = await adminListMembers({ global_filter: q, limit: 8, skip: 0 });
+        setMemberResults(res?.data?.data ?? []);
+      } catch {}
+    }, 300);
   };
 
-  const runExtract = () => {
-    setStep('extracting');
-    extractTimerRef.current = setTimeout(() => {
-      setStep('review');
-    }, 1700);
+  const doUpload = async () => {
+    if (!selectedMember || !uploadPolicyTypeId || !uploadFile) return;
+    const partnerId = selectedMember.enrollments?.[0]?.partner_id;
+    if (!partnerId) { toast.error("Member has no partner enrollment"); return; }
+    setStep('uploading');
+    try {
+      const fd = new FormData();
+      fd.append("user_id", selectedMember.id);
+      fd.append("partner_id", partnerId);
+      fd.append("policy_type_id", uploadPolicyTypeId);
+      fd.append("file", uploadFile);
+      const res = await adminUploadPolicy(fd);
+      setUploadResult(res?.data ?? {});
+      setStep('done');
+      queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
+    } catch (e: any) {
+      setStep('form');
+      toast.error(e?.response?.data?.detail || "Upload failed");
+    }
   };
-
-  const confirmPolicy = () => {
-    setUploadOpen(false);
-    toast.success("Policy added — member notified");
-  };
-
-  const flaggedCount = EXTRACT_FIELDS.filter(f => f.conf < 80).length;
 
   const extractedFields: Record<string, string> = detailPolicy?.extracted_fields ?? {};
   const hasFields = Object.keys(extractedFields).length > 0;
@@ -653,7 +711,14 @@ export default function PoliciesPage() {
       {/* ── Policy Repository ─────────────────────────────────────────── */}
       <SectionCard>
         <CardHeader>
-          <CardTitle>Policy repository</CardTitle>
+          <TabBar style={{ borderBottom: "none", gap: 4 }}>
+            <Tab $active={policyTab === "active"} onClick={() => { setPolicyTab("active"); setFirst(0); }}>
+              Active
+            </Tab>
+            <Tab $active={policyTab === "expired"} onClick={() => { setPolicyTab("expired"); setFirst(0); }}>
+              Expired
+            </Tab>
+          </TabBar>
           <CountMono>{total} policies</CountMono>
         </CardHeader>
 
@@ -672,14 +737,6 @@ export default function PoliciesPage() {
               style={{ width: "100%", height: 36, paddingLeft: 32, paddingRight: 10, borderRadius: 999, border: "1px solid #e8eaf0", fontSize: 13, outline: "none", background: "#f8f9fb" }}
             />
           </div>
-          {statusFilter && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12.5, fontWeight: 600, color: "#1d4ed8" }}>
-              Status: {STATUS_LABELS_MAP[statusFilter] ?? statusFilter}
-              <button onClick={() => router.push("/admin/policies")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", color: "#1d4ed8" }}>
-                <X size={13} />
-              </button>
-            </div>
-          )}
           {typeFilter && (
             <div style={{ display: "flex", alignItems: "center", gap: 6, height: 36, padding: "0 12px", borderRadius: 999, background: "#eff6ff", border: "1px solid #bfdbfe", fontSize: 12.5, fontWeight: 600, color: "#1d4ed8" }}>
               Type: {typeFilter}
@@ -731,22 +788,7 @@ export default function PoliciesPage() {
                   ]}
                 />
               </ThSm>
-              <Th style={{ paddingLeft: 8 }}>
-                <FilterDropdown
-                  label="Status"
-                  value={statusFilter}
-                  onChange={v => {
-                    setFirst(0);
-                    router.push(v ? `/admin/policies?status=${v}` : "/admin/policies");
-                  }}
-                  options={[
-                    { label: "Active",     value: "active" },
-                    { label: "Pending",    value: "need_review" },
-                    { label: "Processing", value: "processing" },
-                    { label: "Rejected",   value: "rejected" },
-                  ]}
-                />
-              </Th>
+              <Th style={{ paddingLeft: 8 }}>Status</Th>
               <Th style={{ paddingLeft: 8 }}>Actions</Th>
             </tr>
           </thead>
@@ -786,20 +828,38 @@ export default function PoliciesPage() {
                     {row.sum_insured != null ? `₹${Number(row.sum_insured).toLocaleString("en-IN")}` : "—"}
                   </TdSm>
                   <TdSm>
-                    {row.status === 'processing'                         && <AiExtractionBadge $s="processing"><span>⏳</span> Processing</AiExtractionBadge>}
-                    {(row.status === 'need_review' || row.status === 'pending') && <AiExtractionBadge $s="need_review"><AlertTriangle size={12} /> Need Review</AiExtractionBadge>}
-                    {row.status === 'active'                            && <AiExtractionBadge $s="active"><Check size={12} /> Approved</AiExtractionBadge>}
-                    {row.status === 'rejected'                          && <AiExtractionBadge $s="rejected"><X size={12} /> Rejected</AiExtractionBadge>}
+                    {(() => {
+                      const d = getDaysUntilExpiry(row.end_date);
+                      if (d !== null && d < 0) return <span style={{ color: "#94a3b8" }}>—</span>;
+                      if (row.status === 'processing')                              return <AiExtractionBadge $s="processing"><span>⏳</span> Processing</AiExtractionBadge>;
+                      if (row.status === 'need_review' || row.status === 'pending') return <AiExtractionBadge $s="need_review"><AlertTriangle size={12} /> Need Review</AiExtractionBadge>;
+                      if (row.status === 'active')                                  return <AiExtractionBadge $s="active"><Check size={12} /> Approved</AiExtractionBadge>;
+                      if (row.status === 'rejected')                                return <AiExtractionBadge $s="rejected"><X size={12} /> Rejected</AiExtractionBadge>;
+                      return <span style={{ color: "#94a3b8" }}>—</span>;
+                    })()}
                   </TdSm>
                   <Td style={{ paddingLeft: 8 }}>
-                    {row.status
-                      ? <StatusPill $status={row.status}>
-                          {row.status === 'processing'  ? 'Processing' :
-                           row.status === 'need_review' ? 'Pending' :
-                           row.status === 'active'      ? 'Active' :
-                           row.status === 'rejected'    ? 'Rejected' : row.status}
-                        </StatusPill>
-                      : <span style={{ color: "#94a3b8" }}>—</span>}
+                    {(() => {
+                      const d = getDaysUntilExpiry(row.end_date);
+                      const isExpired = d !== null && d < 0;
+                      const effectiveStatus = isExpired ? 'expired' : row.status;
+                      return (
+                        <>
+                          {effectiveStatus
+                            ? <StatusPill $status={effectiveStatus}>
+                                {effectiveStatus === 'expired'    ? 'Expired' :
+                                 effectiveStatus === 'processing'  ? 'Processing' :
+                                 effectiveStatus === 'need_review' ? 'Pending' :
+                                 effectiveStatus === 'active'      ? 'Active' :
+                                 effectiveStatus === 'rejected'    ? 'Rejected' : effectiveStatus}
+                              </StatusPill>
+                            : <span style={{ color: "#94a3b8" }}>—</span>}
+                          {d !== null && d >= 0 && d <= 30 && (
+                            <div><ExpiryWarning><AlertTriangle size={10} /> Expires in {d}d</ExpiryWarning></div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </Td>
                   <Td style={{ paddingLeft: 8 }}>
                     <ActionBtns>
@@ -833,171 +893,197 @@ export default function PoliciesPage() {
 
       {/* ── Upload Modal ──────────────────────────────────────────────── */}
       {uploadOpen && (
-        <Overlay onClick={closeUploadModal}>
-          <ModalBox onClick={e => e.stopPropagation()}>
+        <Overlay onClick={step === 'uploading' ? undefined : closeUploadModal}>
+          <ModalBox onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
             <ModalHeader>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <Sparkles size={17} color="#2563eb" />
                 <div>
-                  <ModalTitle>Upload policy — AI extraction</ModalTitle>
-                  <ModalStepLabel>{STEP_LABELS[step]}</ModalStepLabel>
+                  <ModalTitle>Upload policy for member</ModalTitle>
+                  <ModalStepLabel>
+                    {step === 'form' && "Select member · policy type · PDF"}
+                    {step === 'uploading' && "Uploading & running AI extraction…"}
+                    {step === 'done' && "Policy created — AI extraction running in background"}
+                  </ModalStepLabel>
                 </div>
               </div>
-              <CloseBtn onClick={closeUploadModal}><X size={16} /></CloseBtn>
+              {step !== 'uploading' && <CloseBtn onClick={closeUploadModal}><X size={16} /></CloseBtn>}
             </ModalHeader>
 
-            {/* Step 1: Upload */}
-            {step === 'upload' && (
+            {/* Step 1: Form */}
+            {step === 'form' && (
               <>
-                <div style={{ padding: 28 }}>
-                  <DropZone onClick={runExtract}>
-                    <DropIconBox><Upload size={24} /></DropIconBox>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
-                      Drop a policy PDF, or click to browse
-                    </div>
-                    <div style={{ fontSize: 13, color: "#64748b", marginTop: 5 }}>
-                      Health, Motor or Life policy documents · up to 20 MB
-                    </div>
-                  </DropZone>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginTop: 18 }}>
-                    <span style={{ fontSize: 12.5, color: "#64748b" }}>For this demo:</span>
-                    <GhostBtn style={{ height: 34, padding: "0 14px", fontSize: 13 }} onClick={runExtract}>
-                      <Sparkles size={14} color="#2563eb" />
-                      Use a sample policy
-                    </GhostBtn>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Step 2: Extracting */}
-            {step === 'extracting' && (
-              <div style={{ padding: "56px 28px", display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
-                <Spinner />
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>AI is reading the document…</div>
-                  <div style={{ fontSize: 13, color: "#64748b", marginTop: 5 }}>
-                    Detecting fields · extracting policy number, insured name, sum insured &amp; period
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Review */}
-            {step === 'review' && (
-              <>
-                <ReviewGrid>
-                  {/* Doc preview */}
+                <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+                  {/* Member search */}
                   <div>
-                    <DocPreview>
-                      <DocCard>
-                        <div style={{ height: 7, width: "55%", background: "#0a2257", borderRadius: 2, marginBottom: 10 }} />
-                        <DocLine $w="90%" /><DocLine $w="80%" /><DocLine $w="88%" style={{ marginBottom: 14 }} />
-                        <DocLine $w="40%" $color="#86efac" /><DocLine $w="70%" /><DocLine $w="60%" style={{ marginBottom: 0 }} />
-                      </DocCard>
-                      <PdfBadge>PDF</PdfBadge>
-                    </DocPreview>
-                    <DocFilename>Rohan-Mehta-Health.pdf · 3 pages</DocFilename>
-                  </div>
-
-                  {/* Fields */}
-                  <div>
-                    <ToggleRow>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0f172a" }}>
-                        {manualMode ? "Manual entry — AI auto-fill disabled" : "AI auto-filled 6 fields — confirm or edit"}
-                      </div>
-                      <ToggleLabel>
-                        Enter manually
-                        <ToggleTrack $on={manualMode} onClick={() => { setManualMode(v => !v); setEditedFields({}); }} />
-                      </ToggleLabel>
-                    </ToggleRow>
-
-                    {!manualMode && flaggedCount > 0 && (
-                      <AlertBanner>
-                        <AlertTriangle size={14} color="#d97706" style={{ flexShrink: 0, marginTop: 1 }} />
-                        <span>
-                          <strong>{flaggedCount} field needs your confirmation</strong> — Policy period was read with low confidence. Please verify below.
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                      Member
+                    </div>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        value={selectedMember ? (selectedMember.name || selectedMember.email) : memberQuery}
+                        onChange={e => handleMemberSearch(e.target.value)}
+                        placeholder="Search by name or email…"
+                        style={{
+                          width: "100%", height: 38, border: "1px solid #e0e6ec", borderRadius: 8,
+                          padding: "0 12px", fontSize: 13.5, color: "#0f172a", outline: "none",
+                          background: selectedMember ? "#f0fdf4" : "#fff", boxSizing: "border-box",
+                        }}
+                      />
+                      {!selectedMember && memberResults.length > 0 && (
+                        <div style={{
+                          position: "absolute", top: "100%", left: 0, right: 0, zIndex: 20,
+                          background: "#fff", border: "1px solid #e0e6ec", borderRadius: 8,
+                          boxShadow: "0 4px 16px rgba(0,0,0,0.1)", marginTop: 4, overflow: "hidden",
+                        }}>
+                          {memberResults.map((m: any) => (
+                            <div
+                              key={m.id}
+                              onClick={() => { setSelectedMember(m); setMemberQuery(""); setMemberResults([]); }}
+                              style={{
+                                padding: "9px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
+                                borderBottom: "1px solid #f1f5f9",
+                              }}
+                              onMouseEnter={e => (e.currentTarget.style.background = "#f7f9fb")}
+                              onMouseLeave={e => (e.currentTarget.style.background = "")}
+                            >
+                              <div style={{
+                                width: 30, height: 30, borderRadius: "50%", background: "#eff6ff",
+                                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                              }}>
+                                <Users size={14} color="#2563eb" />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{m.name || m.email}</div>
+                                <div style={{ fontSize: 11.5, color: "#64748b" }}>{m.email} {m.partner_name ? `· ${m.partner_name}` : ""}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {selectedMember && (
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+                        <span style={{ fontSize: 12, color: "#16a34a" }}>
+                          ✓ {selectedMember.partner_name ? `Enrolled under ${selectedMember.partner_name}` : "Member selected"}
                         </span>
-                      </AlertBanner>
+                        <button onClick={() => setSelectedMember(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, padding: 0 }}>
+                          Change
+                        </button>
+                      </div>
                     )}
-
-                    <div>
-                      {EXTRACT_FIELDS.map(f => {
-                        const low = f.conf < 80;
-                        const val = manualMode
-                          ? (editedFields[f.key] ?? "")
-                          : (editedFields[f.key] ?? f.value);
-                        return (
-                          <FieldRow key={f.key}>
-                            <FieldLabel>{f.label}</FieldLabel>
-                            <FieldInput
-                              value={val}
-                              placeholder={manualMode ? "Type to enter…" : ""}
-                              onChange={e => setEditedFields(prev => ({ ...prev, [f.key]: e.target.value }))}
-                            />
-                            {!manualMode && (
-                              <ConfChip $low={low}>
-                                {low ? <AlertTriangle size={11} /> : <Check size={11} />}
-                                {low ? "Needs review" : "Auto-filled"}
-                              </ConfChip>
-                            )}
-                          </FieldRow>
-                        );
-                      })}
-                    </div>
                   </div>
-                </ReviewGrid>
+
+                  {/* Policy type */}
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                      Policy type
+                    </div>
+                    <select
+                      value={uploadPolicyTypeId}
+                      onChange={e => setUploadPolicyTypeId(e.target.value)}
+                      style={{
+                        width: "100%", height: 38, border: "1px solid #e0e6ec", borderRadius: 8,
+                        padding: "0 10px", fontSize: 13.5, color: uploadPolicyTypeId ? "#0f172a" : "#94a3b8",
+                        outline: "none", background: "#fff", cursor: "pointer", boxSizing: "border-box",
+                      }}
+                    >
+                      <option value="">Select policy type…</option>
+                      {policyTypes.map((pt: any) => (
+                        <option key={pt.id} value={pt.id}>{pt.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* File upload */}
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
+                      Policy PDF
+                    </div>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,application/pdf"
+                      style={{ display: "none" }}
+                      onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
+                    />
+                    {uploadFile ? (
+                      <div style={{
+                        border: "1px solid #86efac", borderRadius: 8, padding: "10px 14px",
+                        background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "space-between",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <FileText size={16} color="#16a34a" />
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{uploadFile.name}</span>
+                          <span style={{ fontSize: 11.5, color: "#64748b" }}>({(uploadFile.size / 1024).toFixed(0)} KB)</span>
+                        </div>
+                        <button onClick={() => setUploadFile(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8" }}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <DropZone onClick={() => fileInputRef.current?.click()} style={{ padding: "18px 20px" }}>
+                        <DropIconBox><Upload size={20} /></DropIconBox>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: "#0f172a" }}>Click to browse</div>
+                        <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>PDF · up to 20 MB</div>
+                      </DropZone>
+                    )}
+                  </div>
+                </div>
 
                 <ModalFooter>
-                  <span style={{ fontSize: 12, color: "#64748b" }}>
-                    Customer confirms the auto-filled data before it is saved.
-                  </span>
-                  <div style={{ display: "flex", gap: 10 }}>
-                    <GhostBtn onClick={closeUploadModal}>Cancel</GhostBtn>
-                    <AccentBtn onClick={() => setStep('summary')}>
-                      Confirm &amp; summarise <ChevronRight size={15} />
-                    </AccentBtn>
-                  </div>
+                  <GhostBtn onClick={closeUploadModal}>Cancel</GhostBtn>
+                  <AccentBtn
+                    onClick={doUpload}
+                    disabled={!selectedMember || !uploadPolicyTypeId || !uploadFile}
+                    style={{ opacity: (!selectedMember || !uploadPolicyTypeId || !uploadFile) ? 0.5 : 1 }}
+                  >
+                    <Sparkles size={15} />
+                    Upload &amp; extract
+                  </AccentBtn>
                 </ModalFooter>
               </>
             )}
 
-            {/* Step 4: Summary */}
-            {step === 'summary' && (
-              <>
-                <div style={{ padding: 24 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 14 }}>
-                    <Sparkles size={17} color="#2563eb" />
-                    <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>AI policy summary</h3>
+            {/* Step 2: Uploading */}
+            {step === 'uploading' && (
+              <div style={{ padding: "56px 28px", display: "flex", flexDirection: "column", alignItems: "center", gap: 18 }}>
+                <Spinner />
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>Uploading &amp; running AI extraction…</div>
+                  <div style={{ fontSize: 13, color: "#64748b", marginTop: 5 }}>
+                    Extracting policy fields · syncing family members
                   </div>
-
-                  <SummaryBlock>
-                    This is a Star Health individual health insurance policy for Rohan Mehta with a sum insured of ₹10,00,000, valid from 14 Apr 2026 to 13 Apr 2027. It covers in-patient hospitalisation, pre- and post-hospitalisation expenses and day-care procedures, subject to a 30-day initial waiting period.
-                  </SummaryBlock>
-
-                  <SummaryGrid>
-                    {SUMMARY_POINTS.map(pt => (
-                      <SummaryPoint key={pt.label}>
-                        <Check size={16} color="#16a34a" style={{ flexShrink: 0, marginTop: 2 }} />
-                        <div>
-                          <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", color: "#64748b" }}>{pt.label}</div>
-                          <div style={{ fontSize: 13.5, color: "#0f172a", fontWeight: 600, marginTop: 2 }}>{pt.value}</div>
-                        </div>
-                      </SummaryPoint>
-                    ))}
-                  </SummaryGrid>
-
-                  <InfoNote>
-                    <Info size={15} color="#94a3b8" style={{ flexShrink: 0, marginTop: 1 }} />
-                    Summaries are generated from the extracted policy data only. Free-form "ask anything about my policy" Q&A is planned for a later release.
-                  </InfoNote>
                 </div>
+              </div>
+            )}
 
+            {/* Step 3: Done */}
+            {step === 'done' && (
+              <>
+                <div style={{ padding: "32px 28px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
+                  <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <CheckCheck size={28} color="#16a34a" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: "#0f172a" }}>Policy uploaded!</div>
+                    {uploadResult?.policy_number && (
+                      <div style={{ fontSize: 13, color: "#64748b", marginTop: 4 }}>
+                        Policy number: <strong style={{ color: "#0f172a" }}>{uploadResult.policy_number}</strong>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{
+                    background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10,
+                    padding: "12px 16px", fontSize: 13, color: "#1d4ed8", textAlign: "left", lineHeight: 1.5,
+                  }}>
+                    <strong>AI extraction is running in the background.</strong><br />
+                    Family members found in the policy will be added automatically within a few seconds.
+                  </div>
+                </div>
                 <ModalFooter>
-                  <GhostBtn onClick={() => setStep('review')}>Back</GhostBtn>
-                  <AccentBtn onClick={confirmPolicy}>
-                    <Check size={16} />
-                    Confirm &amp; add policy
+                  <AccentBtn onClick={closeUploadModal}>
+                    <Check size={16} /> Done
                   </AccentBtn>
                 </ModalFooter>
               </>
