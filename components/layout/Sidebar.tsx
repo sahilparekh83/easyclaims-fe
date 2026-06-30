@@ -1,7 +1,6 @@
 "use client";
 
-import React from "react";
-import Link from "next/link";
+import React, { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import styled from "styled-components";
 import {
@@ -9,12 +8,13 @@ import {
   Settings, Package, ShieldCheck, Heart, UserCheck,
   BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList,
 } from "lucide-react";
+import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  badge?: number;
+  badgeKey?: string;
 }
 
 const ADMIN_NAV: NavItem[] = [
@@ -23,21 +23,20 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Partners",       href: "/admin/partners",        icon: <Briefcase size={18} /> },
   { label: "Members",        href: "/admin/members",         icon: <Users size={18} /> },
   { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} /> },
-  { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, badge: 7 },
+  { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} /> },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} /> },
   { label: "Policy Types",   href: "/admin/policy-types",    icon: <Package size={18} /> },
-  { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} /> },
+  { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} />, badgeKey: "total" },
   { label: "Email Templates", href: "/admin/email-templates", icon: <Mail size={18} /> },
   { label: "Settings",        href: "/admin/settings",        icon: <Settings size={18} /> },
 ];
 
 const PARTNER_NAV: NavItem[] = [
   { label: "Dashboard",    href: "/partner/dashboard",    icon: <LayoutDashboard size={18} /> },
-  { label: "Members",      href: "/partner/members",      icon: <Users size={18} /> },
-  { label: "Policies",     href: "/partner/policies",     icon: <FileText size={18} /> },
+  { label: "Members",      href: "/partner/members",      icon: <Users size={18} />, badgeKey: "members" },
   { label: "Plans",        href: "/partner/plans",        icon: <CreditCard size={18} /> },
   { label: "Profile",      href: "/partner/profile",      icon: <Settings size={18} /> },
-  { label: "Notifications", href: "/partner/notifications", icon: <Bell size={18} /> },
+  { label: "Notifications", href: "/partner/notifications", icon: <Bell size={18} />, badgeKey: "total" },
 ];
 
 const MEMBER_NAV: NavItem[] = [
@@ -163,10 +162,38 @@ const NavBadge = styled.span`
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+function useBadgeCounts(portal: "admin" | "partner" | "member") {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (portal === "member") return;
+
+    const fetchFn = portal === "admin" ? adminGetBadgeCounts : partnerGetBadgeCounts;
+
+    const fetch = async () => {
+      try {
+        const res = await fetchFn();
+        const data: Record<string, number> = res?.data ?? res ?? {};
+        setCounts(data);
+      } catch {
+        // silent — sidebar badges are best-effort
+      }
+    };
+
+    fetch();
+    timerRef.current = setInterval(fetch, 30_000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [portal]);
+
+  return counts;
+}
+
 export default function Sidebar({ portal }: { portal: "admin" | "partner" | "member" }) {
   const pathname = usePathname();
   const router = useRouter();
   const navItems = NAV_MAP[portal] || [];
+  const badgeCounts = useBadgeCounts(portal);
 
   return (
     <Wrap>
@@ -187,6 +214,7 @@ export default function Sidebar({ portal }: { portal: "admin" | "partner" | "mem
         <SectionLabel>Workspace</SectionLabel>
         {navItems.map((item) => {
           const active = pathname.startsWith(item.href);
+          const badgeCount = item.badgeKey ? (badgeCounts[item.badgeKey] ?? 0) : 0;
           return (
             <NavBtn
               key={item.href}
@@ -195,7 +223,7 @@ export default function Sidebar({ portal }: { portal: "admin" | "partner" | "mem
             >
               {item.icon}
               <span style={{ flex: 1 }}>{item.label}</span>
-              {item.badge != null && <NavBadge>{item.badge}</NavBadge>}
+              {badgeCount > 0 && <NavBadge>{badgeCount > 99 ? "99+" : badgeCount}</NavBadge>}
             </NavBtn>
           );
         })}

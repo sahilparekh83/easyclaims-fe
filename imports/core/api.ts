@@ -42,6 +42,9 @@ export const adminActivatePlan = (id: string) =>
 export const adminArchivePlan = (id: string) =>
   apiClient.post(`/admin/plans/${id}/archive`, {}).then((r) => r.data);
 
+export const adminDeletePlan = (id: string) =>
+  apiClient.delete(`/admin/plans/${id}`).then((r) => r.data);
+
 export const adminLinkPlanToPartner = (planId: string, partnerId: string) =>
   apiClient.post(`/admin/plans/${planId}/partners`, { partner_id: partnerId }).then((r) => r.data);
 
@@ -75,6 +78,53 @@ export const adminRegenPartnerKey = (id: string) =>
 export const adminGetPartnerPlans = (id: string) =>
   apiClient.get(`/admin/partners/${id}/plans`).then((r) => r.data);
 
+export const adminGetPartnerPlansOverview = (id: string) =>
+  apiClient.get(`/admin/partners/${id}/plans-overview`).then((r) => r.data);
+
+export const adminListPartnerChangeRequests = (partnerId: string, params?: { status?: string; skip?: number; limit?: number }) =>
+  apiClient.get(`/admin/partners/${partnerId}/change-requests`, { params }).then((r) => r.data);
+
+export const adminApprovePartnerChangeRequest = (crId: string, data?: { admin_note?: string }) =>
+  apiClient.post(`/admin/partners/change-requests/${crId}/approve`, data || {}).then((r) => r.data);
+
+export const adminRejectPartnerChangeRequest = (crId: string, data?: { admin_note?: string }) =>
+  apiClient.post(`/admin/partners/change-requests/${crId}/reject`, data || {}).then((r) => r.data);
+
+export const adminAddMemberToPartner = (partnerId: string, data: object) =>
+  apiClient.post(`/admin/partners/${partnerId}/members`, data).then((r) => r.data);
+
+export const adminBulkUploadMembersToPartner = (partnerId: string, file: File, planId?: string) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (planId) fd.append("plan_id", planId);
+  return apiClient.post(`/admin/partners/${partnerId}/members/bulk-upload`, fd).then((r) => r.data);
+};
+
+export const adminDownloadMemberBulkSample = (partnerId: string): Promise<Blob> =>
+  apiClient.get(`/admin/partners/${partnerId}/members/bulk-upload/sample`, { responseType: "blob" }).then((r) => r.data);
+
+export const adminDownloadMemberBulkReport = (partnerId: string, file: File): Promise<Blob> => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiClient.post(`/admin/partners/${partnerId}/members/bulk-upload/report`, fd, { responseType: "blob" }).then((r) => r.data);
+};
+
+export const partnerBulkUploadMembers = (file: File, planId?: string) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  if (planId) fd.append("plan_id", planId);
+  return apiClient.post("/partner/members/bulk-upload", fd).then((r) => r.data);
+};
+
+export const partnerDownloadMemberBulkSample = (): Promise<Blob> =>
+  apiClient.get("/partner/members/bulk-upload/sample", { responseType: "blob" }).then((r) => r.data);
+
+export const partnerDownloadMemberBulkReport = (file: File): Promise<Blob> => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiClient.post("/partner/members/bulk-upload/report", fd, { responseType: "blob" }).then((r) => r.data);
+};
+
 // ─────────────────────────────────────────────
 // ADMIN — MEMBERS
 // ─────────────────────────────────────────────
@@ -89,6 +139,9 @@ export const adminListMembersByPartner = (partnerId: string, params?: object) =>
 
 export const adminListPoliciesByPartner = (partnerId: string, params?: object) =>
   apiClient.post(`/admin/partners/${partnerId}/policies/list`, params || {}).then((r) => r.data);
+
+export const adminGetPartnerNotifications = (partnerId: string, params?: { skip?: number; limit?: number }) =>
+  apiClient.get(`/admin/partners/${partnerId}/notifications`, { params }).then((r) => r.data);
 
 export const adminGetMember = (id: string) =>
   apiClient.get(`/admin/members/${id}`).then((r) => r.data);
@@ -135,6 +188,9 @@ export const adminMarkAllNotificationsRead = () =>
 export const adminDeleteNotification = (id: string) =>
   apiClient.delete(`/admin/notifications/${id}`).then((r) => r.data);
 
+export const adminGetBadgeCounts = () =>
+  apiClient.get("/admin/notifications/badge-counts").then((r) => r.data);
+
 // ─────────────────────────────────────────────
 // ADMIN — USERS (internal)
 // ─────────────────────────────────────────────
@@ -158,6 +214,12 @@ export const adminDeleteUser = (id: string) =>
 // ─────────────────────────────────────────────
 export const partnerGetProfile = () =>
   apiClient.get("/partner/profile").then((r) => r.data);
+
+export const partnerSubmitChangeRequest = (data: { requested_fields: Record<string, string>; reason?: string }) =>
+  apiClient.post("/partner/profile/change-request", data).then((r) => r.data);
+
+export const partnerListChangeRequests = (params?: { skip?: number; limit?: number }) =>
+  apiClient.get("/partner/profile/change-requests", { params }).then((r) => r.data);
 
 export const partnerUpdateProfile = (data: object) =>
   apiClient.patch("/partner/profile", data).then((r) => r.data);
@@ -222,6 +284,12 @@ export const partnerMarkAllNotificationsRead = () =>
 export const partnerDeleteNotification = (id: string) =>
   apiClient.delete(`/partner/notifications/${id}`).then((r) => r.data);
 
+export const partnerGetBadgeCounts = () =>
+  apiClient.get("/partner/notifications/badge-counts").then((r) => r.data);
+
+export const partnerMarkReadByType = (type: string) =>
+  apiClient.patch(`/partner/notifications/mark-read-by-type`, null, { params: { type } }).then((r) => r.data);
+
 // ─────────────────────────────────────────────
 // MEMBER — PROFILE
 // ─────────────────────────────────────────────
@@ -279,9 +347,7 @@ export const memberGetPolicy = (id: string) =>
   apiClient.get(`/member/policies/${id}`).then((r) => r.data);
 
 export const memberUploadPolicy = (formData: FormData) =>
-  apiClient.post("/member/policies", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  }).then((r) => r.data);
+  apiClient.post("/member/policies", formData).then((r) => r.data);
 
 export const memberUpdatePolicy = (id: string, data: object) =>
   apiClient.patch(`/member/policies/${id}`, data).then((r) => r.data);
@@ -412,17 +478,14 @@ export const adminBulkUploadMembers = (file: File, partnerId: string, planId?: s
   form.append("file", file);
   form.append("partner_id", partnerId);
   if (planId) form.append("plan_id", planId);
-  return apiClient.post("/admin/members/bulk-upload", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  }).then((r) => r.data);
+  return apiClient.post("/admin/members/bulk-upload", form).then((r) => r.data);
 };
 
-export async function adminBulkUploadPartners(file: File) {
+export async function adminBulkUploadPartners(file: File, planIds?: string[]) {
   const form = new FormData();
   form.append("file", file);
-  const res = await apiClient.post("/admin/partners/bulk-upload", form, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
+  if (planIds && planIds.length > 0) form.append("plan_ids", planIds.join(","));
+  const res = await apiClient.post("/admin/partners/bulk-upload", form);
   return res.data;
 }
 
@@ -430,7 +493,6 @@ export async function adminDownloadPartnerBulkReport(file: File): Promise<Blob> 
   const form = new FormData();
   form.append("file", file);
   const res = await apiClient.post("/admin/partners/bulk-upload/report", form, {
-    headers: { "Content-Type": "multipart/form-data" },
     responseType: "blob",
   });
   return res.data as Blob;

@@ -6,11 +6,10 @@ import { useRouter } from "next/navigation";
 import {
   partnerGetProfile,
   partnerListMembers,
-  partnerListPolicies,
   partnerListPlans,
 } from "@/imports/core/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Users, FileText, CreditCard, Sparkles } from "lucide-react";
+import { Users, CreditCard, Sparkles } from "lucide-react";
 
 const LIST_PARAMS = { limit: 1, skip: 0 };
 const RECENT_PARAMS = { limit: 5, skip: 0, sort_field: "created_at", sort_order: -1 };
@@ -24,7 +23,7 @@ const Page = styled.div`
 
 const KpiGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 18px;
   @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); }
   @media (max-width: 580px) { grid-template-columns: 1fr; }
@@ -192,10 +191,6 @@ export default function DashboardPage() {
     queryKey: ["partner", "members", "total"],
     queryFn: () => partnerListMembers(LIST_PARAMS),
   });
-  const { data: policiesData, isLoading: poL } = useQuery({
-    queryKey: ["partner", "policies", "total"],
-    queryFn: () => partnerListPolicies(LIST_PARAMS),
-  });
   const { data: plansData, isLoading: plL } = useQuery({
     queryKey: ["partner", "plans"],
     queryFn: partnerListPlans,
@@ -208,7 +203,6 @@ export default function DashboardPage() {
   const partnerName: string =
     (profileData as any)?.data?.name ?? (profileData as any)?.data?.partner_name ?? "";
   const totalMembers: number = (membersData as any)?.data?.total ?? 0;
-  const totalPolicies: number = (policiesData as any)?.data?.total ?? 0;
   const plans: any[] = (plansData as any)?.data ?? [];
   const activePlans = plans.filter((p: any) => p.status === "Active" || p.is_active);
   const totalPlans = activePlans.length || plans.length;
@@ -218,9 +212,8 @@ export default function DashboardPage() {
     (name || "M").split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
 
   const KPIS = [
-    { label: "Total members",  value: totalMembers,  loading: mL,  bg: "#eff6ff", color: "#2563eb", icon: <Users size={18} /> },
-    { label: "Total policies", value: totalPolicies, loading: poL, bg: "#fefce8", color: "#ca8a04", icon: <FileText size={18} /> },
-    { label: "Active plans",   value: totalPlans,    loading: plL, bg: "#fdf4ff", color: "#9333ea", icon: <CreditCard size={18} /> },
+    { label: "Total members", value: totalMembers, loading: mL,  bg: "#eff6ff", color: "#2563eb", icon: <Users size={18} /> },
+    { label: "Active plans",  value: totalPlans,   loading: plL, bg: "#fdf4ff", color: "#9333ea", icon: <CreditCard size={18} /> },
   ];
 
   return (

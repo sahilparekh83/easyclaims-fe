@@ -9,7 +9,7 @@ import { ChevronLeft, Upload, CheckCircle2, XCircle, AlertCircle, Download } fro
 import { toast } from "react-toastify";
 import styled from "styled-components";
 import * as XLSX from "xlsx";
-import { adminListPartners, adminBulkUploadMembers } from "@/imports/core/api";
+import { adminListPartners, adminBulkUploadMembers, adminGetPartnerPlansOverview } from "@/imports/core/api";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -190,6 +190,7 @@ export default function BulkUploadPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [partnerId, setPartnerId] = useState<string>("");
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
 
@@ -203,6 +204,16 @@ export default function BulkUploadPage() {
     value: p.id,
   }));
 
+  const { data: partnerPlansData } = useQuery({
+    queryKey: ["admin", "partner-plans-overview", partnerId],
+    queryFn: () => adminGetPartnerPlansOverview(partnerId),
+    enabled: !!partnerId,
+  });
+
+  const planOptions = ((partnerPlansData as any)?.data ?? [])
+    .filter((p: any) => p.linked && p.status === "Active")
+    .map((p: any) => ({ label: p.name, value: p.id }));
+
   // Pre-select partner from URL query param
   useEffect(() => {
     const pid = searchParams.get("partner_id");
@@ -210,7 +221,7 @@ export default function BulkUploadPage() {
   }, [searchParams, partnersData]);
 
   const uploadMutation = useMutation({
-    mutationFn: () => adminBulkUploadMembers(selectedFile!, partnerId),
+    mutationFn: () => adminBulkUploadMembers(selectedFile!, partnerId, selectedPlanId || undefined),
     onSuccess: (res) => {
       setResult(res.data);
       toast.success(`Upload complete: ${res.data.created?.length ?? 0} members created`);
@@ -222,6 +233,8 @@ export default function BulkUploadPage() {
 
   const handleFileSelect = (file: File) => {
     if (!file.name.endsWith(".xlsx") && !file.name.endsWith(".xls")) {
+      setSelectedFile(null);
+      setResult(null);
       toast.error("Please upload an Excel file (.xlsx or .xls)");
       return;
     }
@@ -236,7 +249,7 @@ export default function BulkUploadPage() {
     if (file) handleFileSelect(file);
   };
 
-  const canUpload = !!selectedFile && !!partnerId && !uploadMutation.isPending;
+  const canUpload = !!selectedFile && !!partnerId && !!selectedPlanId && !uploadMutation.isPending;
 
   return (
     <div style={{ maxWidth: "860px" }}>
@@ -266,13 +279,30 @@ export default function BulkUploadPage() {
           <Field>
             <FieldLabel>Partner <span style={{ color: "#ef4444" }}>*</span></FieldLabel>
             <Dropdown
+              inputId="admin-member-bulk-partner-select"
               value={partnerId}
               options={partners}
-              onChange={(e) => setPartnerId(e.value)}
+              onChange={(e) => { setPartnerId(e.value); setSelectedPlanId(""); }}
               placeholder="Select partner"
               filter
               style={{ width: "100%" }}
             />
+          </Field>
+          <Field>
+            <FieldLabel>Membership Plan <span style={{ color: "#ef4444" }}>*</span></FieldLabel>
+            <Dropdown
+              inputId="admin-member-bulk-plan-select"
+              value={selectedPlanId}
+              options={planOptions}
+              onChange={(e) => setSelectedPlanId(e.value)}
+              placeholder={partnerId ? (planOptions.length === 0 ? "No active plans linked" : "Select plan") : "Select a partner first"}
+              disabled={!partnerId || planOptions.length === 0}
+              filter
+              style={{ width: "100%" }}
+            />
+            {partnerId && planOptions.length === 0 && (
+              <span style={{ fontSize: 11.5, color: "#d97706" }}>No active plans linked to this partner</span>
+            )}
           </Field>
         </FormRow>
 

@@ -9,6 +9,7 @@ import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { MultiSelect } from "primereact/multiselect";
 import { Checkbox } from "primereact/checkbox";
 import { toast } from "react-toastify";
 import styled from "styled-components";
@@ -21,6 +22,7 @@ import {
   adminGetPartner,
   adminUpdatePartner,
   adminRegenPartnerKey,
+  adminListPlans,
 } from "@/imports/core/api";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
@@ -330,6 +332,7 @@ interface PartnerFormValues {
   data_1?: string;
   data_2?: string;
   data_3?: string;
+  plan_ids?: string[];
 }
 
 interface EditFormValues {
@@ -376,6 +379,7 @@ interface Partner {
   api_key?: string | null;
   api_rate_limit?: number;
   member_count?: number;
+  unread_notification_count?: number;
   created_at?: string | null;
   [key: string]: unknown;
 }
@@ -457,13 +461,22 @@ export default function PartnersPage() {
   // API key reveal state
   const [keyRevealed, setKeyRevealed] = useState(false);
 
+  const { data: plansData } = useQuery({
+    queryKey: ["admin", "all-plans"],
+    queryFn: () => adminListPlans({ limit: 100 }),
+  });
+  const allPlans = (plansData as any)?.data ?? [];
+  const planOptions = allPlans
+    .filter((p: any) => p.status === "Active")
+    .map((p: any) => ({ label: p.name, value: p.id }));
+
   const createForm = useForm<PartnerFormValues>({
     defaultValues: {
       name: "", email: "", mobile_no: "", partner_type: "Broker",
       legal_company_name: "", trade_name: "", registered_address: "",
       city: "", state: "", pin_code: "", gstin: "", pan: "",
       authorized_signatory_name: "", designation: "",
-      data_1: "", data_2: "", data_3: "",
+      data_1: "", data_2: "", data_3: "", plan_ids: [],
     },
   });
 
@@ -513,6 +526,7 @@ export default function PartnersPage() {
         data_1: values.data_1 || undefined,
         data_2: values.data_2 || undefined,
         data_3: values.data_3 || undefined,
+        plan_ids: values.plan_ids ?? [],
       }),
     onSuccess: () => { invalidate(); toast.success("Partner created"); setCreateOpen(false); createForm.reset(); },
     onError: (err: any) => {
@@ -680,7 +694,14 @@ export default function PartnersPage() {
                       <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
                         <PartnerLogoBox $isBroker={isBroker}>{initials(p.name)}</PartnerLogoBox>
                         <div>
-                          <PartnerName>{p.name}</PartnerName>
+                          <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                            <PartnerName>{p.name}</PartnerName>
+                            {(p.unread_notification_count ?? 0) > 0 && (
+                              <span style={{ background: "#ef4444", color: "#fff", borderRadius: "999px", padding: "1px 7px", fontSize: 11, fontWeight: 700, fontFamily: "monospace" }}>
+                                {p.unread_notification_count}
+                              </span>
+                            )}
+                          </div>
                           <PartnerMeta>{p.partner_type || "Broker"}{p.city ? ` · ${p.city}` : ""}</PartnerMeta>
                         </div>
                       </div>
@@ -1034,6 +1055,26 @@ export default function PartnersPage() {
               </FormField>
             ))}
           </FormGrid2Col>
+
+          {/* Section: Plans */}
+          <SectionDivider>Membership Plans</SectionDivider>
+          <FormField style={{ gridColumn: "1 / -1" }}>
+            <Lbl>Assign Plans <span style={{ color: "#9ca3af", fontWeight: 400 }}>(select at least one)</span></Lbl>
+            <Controller
+              name="plan_ids"
+              control={createForm.control}
+              render={({ field }) => (
+                <MultiSelect
+                  value={field.value ?? []}
+                  onChange={e => field.onChange(e.value)}
+                  options={planOptions}
+                  placeholder="Select plans to assign to this partner"
+                  filter
+                  style={{ width: "100%" }}
+                />
+              )}
+            />
+          </FormField>
         </div>
       </Dialog>
 

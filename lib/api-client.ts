@@ -21,6 +21,10 @@ const apiClient: AxiosInstance = axios.create({
 
 // Attach access token + X-Partner-Id (for member partner-context switching)
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // Let axios auto-set multipart/form-data (with correct boundary) for FormData
+  if (config.data instanceof FormData) {
+    delete config.headers["Content-Type"];
+  }
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }

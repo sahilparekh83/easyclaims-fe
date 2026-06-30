@@ -2,12 +2,9 @@
 
 import React, { useCallback, useRef, useState } from "react";
 import styled from "styled-components";
-import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "primereact/button";
-import { MultiSelect } from "primereact/multiselect";
+import { Dropdown } from "primereact/dropdown";
 import { toast } from "react-toastify";
-import { adminBulkUploadPartners, adminDownloadPartnerBulkReport, adminDownloadPartnerSample, adminListPlans } from "@/imports/core/api";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -147,34 +144,69 @@ const RequiredCols = styled.div`
   color: #0369a1;
 `;
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface UploadResult {
+export interface UploadResult {
   total_rows: number;
-  created: Array<{ row: number; email: string; id: string }>;
+  created: Array<{ row: number; email: string }>;
   skipped: Array<{ row: number; email?: string; reason: string }>;
   errors: Array<{ row: number; email?: string; errors: string[] }>;
 }
 
-export default function PartnerBulkUploadPage() {
-  const router = useRouter();
+export interface PlanOption {
+  label: string;
+  value: string;
+}
+
+export interface MemberBulkUploadProps {
+  title: string;
+  subtitle: string;
+  dropdownInputId: string;
+  dropdownPlaceholder: string;
+  noPlansMessage: string;
+  planOptions: PlanOption[];
+  onBack: () => void;
+  uploadFn: (file: File, planId: string) => Promise<any>;
+  downloadSampleFn: () => Promise<Blob>;
+  downloadReportFn: (file: File) => Promise<Blob>;
+}
+
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function MemberBulkUpload({
+  title,
+  subtitle,
+  dropdownInputId,
+  dropdownPlaceholder,
+  noPlansMessage,
+  planOptions,
+  onBack,
+  uploadFn,
+  downloadSampleFn,
+  downloadReportFn,
+}: MemberBulkUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadingSample, setDownloadingSample] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const { data: plansData } = useQuery({
-    queryKey: ["admin", "all-plans"],
-    queryFn: () => adminListPlans({ limit: 100 }),
-  });
-  const planOptions = ((plansData as any)?.data ?? [])
-    .filter((p: any) => p.status === "Active")
-    .map((p: any) => ({ label: p.name, value: p.id }));
 
   const handleFile = (f: File) => {
     if (!f.name.endsWith(".xlsx") && !f.name.endsWith(".xls")) {
@@ -197,18 +229,14 @@ export default function PartnerBulkUploadPage() {
   }, []);
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
-    if (selectedPlanIds.length === 0) {
-      setUploadError("Please select at least one membership plan to assign to uploaded partners.");
-      return;
-    }
+    if (!selectedFile || !selectedPlanId) return;
     setUploading(true);
     setUploadError(null);
     try {
-      const res = await adminBulkUploadPartners(selectedFile, selectedPlanIds);
+      const res = await uploadFn(selectedFile, selectedPlanId);
       const payload: UploadResult = (res as any)?.data ?? res;
       setResult(payload);
-      toast.success(`Upload complete — ${payload.created?.length ?? 0} partner(s) created`);
+      toast.success(`Upload complete — ${payload.created?.length ?? 0} member(s) created`);
     } catch (err: unknown) {
       const axiosErr = err as { response?: { data?: { detail?: unknown } }; message?: string };
       const detail = axiosErr?.response?.data?.detail ?? axiosErr?.message ?? "Upload failed";
@@ -221,15 +249,8 @@ export default function PartnerBulkUploadPage() {
   const handleDownloadSample = async () => {
     setDownloadingSample(true);
     try {
-      const blob = await adminDownloadPartnerSample();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "partner_upload_sample.xlsx";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const blob = await downloadSampleFn();
+      triggerDownload(blob, "member_upload_sample.xlsx");
     } catch {
       setUploadError("Failed to download sample file");
     } finally {
@@ -241,15 +262,8 @@ export default function PartnerBulkUploadPage() {
     if (!selectedFile) return;
     setDownloading(true);
     try {
-      const blob = await adminDownloadPartnerBulkReport(selectedFile);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "partner_upload_report.xlsx";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const blob = await downloadReportFn(selectedFile);
+      triggerDownload(blob, "member_upload_report.xlsx");
     } catch {
       setUploadError("Failed to generate error report");
     } finally {
@@ -263,40 +277,39 @@ export default function PartnerBulkUploadPage() {
     <Page>
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        <Button icon="pi pi-arrow-left" severity="secondary" text onClick={() => router.push("/admin/partners")} />
+        <Button icon="pi pi-arrow-left" severity="secondary" text onClick={onBack} />
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#161d26", fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}>
-            Bulk Upload Partners
+            {title}
           </h1>
-          <div style={{ fontSize: 13, color: "#6b7a8c", marginTop: 2 }}>Upload an Excel file to create multiple partners at once</div>
+          <div style={{ fontSize: 13, color: "#6b7a8c", marginTop: 2 }}>{subtitle}</div>
         </div>
       </div>
 
-      {/* Required columns info */}
+      {/* Required columns */}
       <Card>
         <CardHeader><CardTitle>Required Excel Columns</CardTitle></CardHeader>
         <CardBody>
           <RequiredCols>
-            <div style={{ fontWeight: 700, marginBottom: 8 }}>Mandatory columns (must be present in Excel header row):</div>
+            <div style={{ fontWeight: 700, marginBottom: 8 }}>Mandatory columns:</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {[
-                "Legal Company Name", "Trade Name/Brand Name", "Registered Office Address",
-                "City", "State", "Pin Code", "GSTIN", "PAN",
-                "Authorized Signatory Name", "Designation", "Mobile Number", "Email ID",
-              ].map(col => (
+              {["Email ID", "Name", "Mobile Number"].map(col => (
                 <span key={col} style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 6, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>
                   {col}
                 </span>
               ))}
             </div>
             <div style={{ marginTop: 10, color: "#0369a1", fontSize: 12 }}>
-              Optional columns: <strong>Partner Type</strong>, <strong>Data 1</strong>, <strong>Data 2</strong>, <strong>Data 3</strong>
+              Optional columns:{" "}
+              <strong>Gender</strong>, <strong>Address</strong>, <strong>City</strong>, <strong>State</strong>, <strong>PIN Code</strong>,{" "}
+              <strong>Sale Date</strong>, <strong>Sales Channel</strong>, <strong>Branch Code</strong>, <strong>Salesperson Name</strong>,{" "}
+              <strong>Employee Code</strong>, <strong>Data 1</strong>, <strong>Data 2</strong>, <strong>Data 3</strong>
             </div>
           </RequiredCols>
         </CardBody>
       </Card>
 
-      {/* Upload Zone */}
+      {/* Upload */}
       <Card>
         <CardHeader><CardTitle>Upload File</CardTitle></CardHeader>
         <CardBody>
@@ -342,19 +355,19 @@ export default function PartnerBulkUploadPage() {
 
           <div style={{ marginTop: 16 }}>
             <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-              Assign Plans to Uploaded Partners <span style={{ color: "#ef4444" }}>*</span>
+              Assign Plan to All Members <span style={{ color: "#ef4444" }}>*</span>
             </label>
-            <MultiSelect
-              inputId="partner-bulk-plan-select"
-              value={selectedPlanIds}
-              onChange={e => setSelectedPlanIds(e.value)}
+            <Dropdown
+              inputId={dropdownInputId}
+              value={selectedPlanId}
+              onChange={e => setSelectedPlanId(e.value)}
               options={planOptions}
-              placeholder="Select at least one plan"
+              placeholder={dropdownPlaceholder}
               filter
               style={{ width: "100%" }}
             />
-            {selectedPlanIds.length === 0 && (
-              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>All uploaded partners will be assigned the selected plans</div>
+            {planOptions.length === 0 && (
+              <div style={{ fontSize: 12, color: "#d97706", marginTop: 4 }}>{noPlansMessage}</div>
             )}
           </div>
 
@@ -369,7 +382,7 @@ export default function PartnerBulkUploadPage() {
               label={uploading ? "Uploading…" : "Upload & Import"}
               icon="pi pi-upload"
               loading={uploading}
-              disabled={!selectedFile || uploading}
+              disabled={!selectedFile || !selectedPlanId || uploading}
               onClick={handleUpload}
             />
             {selectedFile && (
@@ -381,7 +394,7 @@ export default function PartnerBulkUploadPage() {
                 loading={downloading}
                 disabled={downloading}
                 onClick={handleDownloadReport}
-                title="Download the Excel file with error rows highlighted"
+                title="Download Excel with error rows highlighted red"
               />
             )}
           </div>
@@ -428,21 +441,13 @@ export default function PartnerBulkUploadPage() {
                 </div>
                 <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #fecaca" }}>
                   <ErrorTable>
-                    <thead>
-                      <tr>
-                        <ETh>Row</ETh>
-                        <ETh>Email</ETh>
-                        <ETh>Errors</ETh>
-                      </tr>
-                    </thead>
+                    <thead><tr><ETh>Row</ETh><ETh>Email</ETh><ETh>Errors</ETh></tr></thead>
                     <tbody>
                       {(result.errors ?? []).map((e, i) => (
                         <tr key={i}>
                           <ETd style={{ fontFamily: "monospace", color: "#dc2626", fontWeight: 600 }}>#{e.row}</ETd>
                           <ETd>{e.email ?? "—"}</ETd>
-                          <ETd>
-                            {e.errors.map((msg, j) => <ErrorBadge key={j}>{msg}</ErrorBadge>)}
-                          </ETd>
+                          <ETd>{e.errors.map((msg, j) => <ErrorBadge key={j}>{msg}</ErrorBadge>)}</ETd>
                         </tr>
                       ))}
                     </tbody>
@@ -454,17 +459,11 @@ export default function PartnerBulkUploadPage() {
             {(result.skipped?.length ?? 0) > 0 && (
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: "#d97706", marginBottom: 10 }}>
-                  Skipped rows (email already registered):
+                  Skipped rows (member already exists):
                 </div>
                 <div style={{ overflowX: "auto", borderRadius: 8, border: "1px solid #fed7aa" }}>
                   <ErrorTable>
-                    <thead>
-                      <tr>
-                        <ETh>Row</ETh>
-                        <ETh>Email</ETh>
-                        <ETh>Reason</ETh>
-                      </tr>
-                    </thead>
+                    <thead><tr><ETh>Row</ETh><ETh>Email</ETh><ETh>Reason</ETh></tr></thead>
                     <tbody>
                       {(result.skipped ?? []).map((s, i) => (
                         <tr key={i}>

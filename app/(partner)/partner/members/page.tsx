@@ -19,6 +19,7 @@ import {
   partnerListMembers,
   partnerCreateMember,
   partnerListPlans,
+  partnerMarkReadByType,
 } from "@/imports/core/api";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
@@ -265,6 +266,7 @@ export default function MembersPage() {
   const debouncedSearch = useDebounce(search, 300);
 
   useEffect(() => { setPage(0); }, [debouncedSearch, tab]);
+  useEffect(() => { partnerMarkReadByType("new_member").catch(() => {}); }, []);
 
   const form = useForm<MemberFormValues>({
     defaultValues: { email: "", name: "", mobile_no: "", gender: "", address_line: "", address_city: "", address_state: "", address_pin: "", sale_date: "", sales_channel: "", branch_code: "", salesperson_name: "", employee_code: "", data1: "", data2: "", data3: "", plan_id: "" },
@@ -368,6 +370,15 @@ export default function MembersPage() {
               />
             </SearchWrap>
             <Button
+              label="Bulk Upload"
+              icon="pi pi-upload"
+              size="small"
+              severity="secondary"
+              outlined
+              onClick={() => router.push("/partner/members/bulk-upload")}
+              style={{ height: 34, fontSize: 13 }}
+            />
+            <Button
               label="Add member"
               icon="pi pi-plus"
               size="small"
@@ -382,7 +393,6 @@ export default function MembersPage() {
             <tr>
               <Th>Member</Th>
               <ThSm>Plan</ThSm>
-              <ThSm>Policies</ThSm>
               <ThSm>Status</ThSm>
               <Th>Enrolled</Th>
             </tr>
@@ -407,9 +417,6 @@ export default function MembersPage() {
                   {m.enrollment?.plan_name
                     ? <PlanBadge>{m.enrollment.plan_name}</PlanBadge>
                     : <span style={{ color: "#9ca3af" }}>—</span>}
-                </TdSm>
-                <TdSm style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", color: "#374151" }}>
-                  {m.policy_count ?? 0}
                 </TdSm>
                 <TdSm>
                   <StatusBadge value={!!m.is_active} trueLabel="Active" falseLabel="Inactive" />
@@ -583,6 +590,7 @@ export default function MembersPage() {
           </Field>
         </FormGrid>
       </Dialog>
+
     </PageWrap>
   );
 }
