@@ -145,15 +145,19 @@ const AiExtractionBadge = styled.span<{ $s: string }>`
   font-size: 11.5px; font-weight: 700;
   padding: 3px 10px; border-radius: 999px;
   background: ${p =>
-    p.$s === 'processing'  ? '#eff6ff' :
-    p.$s === 'need_review' ? '#fffbeb' :
-    p.$s === 'active'      ? '#f0fdf4' :
-    p.$s === 'rejected'    ? '#fef2f2' : '#f8fafc'};
+    p.$s === 'processing'       ? '#eff6ff' :
+    p.$s === 'need_review'      ? '#fffbeb' :
+    p.$s === 'renewal_pending'  ? '#fdf4ff' :
+    p.$s === 'active'           ? '#f0fdf4' :
+    p.$s === 'renewed'          ? '#f0fdf4' :
+    p.$s === 'rejected'         ? '#fef2f2' : '#f8fafc'};
   color: ${p =>
-    p.$s === 'processing'  ? '#2563eb' :
-    p.$s === 'need_review' ? '#b45309' :
-    p.$s === 'active'      ? '#16a34a' :
-    p.$s === 'rejected'    ? '#b91c1c' : '#64748b'};
+    p.$s === 'processing'       ? '#2563eb' :
+    p.$s === 'need_review'      ? '#b45309' :
+    p.$s === 'renewal_pending'  ? '#7c3aed' :
+    p.$s === 'active'           ? '#16a34a' :
+    p.$s === 'renewed'          ? '#16a34a' :
+    p.$s === 'rejected'         ? '#b91c1c' : '#64748b'};
 `;
 
 const ActionBtns = styled.div`
@@ -833,7 +837,10 @@ export default function PoliciesPage() {
                       if (d !== null && d < 0) return <span style={{ color: "#94a3b8" }}>—</span>;
                       if (row.status === 'processing')                              return <AiExtractionBadge $s="processing"><span>⏳</span> Processing</AiExtractionBadge>;
                       if (row.status === 'need_review' || row.status === 'pending') return <AiExtractionBadge $s="need_review"><AlertTriangle size={12} /> Need Review</AiExtractionBadge>;
+                      if (row.status === 'renewal_pending')                         return <AiExtractionBadge $s="renewal_pending"><AlertTriangle size={12} /> Renewal?</AiExtractionBadge>;
+                      if (row.status === 'active' && row.previous_policy_id)        return <AiExtractionBadge $s="active"><Check size={12} /> Renewed</AiExtractionBadge>;
                       if (row.status === 'active')                                  return <AiExtractionBadge $s="active"><Check size={12} /> Approved</AiExtractionBadge>;
+                      if (row.status === 'renewed')                                 return <AiExtractionBadge $s="renewed"><Check size={12} /> Superseded</AiExtractionBadge>;
                       if (row.status === 'rejected')                                return <AiExtractionBadge $s="rejected"><X size={12} /> Rejected</AiExtractionBadge>;
                       return <span style={{ color: "#94a3b8" }}>—</span>;
                     })()}
@@ -847,11 +854,13 @@ export default function PoliciesPage() {
                         <>
                           {effectiveStatus
                             ? <StatusPill $status={effectiveStatus}>
-                                {effectiveStatus === 'expired'    ? 'Expired' :
-                                 effectiveStatus === 'processing'  ? 'Processing' :
-                                 effectiveStatus === 'need_review' ? 'Pending' :
-                                 effectiveStatus === 'active'      ? 'Active' :
-                                 effectiveStatus === 'rejected'    ? 'Rejected' : effectiveStatus}
+                                {effectiveStatus === 'expired'          ? 'Expired' :
+                                 effectiveStatus === 'processing'        ? 'Processing' :
+                                 effectiveStatus === 'need_review'       ? 'Pending' :
+                                 effectiveStatus === 'renewal_pending'   ? 'Renewal?' :
+                                 effectiveStatus === 'active'            ? 'Active' :
+                                 effectiveStatus === 'renewed'           ? 'Renewed' :
+                                 effectiveStatus === 'rejected'          ? 'Rejected' : effectiveStatus}
                               </StatusPill>
                             : <span style={{ color: "#94a3b8" }}>—</span>}
                           {d !== null && d >= 0 && d <= 30 && (
