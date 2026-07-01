@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import styled, { keyframes } from "styled-components";
 import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Eye, Download, Upload, CheckCircle2, X, AlertTriangle } from "lucide-react";
+import { Eye, Download, Upload, CheckCircle2, X, AlertTriangle, RefreshCw } from "lucide-react";
 import PoliciesTable from "@/components/ui/PoliciesTable";
 import {
   memberListPolicies, memberUploadPolicy, memberUpdatePolicy,
@@ -255,6 +255,15 @@ const AccentBtn = styled.button`
   &:hover { background: #0046a0; }
 `;
 
+const RefreshBtn = styled.button<{ $spinning: boolean }>`
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: 1px solid #e0e6ec; border-radius: 9px;
+  padding: 7px 10px; cursor: pointer; color: #6b7a8c;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  &:hover { background: #f1f5f9; border-color: #0050b0; color: #0050b0; }
+  svg { animation: ${p => p.$spinning ? spin : "none"} 0.7s linear infinite; }
+`;
+
 const FamilyScrollList = styled.div`
   max-height: 200px; overflow-y: auto;
   display: flex; flex-direction: column; gap: 0.5rem; padding: 0.25rem 0;
@@ -328,7 +337,7 @@ export default function MemberPoliciesPage() {
   // View linked members dialog state
   const [viewLinkedPolicy, setViewLinkedPolicy] = useState<Policy | null>(null);
 
-  const { data: policiesData, isLoading } = useQuery({
+  const { data: policiesData, isLoading, isFetching } = useQuery({
     queryKey: ["member", "policies", debouncedSearch, page],
     queryFn: () => memberListPolicies({ global_filter: debouncedSearch, sort_field: "created_at", sort_order: -1, limit: ROWS, skip: page * ROWS }),
   });
@@ -425,6 +434,13 @@ export default function MemberPoliciesPage() {
               <i className="pi pi-search" />
               <SearchInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Search policies…" />
             </SearchWrap>
+            <RefreshBtn
+              $spinning={isFetching}
+              title="Refresh policies"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["member", "policies"] })}
+            >
+              <RefreshCw size={15} />
+            </RefreshBtn>
             <AccentBtn onClick={openUpload}><Upload size={14} />Upload Policy</AccentBtn>
           </div>
         </CardTop>

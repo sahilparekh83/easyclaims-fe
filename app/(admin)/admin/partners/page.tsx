@@ -449,9 +449,11 @@ export default function PartnersPage() {
   const [editLoading, setEditLoading] = useState(false);
   const [regenId, setRegenId] = useState<string | null>(null);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
-  const [search] = useState("");
-  const [first] = useState(0);
+  const [search, setSearch] = useState("");
+  const [first, setFirst] = useState(0);
   const debouncedSearch = useDebounce(search, 300);
+
+  useEffect(() => { setFirst(0); }, [debouncedSearch]);
 
   // Add customer modal state
   const [addCustomerOpen, setAddCustomerOpen] = useState(false);
@@ -626,26 +628,8 @@ export default function PartnersPage() {
   const onCreateSubmit = (values: PartnerFormValues) => createMutation.mutate(values);
   const onEditSubmit = (values: EditFormValues) => { if (!editPartner) return; updateMutation.mutate({ id: editPartner.id, values }); };
 
-  const KPIS = [
-    { label: "Active partners", value: total, loading: isLoading, bg: "#eff6ff", color: "#2563eb", icon: <Briefcase size={18} /> },
-    { label: "Memberships sold (MTD)", value: 0, loading: false, bg: "#f0fdf4", color: "#16a34a", icon: <TrendingUp size={18} /> },
-    { label: "Revenue (MTD)", value: 0, loading: false, bg: "#fefce8", color: "#ca8a04", icon: <CreditCard size={18} /> },
-    { label: "Renewals due", value: 0, loading: false, bg: "#fff1f2", color: "#be123c", icon: <RefreshCw size={18} /> },
-  ];
-
   return (
     <Page>
-      {/* KPI row */}
-      <KpiGrid>
-        {KPIS.map(k => (
-          <KpiCard key={k.label}>
-            <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
-            {k.loading ? <Skeleton /> : <KpiValue>{typeof k.value === "number" ? k.value.toLocaleString("en-IN") : k.value}</KpiValue>}
-            <KpiLabel>{k.label}</KpiLabel>
-          </KpiCard>
-        ))}
-      </KpiGrid>
-
       {/* Main two-col */}
       <TwoCol>
         {/* Partners table */}
@@ -655,7 +639,16 @@ export default function PartnersPage() {
               <CardTitle>Channel partners</CardTitle>
               <CardSub>Brokers &amp; channel partners driving acquisition</CardSub>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <span className="p-input-icon-left" style={{ position: "relative" }}>
+                <i className="pi pi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 13 }} />
+                <InputText
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Search partners…"
+                  style={{ paddingLeft: 30, height: 34, fontSize: 13, width: 200, borderRadius: 7 }}
+                />
+              </span>
               <OutlineBtn
                 onClick={() => { window.location.href = "/admin/partners/bulk-upload"; }}
                 style={{ fontSize: 12.5 }}
@@ -720,11 +713,34 @@ export default function PartnersPage() {
               })}
             </tbody>
           </Table>
+          {total > ROWS && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderTop: "1px solid #f1f2f6" }}>
+              <span style={{ fontSize: 12.5, color: "#6b7280" }}>
+                Showing {first + 1}–{Math.min(first + ROWS, total)} of {total}
+              </span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <OutlineBtn
+                  disabled={first === 0}
+                  onClick={() => setFirst(Math.max(0, first - ROWS))}
+                  style={{ fontSize: 12.5, padding: "5px 14px", opacity: first === 0 ? 0.4 : 1, cursor: first === 0 ? "default" : "pointer" }}
+                >
+                  ← Prev
+                </OutlineBtn>
+                <OutlineBtn
+                  disabled={first + ROWS >= total}
+                  onClick={() => setFirst(first + ROWS)}
+                  style={{ fontSize: 12.5, padding: "5px 14px", opacity: first + ROWS >= total ? 0.4 : 1, cursor: first + ROWS >= total ? "default" : "pointer" }}
+                >
+                  Next →
+                </OutlineBtn>
+              </div>
+            </div>
+          )}
         </SectionCard>
 
         {/* Right col */}
         <RightCol>
-          {/* API access — managed per partner */}
+          {/* API access — hidden
           <ApiCard>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
               <Key size={16} color="#2563eb" />
@@ -737,23 +753,8 @@ export default function PartnersPage() {
               <div style={{ fontSize: 12, color: "#6b7a8c", marginBottom: 6 }}>Rate limit per partner</div>
               <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 14, fontWeight: 600, color: "#161d26" }}>600 req / min</span>
             </div>
-            {newApiKey && (
-              <div style={{ marginTop: 14, background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 10, padding: "12px 14px" }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: "#15803d", marginBottom: 6 }}>New key generated</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12, color: "#0f172a", flex: 1, wordBreak: "break-all" }}>
-                    {keyRevealed ? newApiKey : newApiKey.slice(0, 10) + "••••••••••••"}
-                  </span>
-                  <button onClick={() => setKeyRevealed(v => !v)} style={{ background: "none", border: "none", cursor: "pointer", color: "#64748b", fontSize: 12, fontWeight: 600 }}>
-                    {keyRevealed ? "Hide" : "Reveal"}
-                  </button>
-                  <button onClick={() => { navigator.clipboard.writeText(newApiKey); toast.success("Copied"); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#0050b0", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
-                    <Copy size={12} /> Copy
-                  </button>
-                </div>
-              </div>
-            )}
           </ApiCard>
+          */}
 
           {/* Quick stats */}
           <SectionCard>

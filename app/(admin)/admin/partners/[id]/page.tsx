@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form";
@@ -31,6 +31,7 @@ import {
   adminRejectPartnerChangeRequest,
   adminAddMemberToPartner,
   adminGetPartnerNotifications,
+  adminMarkPartnerNotificationsRead,
 } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
 
@@ -625,6 +626,17 @@ export default function PartnerDetailPage() {
     enabled: !!id,
   });
 
+  useEffect(() => {
+    if (activeTab === "notifications") {
+      adminMarkPartnerNotificationsRead(id)
+        .then(() => {
+          queryClient.invalidateQueries({ queryKey: ["admin", "partner-notifications", id] });
+          queryClient.invalidateQueries({ queryKey: ["admin", "partners"] });
+        })
+        .catch(() => {});
+    }
+  }, [activeTab, id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const partner: Partner | null = partnerRes?.data ?? null;
   const members: Member[] = membersRes?.data?.data ?? [];
   const plansOverview: PlanOverview[] = (plansRes as any)?.data ?? [];
@@ -1047,13 +1059,23 @@ export default function PartnerDetailPage() {
                       </span>
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 16px", marginBottom: 8 }}>
-                      {Object.entries(cr.requested_fields).map(([k, v]) => (
-                        <div key={k} style={{ fontSize: 12 }}>
-                          <span style={{ color: "#6b7280" }}>{FIELD_LABELS[k] ?? k}:</span>{" "}
-                          <span style={{ fontWeight: 600, color: "#111827" }}>{v}</span>
-                        </div>
-                      ))}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+                      {Object.entries(cr.requested_fields).map(([k, v]) => {
+                        const oldVal = partner ? (partner as any)[k] : null;
+                        return (
+                          <div key={k} style={{ fontSize: 12, display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: "0 12px", alignItems: "center", background: "#f9fafb", borderRadius: 6, padding: "6px 10px" }}>
+                            <span style={{ color: "#9ca3af", fontWeight: 600, fontSize: 11 }}>{FIELD_LABELS[k] ?? k}</span>
+                            <div>
+                              <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 1 }}>Current</div>
+                              <span style={{ color: oldVal ? "#374151" : "#d1d5db" }}>{oldVal || "—"}</span>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 1 }}>Requested</div>
+                              <span style={{ fontWeight: 700, color: "#6366f1" }}>{v}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {cr.reason && (
@@ -1182,15 +1204,26 @@ export default function PartnerDetailPage() {
               </div>
             )}
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 14 }}>
-              {Object.entries(reviewCR.requested_fields).map(([k, v]) => (
-                <div key={k} style={{
-                  display: "flex", justifyContent: "space-between", fontSize: 13,
-                  padding: "6px 10px", background: "#f9fafb", borderRadius: 6,
-                }}>
-                  <span style={{ color: "#6b7280" }}>{FIELD_LABELS[k] ?? k}</span>
-                  <span style={{ fontWeight: 600, color: "#111827" }}>{v}</span>
-                </div>
-              ))}
+              {Object.entries(reviewCR.requested_fields).map(([k, v]) => {
+                const oldVal = partner ? (partner as any)[k] : null;
+                return (
+                  <div key={k} style={{
+                    display: "grid", gridTemplateColumns: "130px 1fr 1fr", gap: "0 12px",
+                    alignItems: "center", fontSize: 13,
+                    padding: "7px 10px", background: "#f9fafb", borderRadius: 6,
+                  }}>
+                    <span style={{ color: "#6b7280", fontSize: 12 }}>{FIELD_LABELS[k] ?? k}</span>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 1 }}>Current</div>
+                      <span style={{ color: oldVal ? "#374151" : "#d1d5db" }}>{oldVal || "—"}</span>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 1 }}>→ Requested</div>
+                      <span style={{ fontWeight: 700, color: "#6366f1" }}>{v}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               <label style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6b7a8c" }}>

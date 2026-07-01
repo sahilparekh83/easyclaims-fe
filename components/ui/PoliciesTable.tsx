@@ -263,8 +263,8 @@ export default function PoliciesTable({
   const isMember = role === "member";
   const showFilters = !!onTypeFilter || !!onAiFilter;
 
-  // Column count: POLICY + [MEMBER col?] + TYPE + INSURER + SUM INSURED + [AI EXTRACTION if !member] + STATUS + ACTIONS
-  const colCount = 6 + (showMemberColumn ? 1 : 0) + (isMember ? 0 : 1);
+  // Column count: POLICY + [MEMBER col?] + TYPE + INSURER + [EXPIRY if !member] + SUM INSURED + [AI EXTRACTION if !member] + STATUS + ACTIONS
+  const colCount = 6 + (showMemberColumn ? 1 : 0) + (isMember ? 0 : 2);
 
   return (
     <Table>
@@ -283,6 +283,7 @@ export default function PoliciesTable({
             ) : "Type"}
           </Th>
           <Th>Insurer</Th>
+          {!isMember && <Th>Period</Th>}
           <Th>Sum Insured</Th>
           {!isMember && (
             <Th>
@@ -333,7 +334,7 @@ export default function PoliciesTable({
                 {showMemberSubline && row.member_name && (
                   <PolicySub>{row.member_name}</PolicySub>
                 )}
-                {!showMemberSubline && (row.start_date || row.end_date) && (
+                {isMember && (row.start_date || row.end_date) && (
                   <PolicySub>
                     {row.start_date ? dayjs(row.start_date).format("DD MMM YY") : "—"}
                     {" → "}
@@ -365,6 +366,32 @@ export default function PoliciesTable({
               {/* Insurer */}
               <Td>{row.insurer || <span style={{ color: "#9ca3af" }}>—</span>}</Td>
 
+              {/* Period (start → end) — admin/partner only */}
+              {!isMember && (
+                <Td>
+                  {(row.start_date || row.end_date) ? (
+                    <div>
+                      <div style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12, color: "#64748b" }}>
+                        {row.start_date ? dayjs(row.start_date).format("DD MMM YYYY") : "—"}
+                      </div>
+                      <div style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12.5, fontWeight: 600, color: isExpired ? "#b91c1c" : "#0f172a", marginTop: 2 }}>
+                        {row.end_date ? dayjs(row.end_date).format("DD MMM YYYY") : "—"}
+                      </div>
+                      {daysLeft !== null && daysLeft < 0 && (
+                        <ExpiryPill style={{ color: "#b91c1c", background: "#fee2e2", border: "1px solid #fca5a5" }}>
+                          <AlertTriangle size={10} /> Expired
+                        </ExpiryPill>
+                      )}
+                      {daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 && (
+                        <ExpiryPill><AlertTriangle size={10} /> {daysLeft}d left</ExpiryPill>
+                      )}
+                    </div>
+                  ) : (
+                    <span style={{ color: "#9ca3af" }}>—</span>
+                  )}
+                </Td>
+              )}
+
               {/* Sum Insured */}
               <Td>
                 {row.sum_insured != null
@@ -388,11 +415,6 @@ export default function PoliciesTable({
                   isRenewal={!!row.previous_policy_id}
                   showIcon={isMember}
                 />
-                {!isMember && daysLeft !== null && daysLeft >= 0 && daysLeft <= 30 && (
-                  <div>
-                    <ExpiryPill><AlertTriangle size={10} /> Expires in {daysLeft}d</ExpiryPill>
-                  </div>
-                )}
               </Td>
 
               {/* Actions */}

@@ -384,7 +384,7 @@ async function downloadPdf(memberId: string, policyId: string, fileName?: string
   }
 }
 
-const TABS = ["Profile", "Policies", "Family", "History"] as const;
+const TABS = ["Profile", "Family", "History"] as const;
 type TabKey = (typeof TABS)[number];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -423,10 +423,7 @@ export default function MemberDetailPage() {
   const policies: MemberPolicy[] = member.policies ?? [];
   const policyCount = policies.length;
 
-  const tabLabel = (t: TabKey) => {
-    if (t === "Policies" && policyCount > 0) return `Policies ${policyCount}`;
-    return t;
-  };
+  const tabLabel = (t: TabKey) => t;
 
   return (
     <div style={{ maxWidth: "1100px" }}>

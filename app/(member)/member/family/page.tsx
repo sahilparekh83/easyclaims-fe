@@ -362,11 +362,6 @@ export default function MemberFamilyPage() {
               )} />
           </FormField>
           <ChildAgeCheck control={form.control} childAgeLimit={childAgeLimit} />
-          <FormField>
-            <FormLabel>Coverage Type</FormLabel>
-            <Controller name="coverage_type" control={form.control}
-              render={({ field }) => <Dropdown value={field.value || "Health"} options={COVERAGE_OPTIONS} onChange={e => field.onChange(e.value)} style={{ width: "100%" }} placeholder="Select coverage type" />} />
-          </FormField>
         </FormBody>
       </Dialog>
 
@@ -411,11 +406,6 @@ export default function MemberFamilyPage() {
                   dateFormat="dd M yy" showIcon style={{ width: "100%" }} inputStyle={{ width: "100%" }}
                   placeholder="Leave blank for no change" maxDate={new Date()} />
               )} />
-          </FormField>
-          <FormField>
-            <FormLabel>Coverage Type</FormLabel>
-            <Controller name="coverage_type" control={crForm.control}
-              render={({ field }) => <Dropdown value={field.value} options={[{ label: "— no change —", value: "" }, ...COVERAGE_OPTIONS]} onChange={e => field.onChange(e.value)} style={{ width: "100%" }} />} />
           </FormField>
           <FormField>
             <FormLabel>Reason *</FormLabel>

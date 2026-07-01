@@ -16,7 +16,7 @@ import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminGetMember, adminRenewMemberEnrollment, adminSwitchMemberPlan, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminListPlans, adminViewPolicyPdf, adminDownloadPolicyPdf } from "@/imports/core/api";
+import { adminGetMember, adminRenewMemberEnrollment, adminSwitchMemberPlan, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminListPlans, adminViewPolicyPdf, adminDownloadPolicyPdf, adminDeletePolicy } from "@/imports/core/api";
 import { InputTextarea } from "primereact/inputtextarea";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
@@ -492,6 +492,15 @@ export default function MemberDetailPage() {
     onError: () => toast.error("Failed to switch plan"),
   });
 
+  const deletePolicyMutation = useMutation({
+    mutationFn: (policyId: string) => adminDeletePolicy(policyId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
+      toast.success("Policy deleted");
+    },
+    onError: () => toast.error("Failed to delete policy"),
+  });
+
   const updateMutation = useMutation({
     mutationFn: (v: EditFormValues) => {
       // Backend expects a flat AdminMemberUpdate payload (no nested profile key)
@@ -804,32 +813,7 @@ export default function MemberDetailPage() {
               )}
             </Card>
 
-            <Card>
-              <CardTitle>
-                <UserCheck size={14} /> Nominee
-              </CardTitle>
-              {(member.nominees ?? []).length === 0 ? (
-                <p style={{ color: "#9ca3af", fontSize: "0.875rem", margin: 0 }}>
-                  No nominees added
-                </p>
-              ) : (
-                (member.nominees ?? []).map((n: any) => (
-                  <NomineeRow key={n.id}>
-                    <div>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>
-                        {n.name}
-                      </div>
-                      <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 2 }}>
-                        {n.relation}
-                      </div>
-                    </div>
-                    <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 13, fontWeight: 600, color: "#1d4ed8", background: "#eff6ff", borderRadius: 999, padding: "3px 11px" }}>
-                      {n.share_percent}%
-                    </span>
-                  </NomineeRow>
-                ))
-              )}
-            </Card>
+            {/* Nominee card hidden */}
           </RightCol>
         </ProfileLayout>
       )}
@@ -856,7 +840,7 @@ export default function MemberDetailPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
                       <span style={{ fontWeight: 700, fontSize: 14, color: "#111827" }}>{f.name}</span>
                       <span style={{ fontSize: 11, background: "#f1f5f9", color: "#374151", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{f.relation}</span>
-                      {f.coverage_type && <span style={{ fontSize: 11, background: "#dcfce7", color: "#166534", padding: "2px 8px", borderRadius: 999, fontWeight: 600 }}>{f.coverage_type}</span>}
+                      {/* coverage_type badge hidden */}
                       {f.policy_count > 0 && (
                         <span style={{ fontSize: 11, background: "#fef9c3", color: "#92400e", padding: "2px 8px", borderRadius: 999, fontWeight: 700, border: "1px solid #fde68a" }}>
                           🔗 {f.policy_count} Policy{f.policy_count > 1 ? "ies" : ""}
@@ -953,8 +937,16 @@ export default function MemberDetailPage() {
               policies={memberPolicies}
               role="admin"
               onDownload={async p => { const blob = await adminDownloadPolicyPdf(p.id); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `policy_${p.policy_number}.pdf`; a.click(); URL.revokeObjectURL(url); }}
-              onView={p => router.push(`/admin/policies/${p.id}`)}
+              onView={p => {
+                const qs = new URLSearchParams();
+                qs.set("member_id", id);
+                if (member?.name) qs.set("member_name", encodeURIComponent(member.name));
+                if (fromPartnerId) qs.set("partner_id", fromPartnerId);
+                if (fromPartnerName) qs.set("partner_name", encodeURIComponent(fromPartnerName));
+                router.push(`/admin/policies/${p.id}?${qs.toString()}`);
+              }}
               onLinked={p => setViewLinkedPolicy(p)}
+              onDelete={p => { if (confirm(`Delete policy ${p.policy_number ?? p.id}?`)) deletePolicyMutation.mutate(p.id); }}
               emptyText="No policies uploaded."
             />
           </Card>
@@ -1031,31 +1023,7 @@ export default function MemberDetailPage() {
             </CommRow>
           </Card>
 
-          <Card>
-            <CardTitle>Consent &amp; DPDP</CardTitle>
-            <p style={{ fontSize: "0.78rem", color: "#64748b", margin: "0 0 4px" }}>Digital Personal Data Protection consent record</p>
-            <CommRow>
-              <CommLabel>Consent timestamp</CommLabel>
-              <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12.5, color: "#0f172a", fontWeight: 500 }}>
-                {member.created_at ? new Date(member.created_at).toLocaleString("en-IN") : "Not recorded"}
-              </span>
-            </CommRow>
-            <CommRow>
-              <CommLabel>Consent version</CommLabel>
-              <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 12.5, color: "#0f172a", fontWeight: 500 }}>v2.1</span>
-            </CommRow>
-            <CommRow>
-              <CommLabel>Consent source</CommLabel>
-              <span style={{ fontSize: 12.5, color: "#0f172a", fontWeight: 500 }}>Member portal</span>
-            </CommRow>
-            <ConsentAlert>
-              <ShieldCheck size={16} color="#16a34a" style={{ flexShrink: 0, marginTop: 2 }} />
-              <div>
-                <strong>Active consent on file</strong><br />
-                Member can withdraw consent any time; honoured within 72 hours.
-              </div>
-            </ConsentAlert>
-          </Card>
+          {/* Consent & DPDP — hidden */}
         </div>
       )}
 

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ChevronRight } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "primereact/button";
 import { InputText } from "primereact/inputtext";
@@ -270,7 +271,13 @@ const RenewalBtn = styled.button<{ $variant: 'confirm' | 'dismiss' }>`
 export default function PolicyReviewPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+
+  const fromMemberId   = searchParams.get("member_id") ?? "";
+  const fromMemberName = searchParams.get("member_name") ? decodeURIComponent(searchParams.get("member_name")!) : "";
+  const fromPartnerId  = searchParams.get("partner_id") ?? "";
+  const fromPartnerName = searchParams.get("partner_name") ? decodeURIComponent(searchParams.get("partner_name")!) : "";
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Record<string, string>>({});
 
@@ -365,15 +372,52 @@ export default function PolicyReviewPage() {
       <TopBar>
         <TopLeft>
           <button
-            onClick={() => router.push("/admin/policies")}
+            onClick={() => {
+              if (fromMemberId) {
+                const qs = new URLSearchParams();
+                if (fromPartnerId) qs.set("partner_id", fromPartnerId);
+                if (fromPartnerName) qs.set("partner_name", fromPartnerName);
+                router.push(`/admin/members/${fromMemberId}?${qs.toString()}`);
+              } else {
+                router.push("/admin/policies");
+              }
+            }}
             style={{ border: "none", background: "none", cursor: "pointer", color: "#64748b", display: "flex", alignItems: "center" }}
           >
             <ArrowLeft size={18} />
           </button>
-          <div>
-            <PolicyNo>{policy?.policy_number ?? "—"}</PolicyNo>
-            <MemberName>{policy?.member_name ?? ""}</MemberName>
+
+          {/* Breadcrumb */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 13, color: "#64748b", flexWrap: "wrap" }}>
+            {fromPartnerId ? (
+              <>
+                <span style={{ cursor: "pointer" }} onClick={() => router.push("/admin/partners")}>Partners</span>
+                <ChevronRight size={12} />
+                <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/partners/${fromPartnerId}?tab=members`)}>{fromPartnerName || "Partner"}</span>
+                <ChevronRight size={12} />
+                <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/partners/${fromPartnerId}?tab=members`)}>Members</span>
+                <ChevronRight size={12} />
+                <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/members/${fromMemberId}?partner_id=${fromPartnerId}&partner_name=${encodeURIComponent(fromPartnerName)}`)}>{fromMemberName || "Member"}</span>
+                <ChevronRight size={12} />
+                <span style={{ fontWeight: 700, color: "#0f172a" }}>{policy?.policy_number ?? "Policy"}</span>
+              </>
+            ) : fromMemberId ? (
+              <>
+                <span style={{ cursor: "pointer" }} onClick={() => router.push("/admin/members")}>Members</span>
+                <ChevronRight size={12} />
+                <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/members/${fromMemberId}`)}>{fromMemberName || "Member"}</span>
+                <ChevronRight size={12} />
+                <span style={{ fontWeight: 700, color: "#0f172a" }}>{policy?.policy_number ?? "Policy"}</span>
+              </>
+            ) : (
+              <>
+                <span style={{ cursor: "pointer" }} onClick={() => router.push("/admin/policies")}>Policies</span>
+                <ChevronRight size={12} />
+                <span style={{ fontWeight: 700, color: "#0f172a" }}>{policy?.policy_number ?? "Policy"}</span>
+              </>
+            )}
           </div>
+
           {status && (
             <PolicyStatusBadge status={status} isRenewal={!!policy?.previous_policy_id} />
           )}

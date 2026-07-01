@@ -379,7 +379,6 @@ function CustomTooltip({ active, payload, label }: any) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const RECENT_PARAMS = { limit: 5, skip: 0, sort_field: "created_at", sort_order: -1 };
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -405,18 +404,12 @@ export default function DashboardPage() {
     queryFn: () => adminGetDashboard({ year: yearFilter }),
   });
 
-  const { data: recentMembersData } = useQuery({
-    queryKey: ["admin", "members", "recent"],
-    queryFn: () => adminListMembers(RECENT_PARAMS),
-  });
-
   const { data: plansData } = useQuery({
     queryKey: ["admin", "plans", "all"],
     queryFn: () => adminListPlans({}),
   });
 
   const d = (dash as any)?.data ?? {};
-  const recentMembers: any[] = recentMembersData?.data?.data ?? [];
   const plans: any[] = Array.isArray(plansData?.data) ? plansData.data : [];
 
   const totalMembers         = d.total_members          ?? 0;
@@ -515,65 +508,6 @@ export default function DashboardPage() {
       {/* Policies by Status — Donut (commented out: auto-approve makes status breakdown misleading)
       <Card>…</Card>
       */}
-
-      {/* ── Data Row: Recent Members ─────────────────────────────────────── */}
-      <div>
-        {/* Recent Members */}
-        <Card>
-          <CardHeader>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <CardTitle>Recent Members</CardTitle>
-              <InfoTooltip text="Last 5 members who joined the platform" />
-            </div>
-            <Ghost onClick={() => router.push("/admin/members")}>View all →</Ghost>
-          </CardHeader>
-          <Table>
-            <thead>
-              <tr>
-                <Th>Member</Th>
-                <Th>Plan</Th>
-                <Th>Partner</Th>
-                <Th>Status</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentMembers.length === 0 ? (
-                <tr><Td colSpan={4} style={{ color: "#9ca3af", textAlign: "center" }}>No members yet</Td></tr>
-              ) : recentMembers.map((m: any) => (
-                <tr
-                  key={m.id}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => router.push(`/admin/members/${m.id}`)}
-                  onMouseEnter={e => (e.currentTarget.style.background = "#f8f9fb")}
-                  onMouseLeave={e => (e.currentTarget.style.background = "")}
-                >
-                  <Td>
-                    <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                      <AvatarCircle>{initials(m.name || m.email || "M")}</AvatarCircle>
-                      <div>
-                        <MemberName>{m.name || m.email}</MemberName>
-                        <MemberSub>{m.id?.slice(-8)?.toUpperCase()}</MemberSub>
-                      </div>
-                    </div>
-                  </Td>
-                  <Td>{m.plan_name || "—"}</Td>
-                  <Td>{m.partner_name || "—"}</Td>
-                  <Td><StatusBadge value={!!m.is_active} trueLabel="Active" falseLabel="Inactive" /></Td>
-                </tr>
-              ))}
-            </tbody>
-          </Table>
-        </Card>
-
-        {/* Policy Review Queue (commented out: auto-approve makes this queue always empty)
-        <Card>
-          <CardHeader>
-            <CardTitle>Policy Review Queue</CardTitle>
-            ...
-          </CardHeader>
-        </Card>
-        */}
-      </div>
 
       {/* ── Bottom Row: Bar chart + Plan distribution ─────────────────────── */}
       <ThreeCol style={{ gridTemplateColumns: "1.4fr 1fr" }}>

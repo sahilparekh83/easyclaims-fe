@@ -45,9 +45,8 @@ const MEMBER_NAV: NavItem[] = [
   { label: "Profile",      href: "/member/profile",       icon: <UserCheck size={18} /> },
   { label: "Change Requests", href: "/member/change-requests", icon: <ClipboardList size={18} /> },
   { label: "Family",       href: "/member/family",        icon: <Heart size={18} /> },
-  { label: "Nominees",     href: "/member/nominees",      icon: <Users size={18} /> },
   { label: "Policies",     href: "/member/policies",      icon: <FileText size={18} /> },
-  { label: "Consent",      href: "/member/consent",       icon: <ShieldCheck size={18} /> },
+  // { label: "Consent",      href: "/member/consent",       icon: <ShieldCheck size={18} /> },
   { label: "Notifications", href: "/member/notifications", icon: <Bell size={18} /> },
 ];
 

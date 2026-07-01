@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
@@ -11,7 +11,7 @@ import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
-import { adminListPolicies, adminViewPolicyPdf, adminDownloadPolicyPdf, adminListMembers, listPolicyTypes, adminUploadPolicy } from "@/imports/core/api";
+import { adminListPolicies, adminViewPolicyPdf, adminDownloadPolicyPdf, adminListMembers, listPolicyTypes, adminUploadPolicy, adminDeletePolicy } from "@/imports/core/api";
 import { useDebounce } from "@/hooks/useDebounce";
 
 const ROWS = 20;
@@ -574,13 +574,22 @@ export default function PoliciesPage() {
   const [search, setSearch] = useState("");
   const [first, setFirst] = useState(0);
   const [detailPolicy, setDetailPolicy] = useState<any>(null);
+  const [viewLinkedPolicy, setViewLinkedPolicy] = useState<any>(null);
   const [typeFilter, setTypeFilter] = useState("");
   const [aiFilter, setAiFilter] = useState("");
-  const [policyTab, setPolicyTab] = useState<"active" | "expired">("active");
   const debouncedSearch = useDebounce(search, 300);
 
   // Upload modal state
   const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminDeletePolicy(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
+      toast.success("Policy deleted");
+    },
+    onError: () => toast.error("Failed to delete policy"),
+  });
   const [uploadOpen, setUploadOpen] = useState(false);
   const [step, setStep] = useState<'form' | 'uploading' | 'done'>('form');
   const [memberQuery, setMemberQuery] = useState("");
@@ -592,15 +601,14 @@ export default function PoliciesPage() {
   const memberSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setFirst(0); }, [debouncedSearch, statusFilter, typeFilter, aiFilter, policyTab]);
+  useEffect(() => { setFirst(0); }, [debouncedSearch, statusFilter, typeFilter, aiFilter]);
 
   const activeFilters = [
-    { field: "status", value: policyTab },
     ...(typeFilter ? [{ field: "policy_type", value: typeFilter }] : []),
   ];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "policies", debouncedSearch, policyTab, typeFilter, first],
+    queryKey: ["admin", "policies", debouncedSearch, typeFilter, first],
     queryFn: () => adminListPolicies({
       global_filter: debouncedSearch,
       sort_field: "created_at",
@@ -692,8 +700,8 @@ export default function PoliciesPage() {
               <CheckCircle size={18} />
             </StatIconBox>
             <div>
-              <StatValue>{policies.filter((p: any) => p.status === "Active" || p.status === "active").length}</StatValue>
-              <StatLabel>Active policies</StatLabel>
+              <StatValue>{policies.filter((p: any) => p.status === "active" && (!p.end_date || dayjs(p.end_date).isAfter(dayjs()))).length}</StatValue>
+              <StatLabel>Active (this page)</StatLabel>
             </div>
           </AiStat>
 
@@ -702,8 +710,8 @@ export default function PoliciesPage() {
               <AlertTriangle size={18} />
             </StatIconBox>
             <div>
-              <StatValue>{policies.filter((p: any) => p.status === "Expired" || p.status === "expired").length}</StatValue>
-              <StatLabel>Expired policies</StatLabel>
+              <StatValue>{policies.filter((p: any) => p.end_date && dayjs(p.end_date).isBefore(dayjs())).length}</StatValue>
+              <StatLabel>Expired (this page)</StatLabel>
             </div>
           </AiStat>
         </AiStats>
@@ -717,14 +725,7 @@ export default function PoliciesPage() {
       {/* ── Policy Repository ─────────────────────────────────────────── */}
       <SectionCard>
         <CardHeader>
-          <TabBar style={{ borderBottom: "none", gap: 4 }}>
-            <Tab $active={policyTab === "active"} onClick={() => { setPolicyTab("active"); setFirst(0); }}>
-              Active
-            </Tab>
-            <Tab $active={policyTab === "expired"} onClick={() => { setPolicyTab("expired"); setFirst(0); }}>
-              Expired
-            </Tab>
-          </TabBar>
+          <CardTitle>All Policies</CardTitle>
           <CountMono>{total} policies</CountMono>
         </CardHeader>
 
@@ -767,7 +768,9 @@ export default function PoliciesPage() {
           role="admin"
           showMemberSubline
           onDownload={row => downloadPdf(row.id, row.file_name ?? undefined)}
-          onView={row => router.push(`/admin/policies/${row.id}`)}
+          onView={row => router.push(`/admin/policies/${row.id}?member_id=${row.member_id ?? ""}&member_name=${encodeURIComponent(row.member_name ?? "")}&partner_id=${row.partner_id ?? ""}&partner_name=${encodeURIComponent(row.partner_name ?? "")}`)}
+          onLinked={row => setViewLinkedPolicy(row)}
+          onDelete={row => { if (confirm(`Delete policy ${row.policy_number ?? row.id}?`)) deleteMutation.mutate(row.id); }}
           typeFilter={typeFilter}
           onTypeFilter={v => { setTypeFilter(v); setFirst(0); }}
           aiFilter={aiFilter}
@@ -1023,6 +1026,44 @@ export default function PoliciesPage() {
           <p style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
             No extracted data available for this policy.
           </p>
+        )}
+      </Dialog>
+
+      {/* ── Linked Family Members Dialog ──────────────────────────── */}
+      <Dialog
+        header="Linked Family Members"
+        visible={!!viewLinkedPolicy}
+        onHide={() => setViewLinkedPolicy(null)}
+        style={{ width: "380px" }}
+        modal
+        draggable={false}
+        footer={
+          <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button label="Close" severity="secondary" outlined onClick={() => setViewLinkedPolicy(null)} />
+          </div>
+        }
+      >
+        {viewLinkedPolicy && (
+          <div>
+            <p style={{ marginBottom: "0.75rem", fontSize: "0.9rem", color: "#3a4756" }}>
+              Policy: <strong style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{viewLinkedPolicy.policy_number}</strong>
+            </p>
+            {(viewLinkedPolicy.linked_family_members ?? []).length === 0 ? (
+              <div style={{ fontSize: 13, color: "#9ca3af", textAlign: "center", padding: "1rem 0" }}>No linked family members.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(viewLinkedPolicy.linked_family_members ?? []).map((m: any) => (
+                  <div key={m.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", background: "#f8fafc", borderRadius: 8, border: "1px solid #e2e8f0" }}>
+                    <span style={{ fontSize: 18 }}>👤</span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#161d26" }}>{m.name}</div>
+                      <div style={{ fontSize: "0.78rem", color: "#6b7a8c", textTransform: "capitalize" }}>{m.relation}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </Dialog>
     </Page>

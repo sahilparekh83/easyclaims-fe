@@ -143,6 +143,9 @@ export const adminListPoliciesByPartner = (partnerId: string, params?: object) =
 export const adminGetPartnerNotifications = (partnerId: string, params?: { skip?: number; limit?: number }) =>
   apiClient.get(`/admin/partners/${partnerId}/notifications`, { params }).then((r) => r.data);
 
+export const adminMarkPartnerNotificationsRead = (partnerId: string) =>
+  apiClient.patch(`/admin/partners/${partnerId}/notifications/mark-all-read`).then((r) => r.data);
+
 export const adminGetMember = (id: string) =>
   apiClient.get(`/admin/members/${id}`).then((r) => r.data);
 
@@ -213,6 +216,9 @@ export const adminUpdateUser = (id: string, data: object) =>
 
 export const adminDeleteUser = (id: string) =>
   apiClient.delete(`/users/${id}`).then((r) => r.data);
+
+export const adminDeletePolicy = (id: string) =>
+  apiClient.delete(`/admin/policies/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // PARTNER — PROFILE
