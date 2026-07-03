@@ -15,9 +15,10 @@ import { Dropdown } from "primereact/dropdown";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
-import { ArrowLeft, Download, Eye, Users, FileText, User, Calendar, Phone, Mail, MapPin, Building2, Upload, ClipboardList, Bell } from "lucide-react";
+import { ArrowLeft, Download, Eye, Users, FileText, User, Calendar, Phone, Mail, MapPin, Building2, Upload, ClipboardList, Bell, Palette } from "lucide-react";
 import {
   adminGetPartner,
+  adminUpdatePartner,
   adminListMembersByPartner,
   adminListPoliciesByPartner,
   adminViewPolicyPdf,
@@ -32,6 +33,9 @@ import {
   adminAddMemberToPartner,
   adminGetPartnerNotifications,
   adminMarkPartnerNotificationsRead,
+  adminUploadPartnerCardLogo,
+  adminGetPartnerCardLogo,
+  adminDownloadCardPreview,
 } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
 
@@ -240,6 +244,8 @@ interface Partner {
   email: string | null;
   mobile_no: string | null;
   status: string;
+  card_logo_key: string | null;
+  card_color: string | null;
   api_key: string | null;
   api_rate_limit: number;
   member_count?: number;
@@ -509,13 +515,16 @@ export default function PartnerDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [expandedRows, setExpandedRows] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<"plans" | "members" | "change-requests" | "notifications">(
-    (searchParams.get("tab") as "plans" | "members" | "change-requests" | "notifications") ?? "members"
+  const [activeTab, setActiveTab] = useState<"plans" | "members" | "change-requests" | "notifications" | "branding">(
+    (searchParams.get("tab") as "plans" | "members" | "change-requests" | "notifications" | "branding") ?? "members"
   );
   const [reviewCR, setReviewCR] = useState<PartnerChangeRequest | null>(null);
   const [reviewAction, setReviewAction] = useState<"approve" | "reject" | null>(null);
   const [adminNote, setAdminNote] = useState("");
   const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const [colorDraft, setColorDraft] = useState<string>("#0050b0");
+  const [downloadingCardPreview, setDownloadingCardPreview] = useState(false);
 
   const memberForm = useForm<MemberFormValues>({
     defaultValues: {
@@ -645,6 +654,58 @@ export default function PartnerDetailPage() {
   const pendingCRCount = changeRequests.filter(cr => cr.status === "pending").length;
   const partnerNotifications: any[] = (notifRes as any)?.data?.data ?? [];
   const notifUnreadCount: number = (notifRes as any)?.data?.unread_count ?? 0;
+
+  // ── Card branding (E6/E7/E10) ─────────────────────────────────────────────
+
+  useEffect(() => {
+    if (partner?.card_color) setColorDraft(partner.card_color);
+  }, [partner?.card_color]);
+
+  useEffect(() => {
+    if (!partner?.card_logo_key) { setLogoPreviewUrl(null); return; }
+    let revoked = false;
+    let url: string | null = null;
+    adminGetPartnerCardLogo(id).then(blob => {
+      if (revoked) return;
+      url = URL.createObjectURL(blob);
+      setLogoPreviewUrl(url);
+    }).catch(() => setLogoPreviewUrl(null));
+    return () => { revoked = true; if (url) URL.revokeObjectURL(url); };
+  }, [id, partner?.card_logo_key]);
+
+  const uploadLogoMutation = useMutation({
+    mutationFn: (file: File) => adminUploadPartnerCardLogo(id, file),
+    onSuccess: () => {
+      toast.success("Logo uploaded");
+      queryClient.invalidateQueries({ queryKey: ["admin", "partner", id] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to upload logo")),
+  });
+
+  const saveColorMutation = useMutation({
+    mutationFn: (color: string) => adminUpdatePartner(id, { card_color: color }),
+    onSuccess: () => {
+      toast.success("Brand color saved");
+      queryClient.invalidateQueries({ queryKey: ["admin", "partner", id] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to save color")),
+  });
+
+  const handleDownloadCardPreview = async () => {
+    setDownloadingCardPreview(true);
+    try {
+      const blob = await adminDownloadCardPreview(id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "membership_card_preview.pdf";
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      toast.error("Failed to generate preview");
+    } finally {
+      setDownloadingCardPreview(false);
+    }
+  };
 
   // ── Column templates ──────────────────────────────────────────────────────
 
@@ -879,6 +940,10 @@ export default function PartnerDetailPage() {
             {notifUnreadCount > 0 && (
               <CountBadge style={{ background: "#fef2f2", color: "#dc2626" }}>{notifUnreadCount} unread</CountBadge>
             )}
+          </Tab>
+          <Tab $active={activeTab === "branding"} onClick={() => setActiveTab("branding")}>
+            <Palette size={14} />
+            Card Branding
           </Tab>
         </TabRow>
 
@@ -1155,6 +1220,65 @@ export default function PartnerDetailPage() {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Card Branding tab (E6/E7/E10) */}
+        {activeTab === "branding" && (
+          <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 480 }}>
+            <div style={{ fontSize: 12.5, color: "#6b7280", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "10px 14px" }}>
+              These control how this partner's Membership Card looks. If not set, the system default look is used.
+              No HTML needed — just a logo and a brand color.
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 8 }}>Logo</div>
+              {logoPreviewUrl ? (
+                <img src={logoPreviewUrl} alt="Partner logo" style={{ height: 60, marginBottom: 10, borderRadius: 6, border: "1px solid #e5e7eb" }} />
+              ) : (
+                <div style={{ fontSize: 12.5, color: "#9ca3af", marginBottom: 10 }}>No logo uploaded yet — default EasyClaims branding will be used.</div>
+              )}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogoMutation.mutate(f); e.target.value = ""; }}
+                disabled={uploadLogoMutation.isPending}
+              />
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 8 }}>Brand Color</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <input
+                  type="color"
+                  value={colorDraft}
+                  onChange={e => setColorDraft(e.target.value)}
+                  style={{ width: 42, height: 32, border: "1px solid #e5e7eb", borderRadius: 6, cursor: "pointer" }}
+                />
+                <InputText value={colorDraft} onChange={e => setColorDraft(e.target.value)} style={{ width: 110, fontFamily: "monospace" }} />
+                <Button
+                  label="Save"
+                  size="small"
+                  loading={saveColorMutation.isPending}
+                  onClick={() => saveColorMutation.mutate(colorDraft)}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 8 }}>Preview</div>
+              <Button
+                label={downloadingCardPreview ? "Generating…" : "Download Preview"}
+                icon="pi pi-download"
+                size="small"
+                outlined
+                loading={downloadingCardPreview}
+                onClick={handleDownloadCardPreview}
+              />
+              <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 6 }}>
+                Generates a sample Membership Card PDF with dummy member data, using this partner's current logo and color.
+              </div>
+            </div>
           </div>
         )}
       </SectionCard>

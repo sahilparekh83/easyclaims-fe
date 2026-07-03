@@ -12,8 +12,13 @@ import { Tag } from "primereact/tag";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
+import { Dropdown } from "primereact/dropdown";
 import PageHeader from "@/components/ui/PageHeader";
-import { adminListEmailTemplates, adminUpdateEmailTemplate } from "@/imports/core/api";
+import {
+  adminListEmailTemplates, adminUpdateEmailTemplate,
+  adminListTemplateOverrides, adminCreateTemplateOverride, adminDeleteTemplateOverride,
+  adminListPartners,
+} from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
 
 // ─── Styled ────────────────────────────────────────────────────────────────────
@@ -84,6 +89,16 @@ interface MessageTemplate {
   updated_at?: string | null;
 }
 
+interface TemplateOverride {
+  id: string;
+  slug: string;
+  partner_id: string;
+  partner_name?: string | null;
+  subject?: string | null;
+  html_body: string;
+  description?: string | null;
+}
+
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default function EmailTemplatesPage() {
@@ -92,6 +107,12 @@ export default function EmailTemplatesPage() {
   const [subject, setSubject] = useState("");
   const [htmlBody, setHtmlBody] = useState("");
   const [description, setDescription] = useState("");
+
+  const [overridesFor, setOverridesFor] = useState<MessageTemplate | null>(null);
+  const [addingOverride, setAddingOverride] = useState(false);
+  const [overridePartnerId, setOverridePartnerId] = useState("");
+  const [overrideSubject, setOverrideSubject] = useState("");
+  const [overrideBody, setOverrideBody] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "email-templates"],
@@ -118,6 +139,62 @@ export default function EmailTemplatesPage() {
     setSubject(t.subject ?? "");
     setHtmlBody(t.html_body);
     setDescription(t.description ?? "");
+  };
+
+  // ── Partner overrides (E6, 4th MOM) ─────────────────────────────────────────
+
+  const { data: overridesData, isLoading: overridesLoading } = useQuery({
+    queryKey: ["admin", "email-template-overrides", overridesFor?.slug],
+    queryFn: () => adminListTemplateOverrides(overridesFor!.slug),
+    enabled: !!overridesFor,
+  });
+  const overrides: TemplateOverride[] = (overridesData as any)?.data ?? [];
+
+  const { data: partnersData } = useQuery({
+    queryKey: ["admin", "partners", "list"],
+    queryFn: () => adminListPartners({ skip: 0, limit: 500 }),
+    enabled: !!overridesFor,
+  });
+  const partnerOptions = ((partnersData as any)?.data?.data ?? [])
+    .filter((p: any) => !overrides.some(o => o.partner_id === p.id))
+    .map((p: any) => ({ label: p.name, value: p.id }));
+
+  const createOverrideMutation = useMutation({
+    mutationFn: () => adminCreateTemplateOverride(overridesFor!.slug, {
+      partner_id: overridePartnerId,
+      subject: overrideSubject.trim(),
+      html_body: overrideBody.trim(),
+    }),
+    onSuccess: () => {
+      toast.success("Partner override created");
+      queryClient.invalidateQueries({ queryKey: ["admin", "email-template-overrides", overridesFor?.slug] });
+      setAddingOverride(false);
+      setOverridePartnerId(""); setOverrideSubject(""); setOverrideBody("");
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to create override")),
+  });
+
+  const deleteOverrideMutation = useMutation({
+    mutationFn: (id: string) => adminDeleteTemplateOverride(id),
+    onSuccess: () => {
+      toast.success("Override removed — partner now uses the system default");
+      queryClient.invalidateQueries({ queryKey: ["admin", "email-template-overrides", overridesFor?.slug] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to remove override")),
+  });
+
+  const openOverrides = (t: MessageTemplate) => {
+    setOverridesFor(t);
+    setAddingOverride(false);
+  };
+
+  const onCreateOverride = () => {
+    if (!overridePartnerId) { toast.error("Select a partner"); return; }
+    if (overridesFor?.channel_type === "email" && !overrideSubject.trim()) {
+      toast.error("Subject is required for email templates"); return;
+    }
+    if (!overrideBody.trim()) { toast.error("Body is required"); return; }
+    createOverrideMutation.mutate();
   };
 
   const onSave = () => {
@@ -176,14 +253,24 @@ export default function EmailTemplatesPage() {
     row.updated_at ? dayjs(row.updated_at).format("DD MMM YYYY HH:mm") : "—";
 
   const actionsBody = (row: MessageTemplate) => (
-    <Button
-      label="Edit"
-      icon="pi pi-pencil"
-      text
-      size="small"
-      severity="info"
-      onClick={() => openEdit(row)}
-    />
+    <div style={{ display: "flex", gap: 4 }}>
+      <Button
+        label="Edit"
+        icon="pi pi-pencil"
+        text
+        size="small"
+        severity="info"
+        onClick={() => openEdit(row)}
+      />
+      <Button
+        label="Partner Overrides"
+        icon="pi pi-users"
+        text
+        size="small"
+        severity="secondary"
+        onClick={() => openOverrides(row)}
+      />
+    </div>
   );
 
   const isWA = editTemplate?.channel_type === "whatsapp";
@@ -215,7 +302,7 @@ export default function EmailTemplatesPage() {
             <Column header="Description" body={descBody} style={{ minWidth: "200px" }} />
             <Column header="Status" body={statusBody} style={{ width: "90px" }} />
             <Column header="Last Updated" body={updatedBody} style={{ minWidth: "150px" }} />
-            <Column header="" body={actionsBody} style={{ width: "80px" }} />
+            <Column header="" body={actionsBody} style={{ width: "170px" }} />
           </DataTable>
         )}
       </div>
@@ -302,6 +389,109 @@ export default function EmailTemplatesPage() {
             </Hint>
           </Field>
         </FormGrid>
+      </Dialog>
+
+      {/* ── Partner Overrides Dialog (E6, 4th MOM) ──────────────────────────── */}
+      <Dialog
+        header={
+          <div>
+            <span style={{ fontSize: "1rem", fontWeight: 600 }}>Partner Overrides</span>
+            {overridesFor && (
+              <div style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: "2px", fontWeight: 400 }}>
+                Slug: <SlugChip>{overridesFor.slug}</SlugChip> — a partner override takes priority over the system default for that partner's members.
+              </div>
+            )}
+          </div>
+        }
+        visible={!!overridesFor}
+        onHide={() => { setOverridesFor(null); setAddingOverride(false); }}
+        style={{ width: "700px" }}
+      >
+        {overridesLoading ? (
+          <p style={{ color: "#6b7280" }}>Loading…</p>
+        ) : (
+          <>
+            {overrides.length === 0 && !addingOverride && (
+              <p style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
+                No partner overrides yet — all partners use the system default for this message.
+              </p>
+            )}
+            {overrides.map((o) => (
+              <div key={o.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 14px", border: "1px solid #e5e7eb", borderRadius: 8, marginBottom: 8,
+              }}>
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>{o.partner_name || o.partner_id}</div>
+                  {o.subject && <div style={{ fontSize: "0.78rem", color: "#6b7280" }}>{o.subject}</div>}
+                </div>
+                <Button
+                  label="Remove"
+                  icon="pi pi-trash"
+                  text
+                  size="small"
+                  severity="danger"
+                  loading={deleteOverrideMutation.isPending}
+                  onClick={() => {
+                    if (window.confirm(`Remove ${o.partner_name || "this partner"}'s override? They will go back to the system default.`)) {
+                      deleteOverrideMutation.mutate(o.id);
+                    }
+                  }}
+                />
+              </div>
+            ))}
+
+            {!addingOverride ? (
+              <Button
+                label="+ Add Partner Override"
+                size="small"
+                outlined
+                style={{ marginTop: 8 }}
+                onClick={() => setAddingOverride(true)}
+                disabled={partnerOptions.length === 0}
+              />
+            ) : (
+              <FormGrid style={{ marginTop: 12, borderTop: "1px solid #f3f4f6", paddingTop: 12 }}>
+                <Field>
+                  <Label>Partner *</Label>
+                  <Dropdown
+                    value={overridePartnerId}
+                    options={partnerOptions}
+                    onChange={(e) => setOverridePartnerId(e.value)}
+                    placeholder="Select a partner"
+                    filter
+                    style={{ width: "100%" }}
+                  />
+                </Field>
+                {overridesFor?.channel_type === "email" && (
+                  <Field>
+                    <Label>Subject *</Label>
+                    <InputText
+                      value={overrideSubject}
+                      onChange={(e) => setOverrideSubject(e.target.value)}
+                      style={{ width: "100%" }}
+                    />
+                  </Field>
+                )}
+                <Field>
+                  <Label>{overridesFor?.channel_type === "whatsapp" ? "Message Body *" : "HTML Body *"}</Label>
+                  <InputTextarea
+                    value={overrideBody}
+                    onChange={(e) => setOverrideBody(e.target.value)}
+                    rows={overridesFor?.channel_type === "whatsapp" ? 8 : 12}
+                    style={{ width: "100%", fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: "0.8rem" }}
+                    placeholder={overridesFor?.html_body}
+                  />
+                  <Hint>Starting point — copy the system default above and customize it.</Hint>
+                </Field>
+                <FooterRow>
+                  <Button label="Cancel" severity="secondary" outlined size="small" onClick={() => setAddingOverride(false)} />
+                  <Button label="Create Override" size="small" loading={createOverrideMutation.isPending} onClick={onCreateOverride} />
+                </FooterRow>
+              </FormGrid>
+            )}
+          </>
+        )}
       </Dialog>
     </div>
   );

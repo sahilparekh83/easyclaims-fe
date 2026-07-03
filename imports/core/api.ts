@@ -75,6 +75,18 @@ export const adminUpdatePartner = (id: string, data: object) =>
 export const adminRegenPartnerKey = (id: string) =>
   apiClient.post(`/admin/partners/${id}/regenerate-key`, {}).then((r) => r.data);
 
+export const adminUploadPartnerCardLogo = (id: string, file: File) => {
+  const fd = new FormData();
+  fd.append("file", file);
+  return apiClient.post(`/admin/partners/${id}/card-logo`, fd).then((r) => r.data);
+};
+
+export const adminGetPartnerCardLogo = (id: string): Promise<Blob> =>
+  apiClient.get(`/admin/partners/${id}/card-logo/view`, { responseType: "blob" }).then((r) => r.data);
+
+export const adminDownloadCardPreview = (id: string): Promise<Blob> =>
+  apiClient.get(`/admin/partners/${id}/card-preview`, { responseType: "blob" }).then((r) => r.data);
+
 export const adminGetPartnerPlans = (id: string) =>
   apiClient.get(`/admin/partners/${id}/plans`).then((r) => r.data);
 
@@ -318,8 +330,8 @@ export const memberGetFamily = () =>
 
 export const memberListFamily = memberGetFamily;  // backward-compat alias
 
-export const memberCreateFamily = (data: object) =>
-  apiClient.post("/member/family", data).then((r) => r.data);
+export const memberRequestAddFamily = (data: { requested_fields: object; reason?: string }) =>
+  apiClient.post("/member/family/requests", data).then((r) => r.data);
 
 export const memberUpdateFamily = (id: string, data: object) =>
   apiClient.patch(`/member/family/${id}`, data).then((r) => r.data);
@@ -426,6 +438,15 @@ export const adminGetEmailTemplate = (id: string) =>
 export const adminUpdateEmailTemplate = (id: string, data: object) =>
   apiClient.patch(`/admin/email-templates/${id}`, data).then((r) => r.data);
 
+export const adminListTemplateOverrides = (slug: string) =>
+  apiClient.get(`/admin/email-templates/${slug}/overrides`).then((r) => r.data);
+
+export const adminCreateTemplateOverride = (slug: string, data: { partner_id: string; subject: string; html_body: string; description?: string }) =>
+  apiClient.post(`/admin/email-templates/${slug}/overrides`, data).then((r) => r.data);
+
+export const adminDeleteTemplateOverride = (templateId: string) =>
+  apiClient.delete(`/admin/email-templates/overrides/${templateId}`).then((r) => r.data);
+
 // ─────────────────────────────────────────────
 // ADMIN — CRON
 // ─────────────────────────────────────────────
@@ -474,6 +495,24 @@ export const adminGetMemberEnrollmentHistory = (memberId: string) =>
 
 export const adminSwitchMemberPlan = (memberId: string, plan_id: string) =>
   apiClient.patch(`/admin/members/${memberId}/plan`, { plan_id }).then((r) => r.data);
+
+export const adminCancelMemberEnrollment = (memberId: string, reason?: string) =>
+  apiClient.post(`/admin/members/${memberId}/enrollment/cancel`, { reason }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — FINANCE (Float Ledger)
+// ─────────────────────────────────────────────
+export const adminFinanceDashboard = () =>
+  apiClient.get("/admin/finance/dashboard").then((r) => r.data);
+
+export const adminFinanceTopUp = (partner_id: string, amount: number, note?: string) =>
+  apiClient.post("/admin/finance/topup", { partner_id, amount, note }).then((r) => r.data);
+
+export const adminFinanceLedger = (params: object = {}) =>
+  apiClient.get("/admin/finance/ledger", { params }).then((r) => r.data);
+
+export const adminFinanceReconcile = (transactionId: string) =>
+  apiClient.patch(`/admin/finance/ledger/${transactionId}/reconcile`, {}).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // PARTNER — MEMBER ENROLLMENT

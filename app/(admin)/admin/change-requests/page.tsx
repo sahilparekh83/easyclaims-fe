@@ -162,6 +162,13 @@ const FIELD_LABELS: Record<string, string> = {
   data1: "Data 1", data2: "Data 2", data3: "Data 3",
 };
 
+function requestTypeLabel(cr: any): string {
+  if (cr.entity_type === "family_member") {
+    return cr.entity_id ? `Edit — ${cr.family_member_name || "Family Member"}` : "New Family Member";
+  }
+  return "Profile";
+}
+
 export default function AdminChangeRequestsPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<string>("pending");
@@ -258,7 +265,12 @@ export default function AdminChangeRequestsPage() {
         <RequestRow key={cr.id} onClick={() => { setSelected(cr); setAdminNote(""); }}>
           <RowTop>
             <div>
-              <MemberName>{cr.member_name || "Member"}</MemberName>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <MemberName>{cr.member_name || "Member"}</MemberName>
+                <span style={{ fontSize: 10.5, fontWeight: 700, padding: "1px 8px", borderRadius: 999, background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb" }}>
+                  {requestTypeLabel(cr)}
+                </span>
+              </div>
               <MemberEmail>{cr.member_email || cr.user_id?.slice(-8)?.toUpperCase()}</MemberEmail>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -303,7 +315,12 @@ export default function AdminChangeRequestsPage() {
         {selected && (
           <>
             <div style={{ marginBottom: "1rem" }}>
-              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>{selected.member_name || "Member"}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>{selected.member_name || "Member"}</div>
+                <span style={{ fontSize: 10.5, fontWeight: 700, padding: "1px 8px", borderRadius: 999, background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb" }}>
+                  {requestTypeLabel(selected)}
+                </span>
+              </div>
               <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>{selected.member_email}</div>
             </div>
 

@@ -229,7 +229,7 @@ export default function MemberBulkUpload({
   }, []);
 
   const handleUpload = async () => {
-    if (!selectedFile || !selectedPlanId) return;
+    if (!selectedFile) return;
     setUploading(true);
     setUploadError(null);
     try {
@@ -301,9 +301,13 @@ export default function MemberBulkUpload({
             </div>
             <div style={{ marginTop: 10, color: "#0369a1", fontSize: 12 }}>
               Optional columns:{" "}
-              <strong>Gender</strong>, <strong>Address</strong>, <strong>City</strong>, <strong>State</strong>, <strong>PIN Code</strong>,{" "}
+              <strong>Plan Name</strong>, <strong>Gender</strong>, <strong>Address</strong>, <strong>City</strong>, <strong>State</strong>, <strong>PIN Code</strong>,{" "}
               <strong>Sale Date</strong>, <strong>Sales Channel</strong>, <strong>Branch Code</strong>, <strong>Salesperson Name</strong>,{" "}
               <strong>Employee Code</strong>, <strong>Data 1</strong>, <strong>Data 2</strong>, <strong>Data 3</strong>
+            </div>
+            <div style={{ marginTop: 8, color: "#0369a1", fontSize: 12 }}>
+              Add a <strong>Plan Name</strong> column to enroll different rows into different plans — a row's own
+              Plan Name overrides the default plan selected below. Copy exact plan names from the Plans page.
             </div>
           </RequiredCols>
         </CardBody>
@@ -355,7 +359,7 @@ export default function MemberBulkUpload({
 
           <div style={{ marginTop: 16 }}>
             <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-              Assign Plan to All Members <span style={{ color: "#ef4444" }}>*</span>
+              Default Plan <span style={{ color: "#9ca3af", fontWeight: 500 }}>(optional — used only for rows without a Plan Name)</span>
             </label>
             <Dropdown
               inputId={dropdownInputId}
@@ -364,6 +368,7 @@ export default function MemberBulkUpload({
               options={planOptions}
               placeholder={dropdownPlaceholder}
               filter
+              showClear
               style={{ width: "100%" }}
             />
             {planOptions.length === 0 && (
@@ -382,7 +387,7 @@ export default function MemberBulkUpload({
               label={uploading ? "Uploading…" : "Upload & Import"}
               icon="pi pi-upload"
               loading={uploading}
-              disabled={!selectedFile || !selectedPlanId || uploading}
+              disabled={!selectedFile || uploading}
               onClick={handleUpload}
             />
             {selectedFile && (

@@ -219,6 +219,36 @@ export default function MemberPolicyDetailPage() {
                     <FieldVal>{policy.insurer}</FieldVal>
                   </FieldRow>
                 )}
+                {policy?.vehicle_number && (
+                  <FieldRow>
+                    <FieldKey>Vehicle Number</FieldKey>
+                    <FieldVal>{policy.vehicle_number}</FieldVal>
+                  </FieldRow>
+                )}
+                {policy?.vehicle_type && (
+                  <FieldRow>
+                    <FieldKey>Vehicle Type</FieldKey>
+                    <FieldVal>{policy.vehicle_type}</FieldVal>
+                  </FieldRow>
+                )}
+                {policy?.vehicle_owner_family_member_id && (
+                  <FieldRow>
+                    <FieldKey>Vehicle Owner</FieldKey>
+                    <FieldVal>
+                      {(policy.linked_family_members ?? []).find(
+                        (m: any) => m.id === policy.vehicle_owner_family_member_id
+                      )?.name ?? "—"}
+                    </FieldVal>
+                  </FieldRow>
+                )}
+                {(policy?.linked_nominees ?? []).length > 0 && (
+                  <FieldRow>
+                    <FieldKey>Nominee(s)</FieldKey>
+                    <FieldVal>
+                      {policy.linked_nominees.map((n: any) => `${n.name} (${n.relation} · ${n.share_percent}%)`).join(", ")}
+                    </FieldVal>
+                  </FieldRow>
+                )}
               </tbody>
             </FieldTable>
 

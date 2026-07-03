@@ -16,7 +16,8 @@ import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminGetMember, adminRenewMemberEnrollment, adminSwitchMemberPlan, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminListPlans, adminViewPolicyPdf, adminDownloadPolicyPdf, adminDeletePolicy } from "@/imports/core/api";
+import { adminGetMember, adminRenewMemberEnrollment, adminSwitchMemberPlan, adminCancelMemberEnrollment, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminListPlans, adminViewPolicyPdf, adminDownloadPolicyPdf, adminDeletePolicy } from "@/imports/core/api";
+import { getApiError } from "@/imports/core/errors";
 import { InputTextarea } from "primereact/inputtextarea";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
@@ -401,6 +402,8 @@ export default function MemberDetailPage() {
   const [familyCrNote, setFamilyCrNote] = useState("");
   const [switchPlanOpen, setSwitchPlanOpen] = useState(false);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
   const [viewLinkedPolicy, setViewLinkedPolicy] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
@@ -490,6 +493,17 @@ export default function MemberDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
     },
     onError: () => toast.error("Failed to switch plan"),
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (reason: string) => adminCancelMemberEnrollment(id, reason || undefined),
+    onSuccess: () => {
+      toast.success("Membership cancelled");
+      setCancelOpen(false);
+      setCancelReason("");
+      queryClient.invalidateQueries({ queryKey: ["admin", "member", id] });
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to cancel membership")),
   });
 
   const deletePolicyMutation = useMutation({
@@ -665,9 +679,10 @@ export default function MemberDetailPage() {
             )}
           </MemberMeta>
           {enrollment && (
-            <MemberId style={{ marginTop: 2 }}>
+            <MemberId style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
               {enrollment.partner_name || "Partner"} ·{" "}
               {enrollment.plan_name || enrollment.plan_id}
+              <StatusBadge value={enrollment.status} />
             </MemberId>
           )}
         </HeroInfo>
@@ -690,6 +705,15 @@ export default function MemberDetailPage() {
             loading={renewMutation.isPending}
             onClick={() => renewMutation.mutate()}
             icon="pi pi-refresh"
+          />
+          <Button
+            label="Cancel Membership"
+            outlined
+            size="small"
+            severity="danger"
+            disabled={enrollment?.status === "Cancelled"}
+            onClick={() => setCancelOpen(true)}
+            icon="pi pi-ban"
           />
           <Button
             label="Edit Member"
@@ -1437,6 +1461,46 @@ export default function MemberDetailPage() {
               onChange={e => setSelectedPlanId(e.value)}
               options={activePlanOptions}
               placeholder="Choose a plan"
+              style={{ width: "100%" }}
+            />
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Cancel Membership Dialog */}
+      <Dialog
+        header="Cancel Membership"
+        visible={cancelOpen}
+        onHide={() => { setCancelOpen(false); setCancelReason(""); }}
+        style={{ width: "420px" }}
+        modal
+        draggable={false}
+        footer={
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+            <Button label="Back" severity="secondary" outlined onClick={() => { setCancelOpen(false); setCancelReason(""); }} disabled={cancelMutation.isPending} />
+            <Button
+              label="Cancel Membership"
+              severity="danger"
+              icon="pi pi-ban"
+              loading={cancelMutation.isPending}
+              onClick={() => cancelMutation.mutate(cancelReason)}
+            />
+          </div>
+        }
+      >
+        <div style={{ paddingTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <div style={{ fontSize: 13, color: "#6b7280" }}>
+            This will immediately block the member's portal access for this enrollment. This action can be reversed later via "Renew".
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <label style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#6b7a8c" }}>
+              Reason (optional)
+            </label>
+            <InputTextarea
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              rows={3}
+              placeholder="Why is this membership being cancelled?"
               style={{ width: "100%" }}
             />
           </div>

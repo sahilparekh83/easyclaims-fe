@@ -8,7 +8,7 @@ import PoliciesTable from "@/components/ui/PoliciesTable";
 import {
   memberListPolicies, memberUploadPolicy, memberUpdatePolicy,
   memberDeletePolicy, memberViewPolicyPdf, memberDownloadPolicyPdf,
-  listPolicyTypes, memberListFamily,
+  listPolicyTypes, memberListFamily, memberListNominees,
 } from "@/imports/core/api";
 import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { Button } from "primereact/button";
@@ -78,6 +78,15 @@ const UploadSelect = styled.select`
   border: 1.5px solid #e0e6ec; border-radius: 10px;
   padding: 0 12px; font-size: 14px; color: #161d26;
   background: #f7f9fb; outline: none; cursor: pointer;
+  margin-bottom: 18px;
+  &:focus { border-color: #0050b0; background: #fff; }
+`;
+
+const UploadInput = styled.input`
+  width: 100%; height: 42px;
+  border: 1.5px solid #e0e6ec; border-radius: 10px;
+  padding: 0 12px; font-size: 14px; color: #161d26;
+  background: #f7f9fb; outline: none;
   margin-bottom: 18px;
   &:focus { border-color: #0050b0; background: #fff; }
 `;
@@ -285,8 +294,13 @@ interface Policy {
   start_date: string; end_date: string; status: string; file_name?: string | null;
   previous_policy_id?: string | null;
   linked_family_members: LinkedMember[] | null | undefined;
+  linked_nominees?: LinkedNominee[] | null | undefined;
+  vehicle_number?: string | null; vehicle_type?: string | null;
+  vehicle_owner_family_member_id?: string | null;
 }
+interface LinkedNominee { id: string; name: string; relation: string; share_percent: number; }
 interface FamilyMember { id: string; name: string; relation: string; }
+interface Nominee { id: string; name: string; relation: string; share_percent: number; }
 interface PolicyType { id: string; name: string; }
 
 // ─── PDF helpers ──────────────────────────────────────────────────────────────
@@ -326,6 +340,10 @@ export default function MemberPoliciesPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadPolicyTypeId, setUploadPolicyTypeId] = useState("");
   const [dropActive, setDropActive] = useState(false);
+  const [uploadVehicleNumber, setUploadVehicleNumber] = useState("");
+  const [uploadVehicleType, setUploadVehicleType] = useState("");
+  const [uploadVehicleOwnerId, setUploadVehicleOwnerId] = useState("");
+  const [uploadNomineeIds, setUploadNomineeIds] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Edit links dialog state
@@ -343,12 +361,14 @@ export default function MemberPoliciesPage() {
   });
   const { data: policyTypesData } = useQuery({ queryKey: ["policy-types"], queryFn: () => listPolicyTypes(true) });
   const { data: familyData } = useQuery({ queryKey: ["member", "family"], queryFn: memberListFamily });
+  const { data: nomineesData } = useQuery({ queryKey: ["member", "nominees"], queryFn: memberListNominees });
 
   const policies: Policy[] = policiesData?.data?.data ?? [];
   const total: number = policiesData?.data?.total ?? 0;
   const totalPages = Math.ceil(total / ROWS);
   const policyTypes: PolicyType[] = policyTypesData?.data ?? [];
   const familyMembers: FamilyMember[] = (familyData as any)?.data?.family ?? (familyData as any)?.data ?? [];
+  const nominees: Nominee[] = (nomineesData as any)?.data ?? [];
 
   const uploadMutation = useMutation({
     mutationFn: (formData: FormData) => memberUploadPolicy(formData),
@@ -376,6 +396,10 @@ export default function MemberPoliciesPage() {
     setSelectedFile(null);
     setUploadPolicyTypeId("");
     setDropActive(false);
+    setUploadVehicleNumber("");
+    setUploadVehicleType("");
+    setUploadVehicleOwnerId("");
+    setUploadNomineeIds([]);
     setUploadVisible(true);
   };
 
@@ -384,7 +408,16 @@ export default function MemberPoliciesPage() {
     setSelectedFile(null);
     setUploadPolicyTypeId("");
     setDropActive(false);
+    setUploadVehicleNumber("");
+    setUploadVehicleType("");
+    setUploadVehicleOwnerId("");
+    setUploadNomineeIds([]);
   };
+
+  const isMotorUpload = policyTypes.find(pt => pt.id === uploadPolicyTypeId)?.name?.toLowerCase() === "motor";
+  const isLifeUpload = policyTypes.find(pt => pt.id === uploadPolicyTypeId)?.name?.toLowerCase() === "life";
+  const toggleUploadNomineeId = (id: string) =>
+    setUploadNomineeIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const openEditLinksDialog = (policy: Policy) => {
     setEditingPolicy(policy);
@@ -416,6 +449,14 @@ export default function MemberPoliciesPage() {
     const fd = new FormData();
     fd.append("file", selectedFile);
     fd.append("policy_type_id", uploadPolicyTypeId);
+    if (isMotorUpload) {
+      if (uploadVehicleNumber) fd.append("vehicle_number", uploadVehicleNumber);
+      if (uploadVehicleType) fd.append("vehicle_type", uploadVehicleType);
+      if (uploadVehicleOwnerId) fd.append("vehicle_owner_family_member_id", uploadVehicleOwnerId);
+    }
+    if (isLifeUpload && uploadNomineeIds.length > 0) {
+      fd.append("nominee_ids", uploadNomineeIds.join(","));
+    }
     uploadMutation.mutate(fd);
   };
 
@@ -482,6 +523,65 @@ export default function MemberPoliciesPage() {
               <option value="">Select policy type…</option>
               {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
             </UploadSelect>
+
+            {isMotorUpload && (
+              <>
+                <FieldLabel>Vehicle Number</FieldLabel>
+                <UploadInput
+                  type="text"
+                  value={uploadVehicleNumber}
+                  onChange={e => setUploadVehicleNumber(e.target.value)}
+                  placeholder="e.g. MH12AB1234"
+                />
+
+                <FieldLabel>Vehicle Type</FieldLabel>
+                <UploadSelect value={uploadVehicleType} onChange={e => setUploadVehicleType(e.target.value)}>
+                  <option value="">Select vehicle type…</option>
+                  <option value="Car">Car</option>
+                  <option value="Bike">Bike</option>
+                  <option value="Commercial">Commercial</option>
+                </UploadSelect>
+
+                <FieldLabel>Vehicle Owner</FieldLabel>
+                <UploadSelect value={uploadVehicleOwnerId} onChange={e => setUploadVehicleOwnerId(e.target.value)}>
+                  <option value="">Select family member…</option>
+                  {familyMembers.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </UploadSelect>
+              </>
+            )}
+
+            {isLifeUpload && (
+              <>
+                <FieldLabel>Nominee(s)</FieldLabel>
+                {nominees.length === 0 ? (
+                  <div style={{ padding: "12px", background: "#f8fafc", borderRadius: 8, fontSize: "0.85rem", color: "#9ca3af", textAlign: "center", marginBottom: 18 }}>
+                    No nominees added yet. Add nominees first from the Nominees menu.
+                  </div>
+                ) : (
+                  <FamilyScrollList style={{ marginBottom: 18 }}>
+                    {nominees.map(n => {
+                      const isChecked = uploadNomineeIds.includes(n.id);
+                      return (
+                        <FamilyCheckRow
+                          key={n.id}
+                          style={{ cursor: "pointer", padding: "6px 8px", borderRadius: 6, background: isChecked ? "#eff6ff" : "transparent" }}
+                          onClick={() => toggleUploadNomineeId(n.id)}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleUploadNomineeId(n.id)}
+                            style={{ width: 16, height: 16, cursor: "pointer", accentColor: "#0050b0" }}
+                          />
+                          <span style={{ fontWeight: isChecked ? 600 : 400 }}>{n.name}</span>
+                          <span style={{ color: "#94a3b8", fontSize: 12 }}>({n.relation} · {n.share_percent}%)</span>
+                        </FamilyCheckRow>
+                      );
+                    })}
+                  </FamilyScrollList>
+                )}
+              </>
+            )}
 
             <FieldLabel>Policy Document (PDF) *</FieldLabel>
             <UploadDropzone

@@ -342,6 +342,7 @@ interface EditFormValues {
   city: string;
   state: string;
   status: string;
+  allow_member_upload: boolean;
   legal_company_name: string;
   trade_name: string;
   registered_address: string;
@@ -374,6 +375,7 @@ interface Partner {
   data_2?: string | null;
   data_3?: string | null;
   status: string;
+  allow_member_upload?: boolean;
   email?: string | null;
   mobile_no?: string | null;
   api_key?: string | null;
@@ -551,6 +553,7 @@ export default function PartnersPage() {
         state: values.state || undefined,
         partner_type: values.partner_type || undefined,
         status: values.status || undefined,
+        allow_member_upload: values.allow_member_upload,
         legal_company_name: values.legal_company_name || undefined,
         trade_name: values.trade_name || undefined,
         registered_address: values.registered_address || undefined,
@@ -606,6 +609,7 @@ export default function PartnersPage() {
         city: (p.city as string) ?? "",
         state: (p.state as string) ?? "",
         status: p.status ?? "Active",
+        allow_member_upload: p.allow_member_upload ?? true,
         legal_company_name: (p.legal_company_name as string) ?? "",
         trade_name: (p.trade_name as string) ?? "",
         registered_address: (p.registered_address as string) ?? "",
@@ -1246,6 +1250,19 @@ export default function PartnersPage() {
                   <><Dropdown value={field.value} options={STATUS_OPTIONS} onChange={e => field.onChange(e.value)}
                     invalid={!!fieldState.error} style={{ width: "100%" }} />
                   {fieldState.error && <Err>{fieldState.error.message}</Err>}</>
+                )}
+              />
+            </FormField>
+            <FormField>
+              <Lbl>Allow Member Upload</Lbl>
+              <Controller name="allow_member_upload" control={editForm.control}
+                render={({ field }) => (
+                  <Dropdown
+                    value={field.value ? "yes" : "no"}
+                    options={[{ label: "Yes", value: "yes" }, { label: "No", value: "no" }]}
+                    onChange={e => field.onChange(e.value === "yes")}
+                    style={{ width: "100%" }}
+                  />
                 )}
               />
             </FormField>

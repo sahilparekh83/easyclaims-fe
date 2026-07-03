@@ -1,9 +1,10 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import styled from "styled-components";
-import { Check, Minus, Users } from "lucide-react";
+import { Check, Minus, Users, Copy, CopyCheck } from "lucide-react";
+import { toast } from "react-toastify";
 import { partnerListPlans } from "@/imports/core/api";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -211,12 +212,27 @@ export default function PlansPage() {
   });
 
   const plans: any[] = (data as any)?.data ?? [];
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyPlanName = async (id: string, name: string) => {
+    try {
+      await navigator.clipboard.writeText(name);
+      setCopiedId(id);
+      toast.success(`Copied "${name}"`);
+      setTimeout(() => setCopiedId(c => (c === id ? null : c)), 1500);
+    } catch {
+      toast.error("Failed to copy — please copy manually");
+    }
+  };
 
   return (
     <Page>
       <div>
         <PageTitle>Membership Plans</PageTitle>
-        <PageSub>Plans available to your members — both global and partner-specific</PageSub>
+        <PageSub>
+          Plans available to your members — both global and partner-specific. Copy a Plan Name below to use in the
+          "Plan Name" column of the member bulk-upload sheet.
+        </PageSub>
       </div>
 
       {isLoading ? (
@@ -257,6 +273,20 @@ export default function PlansPage() {
                     <h3 style={{ fontSize: 19, fontWeight: 800, color: "#0f172a", margin: 0, whiteSpace: "nowrap" }}>
                       {plan.name}
                     </h3>
+                    <button
+                      onClick={() => copyPlanName(plan.id, plan.name)}
+                      title="Copy plan name for bulk-upload sheet"
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        background: copiedId === plan.id ? "#f0fdf4" : "#f8f9fb",
+                        border: `1px solid ${copiedId === plan.id ? "#bbf7d0" : "#e2e8f0"}`,
+                        borderRadius: 999, padding: "2px 8px", cursor: "pointer",
+                        fontSize: 11, fontWeight: 600, color: copiedId === plan.id ? "#16a34a" : "#64748b",
+                      }}
+                    >
+                      {copiedId === plan.id ? <CopyCheck size={12} /> : <Copy size={12} />}
+                      {copiedId === plan.id ? "Copied" : "Copy"}
+                    </button>
                     {plan.popular && <PopularBadge>Most popular</PopularBadge>}
                   </div>
                   <p style={{ fontSize: 12.5, color: "#64748b", margin: 0 }}>{tagline}</p>
