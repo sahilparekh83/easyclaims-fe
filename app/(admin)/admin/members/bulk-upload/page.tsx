@@ -165,15 +165,15 @@ interface UploadResult {
 function downloadSampleExcel() {
   const headers = [
     "Sale Date", "Primary Member Full Name", "Gender", "Primary Mobile No.",
-    "Primary Email ID", "Address Line1", "City", "State", "Pin Code",
+    "Primary Email ID", "Plan Name", "Address Line1", "City", "State", "Pin Code",
     "Sales Channel", "Partner Branch Code", "Sales Person Name", "Employee Code",
     "Data 1", "Data 2", "Data 3",
   ];
   const sample = [
-    ["2024-01-15", "Rajesh Kumar", "Male", "9876543210", "rajesh@example.com",
+    ["2024-01-15", "Rajesh Kumar", "Male", "9876543210", "rajesh@example.com", "Gold Plan",
      "123 MG Road", "Mumbai", "Maharashtra", "400001",
      "Direct", "BR001", "Amit Shah", "EMP123", "", "", ""],
-    ["2024-02-20", "Priya Sharma", "Female", "9123456780", "priya@example.com",
+    ["2024-02-20", "Priya Sharma", "Female", "9123456780", "priya@example.com", "Silver Plan",
      "45 Gandhi Nagar", "Pune", "Maharashtra", "411001",
      "Online", "BR002", "Ritu Mehta", "EMP456", "", "", ""],
   ];
@@ -249,7 +249,7 @@ export default function BulkUploadPage() {
     if (file) handleFileSelect(file);
   };
 
-  const canUpload = !!selectedFile && !!partnerId && !!selectedPlanId && !uploadMutation.isPending;
+  const canUpload = !!selectedFile && !!partnerId && !uploadMutation.isPending;
 
   return (
     <div style={{ maxWidth: "860px" }}>
@@ -289,7 +289,7 @@ export default function BulkUploadPage() {
             />
           </Field>
           <Field>
-            <FieldLabel>Membership Plan <span style={{ color: "#ef4444" }}>*</span></FieldLabel>
+            <FieldLabel>Default Plan <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional — used for rows without a Plan Name)</span></FieldLabel>
             <Dropdown
               inputId="admin-member-bulk-plan-select"
               value={selectedPlanId}
@@ -297,11 +297,12 @@ export default function BulkUploadPage() {
               onChange={(e) => setSelectedPlanId(e.value)}
               placeholder={partnerId ? (planOptions.length === 0 ? "No active plans linked" : "Select plan") : "Select a partner first"}
               disabled={!partnerId || planOptions.length === 0}
+              showClear
               filter
               style={{ width: "100%" }}
             />
             {partnerId && planOptions.length === 0 && (
-              <span style={{ fontSize: 11.5, color: "#d97706" }}>No active plans linked to this partner</span>
+              <span style={{ fontSize: 11.5, color: "#d97706" }}>No active plans linked to this partner — add a Plan Name column instead</span>
             )}
           </Field>
         </FormRow>
@@ -359,11 +360,15 @@ export default function BulkUploadPage() {
               </span>
             ))}
             <span style={{ fontSize: 11.5, color: "#9ca3af", padding: "2px 4px" }}>+ optional:</span>
-            {["Sales Channel", "Partner Branch Code", "Sales Person Name", "Employee Code", "Data 1", "Data 2", "Data 3"].map(c => (
+            {["Plan Name", "Sales Channel", "Partner Branch Code", "Sales Person Name", "Employee Code", "Data 1", "Data 2", "Data 3"].map(c => (
               <span key={c} style={{ fontSize: 11.5, padding: "2px 8px", borderRadius: 6, background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb" }}>
                 {c}
               </span>
             ))}
+          </div>
+          <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 8 }}>
+            Add a <strong>Plan Name</strong> column to enroll different rows into different plans — it overrides the
+            default plan selected above for that row.
           </div>
         </div>
 

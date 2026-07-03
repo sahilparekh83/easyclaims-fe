@@ -4,7 +4,7 @@ import styled from "styled-components";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import {
-  memberGetFamily, memberCreateFamily, memberUpdateFamily, memberDeleteFamily,
+  memberGetFamily, memberRequestAddFamily, memberUpdateFamily, memberDeleteFamily,
   memberCreateFamilyChangeRequest,
 } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
@@ -22,26 +22,35 @@ import dayjs from "dayjs";
 
 interface FamilyMember {
   id: string; name: string; relation: string;
-  gender?: string; dob?: string | null; coverage_type?: string;
+  gender?: string; dob?: string | null; mobile_no?: string | null; email?: string | null;
+  coverage_type?: string;
   policy_count: number;
 }
 interface FamilyFormValues {
-  name: string; relation: string; gender: string; dob: string; coverage_type: string;
+  name: string; relation: string; gender: string; dob: string;
+  mobile_no: string; email: string; coverage_type: string;
 }
 interface CrFormValues {
-  name: string; relation: string; gender: string; dob: string; coverage_type: string; reason: string;
+  name: string; relation: string; gender: string; dob: string;
+  mobile_no: string; email: string; coverage_type: string; reason: string;
 }
 
 const GENDER_OPTIONS = [{ label: "Male", value: "Male" }, { label: "Female", value: "Female" }, { label: "Other", value: "Other" }];
 const RELATION_OPTIONS = [
+  { label: "Self", value: "Self" },
   { label: "Spouse", value: "Spouse" },
-  { label: "Child", value: "Child" },
-  { label: "Parent", value: "Parent" },
+  { label: "Son", value: "Son" },
+  { label: "Daughter", value: "Daughter" },
+  { label: "Father", value: "Father" },
+  { label: "Mother", value: "Mother" },
+  { label: "Brother", value: "Brother" },
+  { label: "Sister", value: "Sister" },
   { label: "Other", value: "Other" },
 ];
+const CHILD_RELATIONS = ["Son", "Daughter"];
 const COVERAGE_OPTIONS = [{ label: "Health", value: "Health" }, { label: "Life", value: "Life" }, { label: "Accident", value: "Accident" }, { label: "Critical Illness", value: "Critical Illness" }];
 const QUERY_KEY = ["member", "family"];
-const DEFAULT_FORM: FamilyFormValues = { name: "", relation: "", gender: "", dob: "", coverage_type: "Health" };
+const DEFAULT_FORM: FamilyFormValues = { name: "", relation: "", gender: "", dob: "", mobile_no: "", email: "", coverage_type: "Health" };
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -125,7 +134,7 @@ function ChildAgeCheck({ control, childAgeLimit }: { control: any; childAgeLimit
   const relation = useWatch({ control, name: "relation" });
   const dob = useWatch({ control, name: "dob" });
 
-  if (relation !== "Child" || !dob) return null;
+  if (!CHILD_RELATIONS.includes(relation) || !dob) return null;
 
   const age = calcAge(dob);
   const today = dayjs().format("DD MMM YYYY");
@@ -157,7 +166,7 @@ export default function MemberFamilyPage() {
 
   const form = useForm<FamilyFormValues>({ defaultValues: DEFAULT_FORM });
   const crForm = useForm<CrFormValues>({
-    defaultValues: { name: "", relation: "", gender: "", dob: "", coverage_type: "", reason: "" },
+    defaultValues: { name: "", relation: "", gender: "", dob: "", mobile_no: "", email: "", coverage_type: "", reason: "" },
   });
 
   const { data, isLoading } = useQuery({ queryKey: QUERY_KEY, queryFn: memberGetFamily });
@@ -170,14 +179,22 @@ export default function MemberFamilyPage() {
   const watchedRelation = useWatch({ control: form.control, name: "relation" });
   const watchedDob = useWatch({ control: form.control, name: "dob" });
   const isChildOverLimit =
-    watchedRelation === "Child" &&
+    CHILD_RELATIONS.includes(watchedRelation) &&
     !!watchedDob &&
     calcAge(watchedDob) > childAgeLimit;
 
-  const createMutation = useMutation({
-    mutationFn: (values: FamilyFormValues) => memberCreateFamily(values),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: QUERY_KEY }); toast.success("Family member added!"); closeDialog(); },
-    onError: (err: any) => { toast.error(getApiError(err, "Failed to add family member")); },
+  const requestAddMutation = useMutation({
+    mutationFn: (values: FamilyFormValues) => {
+      const fields: Record<string, string> = { name: values.name, relation: values.relation };
+      if (values.gender) fields.gender = values.gender;
+      if (values.dob) fields.dob = values.dob;
+      if (values.mobile_no) fields.mobile_no = values.mobile_no;
+      if (values.email) fields.email = values.email;
+      if (values.coverage_type) fields.coverage_type = values.coverage_type;
+      return memberRequestAddFamily({ requested_fields: fields });
+    },
+    onSuccess: () => { toast.success("Request submitted — admin will review shortly"); closeDialog(); },
+    onError: (err: any) => { toast.error(getApiError(err, "Failed to submit request")); },
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, values }: { id: string; values: FamilyFormValues }) => memberUpdateFamily(id, values),
@@ -196,6 +213,8 @@ export default function MemberFamilyPage() {
       if (values.relation) fields.relation = values.relation;
       if (values.gender) fields.gender = values.gender;
       if (values.dob) fields.dob = values.dob;
+      if (values.mobile_no) fields.mobile_no = values.mobile_no;
+      if (values.email) fields.email = values.email;
       if (values.coverage_type) fields.coverage_type = values.coverage_type;
       if (!Object.keys(fields).length) throw new Error("Enter at least one field to change");
       return memberCreateFamilyChangeRequest(id, { requested_fields: fields, reason: values.reason || undefined });
@@ -213,22 +232,30 @@ export default function MemberFamilyPage() {
   };
   const openEditDialog = (member: FamilyMember) => {
     setEditingMember(member);
-    form.reset({ name: member.name, relation: member.relation, gender: member.gender ?? "", dob: member.dob ?? "", coverage_type: member.coverage_type || "Health" });
+    form.reset({
+      name: member.name, relation: member.relation, gender: member.gender ?? "", dob: member.dob ?? "",
+      mobile_no: member.mobile_no ?? "", email: member.email ?? "",
+      coverage_type: member.coverage_type || "Health",
+    });
     setDialogVisible(true);
   };
   const closeDialog = () => { setDialogVisible(false); setEditingMember(null); form.reset(DEFAULT_FORM); };
   const openCrDialog = (member: FamilyMember) => {
     setCrTarget(member);
-    crForm.reset({ name: member.name, relation: member.relation, gender: member.gender ?? "", dob: member.dob ?? "", coverage_type: member.coverage_type ?? "", reason: "" });
+    crForm.reset({
+      name: member.name, relation: member.relation, gender: member.gender ?? "", dob: member.dob ?? "",
+      mobile_no: member.mobile_no ?? "", email: member.email ?? "",
+      coverage_type: member.coverage_type ?? "", reason: "",
+    });
     setCrDialogVisible(true);
   };
   const handleDelete = (member: FamilyMember) => {
     if (window.confirm(`Remove "${member.name}" from family members?`)) deleteMutation.mutate(member.id);
   };
   const onSubmit = (values: FamilyFormValues) => {
-    editingMember ? updateMutation.mutate({ id: editingMember.id, values }) : createMutation.mutate(values);
+    editingMember ? updateMutation.mutate({ id: editingMember.id, values }) : requestAddMutation.mutate(values);
   };
-  const isSaving = createMutation.isPending || updateMutation.isPending;
+  const isSaving = requestAddMutation.isPending || updateMutation.isPending;
   const initials = (name: string) => name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 
   return (
@@ -237,7 +264,7 @@ export default function MemberFamilyPage() {
         <PageTitle>Family Members</PageTitle>
         <AccentBtn onClick={openAddDialog} disabled={atLimit}>
           <i className="pi pi-plus" style={{ fontSize: 12 }} />
-          {atLimit ? `Limit reached (${planLimit})` : "Add member"}
+          {atLimit ? `Limit reached (${planLimit})` : "Request to add member"}
         </AccentBtn>
       </PageHeader>
 
@@ -254,11 +281,11 @@ export default function MemberFamilyPage() {
         <EmptyState>
           <Users size={32} color="#cbd5e1" style={{ marginBottom: 12 }} />
           <div style={{ fontSize: 15, fontWeight: 600, color: "#6b7a8c" }}>No family members added</div>
-          <div style={{ fontSize: 13, color: "#9ca3af", marginTop: 4 }}>Add family members to link them to your policies</div>
+          <div style={{ fontSize: 13, color: "#9ca3af", marginTop: 4 }}>Family members are added from your policy documents — or request one above</div>
         </EmptyState>
       ) : familyMembers.map(member => {
         const locked = member.policy_count > 0;
-        const isChild = member.relation === "Child";
+        const isChild = CHILD_RELATIONS.includes(member.relation);
         const childAge = isChild && member.dob ? calcAge(member.dob) : null;
         const childOverLimit = childAge !== null && childAge > childAgeLimit;
 
@@ -282,6 +309,8 @@ export default function MemberFamilyPage() {
                   </span>
                 ) : "—"}
                 {member.gender ? ` · ${member.gender}` : ""}
+                {member.mobile_no ? ` · ${member.mobile_no}` : ""}
+                {member.email ? ` · ${member.email}` : ""}
               </MemberMeta>
               {locked && (
                 <LockNotice>
@@ -317,13 +346,13 @@ export default function MemberFamilyPage() {
 
       {/* Add/Edit Dialog */}
       <Dialog
-        header={editingMember ? "Edit Family Member" : "Add Family Member"}
+        header={editingMember ? "Edit Family Member" : "Request to Add Family Member"}
         visible={dialogVisible} onHide={closeDialog} style={{ width: "480px" }} closable={!isSaving}
         footer={
           <DialogFooterRow>
             <Button label="Cancel" severity="secondary" onClick={closeDialog} disabled={isSaving} />
             <Button
-              label="Save"
+              label={editingMember ? "Save" : "Submit Request"}
               loading={isSaving}
               disabled={isChildOverLimit}
               onClick={form.handleSubmit(onSubmit)}
@@ -331,6 +360,11 @@ export default function MemberFamilyPage() {
           </DialogFooterRow>
         }
       >
+        {!editingMember && (
+          <div style={{ fontSize: 12.5, color: "#6b7280", marginBottom: 14, padding: "8px 12px", background: "#eff6ff", borderRadius: 8, border: "1px solid #bfdbfe" }}>
+            This will be sent to the admin for review. The family member will be added once approved.
+          </div>
+        )}
         <FormBody>
           <FormField>
             <FormLabel>Name *</FormLabel>
@@ -359,6 +393,20 @@ export default function MemberFamilyPage() {
                   onChange={e => { const v = e.value; field.onChange(v instanceof Date ? dayjs(v).format("YYYY-MM-DD") : ""); }}
                   dateFormat="dd M yy" showIcon style={{ width: "100%" }} inputStyle={{ width: "100%" }}
                   placeholder="Select date" maxDate={new Date()} />
+              )} />
+          </FormField>
+          <FormField>
+            <FormLabel>Mobile Number</FormLabel>
+            <Controller name="mobile_no" control={form.control}
+              render={({ field, fieldState }) => (
+                <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Mobile number" />{fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}</>
+              )} />
+          </FormField>
+          <FormField>
+            <FormLabel>Email</FormLabel>
+            <Controller name="email" control={form.control}
+              render={({ field, fieldState }) => (
+                <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} placeholder="Email address" />{fieldState.error && <FieldError>{fieldState.error.message}</FieldError>}</>
               )} />
           </FormField>
           <ChildAgeCheck control={form.control} childAgeLimit={childAgeLimit} />
@@ -406,6 +454,16 @@ export default function MemberFamilyPage() {
                   dateFormat="dd M yy" showIcon style={{ width: "100%" }} inputStyle={{ width: "100%" }}
                   placeholder="Leave blank for no change" maxDate={new Date()} />
               )} />
+          </FormField>
+          <FormField>
+            <FormLabel>Mobile Number</FormLabel>
+            <Controller name="mobile_no" control={crForm.control}
+              render={({ field }) => <InputText {...field} style={{ width: "100%" }} placeholder={crTarget?.mobile_no || "Leave blank for no change"} />} />
+          </FormField>
+          <FormField>
+            <FormLabel>Email</FormLabel>
+            <Controller name="email" control={crForm.control}
+              render={({ field }) => <InputText {...field} style={{ width: "100%" }} placeholder={crTarget?.email || "Leave blank for no change"} />} />
           </FormField>
           <FormField>
             <FormLabel>Reason *</FormLabel>

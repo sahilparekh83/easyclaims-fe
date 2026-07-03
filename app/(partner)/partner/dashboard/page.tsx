@@ -9,7 +9,7 @@ import {
   partnerListPlans,
 } from "@/imports/core/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Users, CreditCard, Sparkles } from "lucide-react";
+import { Users, CreditCard, Sparkles, Wallet } from "lucide-react";
 
 const LIST_PARAMS = { limit: 1, skip: 0 };
 const RECENT_PARAMS = { limit: 5, skip: 0, sort_field: "created_at", sort_order: -1 };
@@ -207,6 +207,8 @@ export default function DashboardPage() {
   const activePlans = plans.filter((p: any) => p.status === "Active" || p.is_active);
   const totalPlans = activePlans.length || plans.length;
   const recentMembers: any[] = (recentMembersData as any)?.data?.data ?? [];
+  const floatBalance: number = (profileData as any)?.data?.float_balance ?? 0;
+  const isLowFloat: boolean = (profileData as any)?.data?.is_low_float ?? false;
 
   const initials = (name: string) =>
     (name || "M").split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase();
@@ -214,6 +216,13 @@ export default function DashboardPage() {
   const KPIS = [
     { label: "Total members", value: totalMembers, loading: mL,  bg: "#eff6ff", color: "#2563eb", icon: <Users size={18} /> },
     { label: "Active plans",  value: totalPlans,   loading: plL, bg: "#fdf4ff", color: "#9333ea", icon: <CreditCard size={18} /> },
+    {
+      label: isLowFloat ? "Float balance (Low!)" : "Float balance",
+      value: floatBalance, loading: false,
+      bg: isLowFloat ? "#fef2f2" : "#f0fdf4",
+      color: isLowFloat ? "#dc2626" : "#16a34a",
+      icon: <Wallet size={18} />,
+    },
   ];
 
   return (

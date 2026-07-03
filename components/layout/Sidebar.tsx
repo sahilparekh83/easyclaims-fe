@@ -6,7 +6,7 @@ import styled from "styled-components";
 import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
-  BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList,
+  BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet,
 } from "lucide-react";
 import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
 
@@ -25,6 +25,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} /> },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} /> },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} /> },
+  { label: "Finance",        href: "/admin/finance",         icon: <Wallet size={18} /> },
   { label: "Policy Types",   href: "/admin/policy-types",    icon: <Package size={18} /> },
   { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} />, badgeKey: "total" },
   { label: "Email Templates", href: "/admin/email-templates", icon: <Mail size={18} /> },

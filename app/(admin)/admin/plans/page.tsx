@@ -412,6 +412,8 @@ interface Plan {
   status: string;
   member_count?: number;
   partner_count?: number;
+  max_claim_value?: number | null;
+  capping?: { max_family_members?: number; max_claim_value?: number | null; max_policies?: number };
   benefits?: Partial<Benefits>;
   benefits_json?: Partial<Benefits>;
 }
@@ -424,6 +426,7 @@ interface Draft {
   status: string;
   popular: boolean;
   plan_type: string;
+  max_claim_value: number | null;
   benefits: Benefits;
 }
 
@@ -437,6 +440,7 @@ const BLANK_BENEFITS: Benefits = {
 const BLANK_DRAFT: Draft = {
   name: "New plan", tagline: "Describe this tier",
   price: 1999, cycle: "Annual", status: "Draft", popular: false, plan_type: "partner",
+  max_claim_value: null,
   benefits: { ...BLANK_BENEFITS },
 };
 
@@ -448,8 +452,6 @@ const BENEFIT_DEFS: Array<{
   min?: number; max?: number;
   options?: string[];
 }> = [
-  { id: "family",    label: "Family members covered",            kind: "number",  icon: <Users size={15} />,          min: 1, max: 10 },
-  { id: "slots",     label: "Policy storage slots",              kind: "number",  icon: <Shield size={15} />,         min: 1, max: 20 },
   { id: "claim",     label: "Claim assistance level",            kind: "select",  icon: <FileText size={15} />,       options: ["Standard", "Priority", "24×7 Priority"] },
   { id: "aiqa",      label: "AI policy Q&A — WhatsApp & email",  kind: "toggle",  icon: <MessageSquare size={15} /> },
   { id: "aicalls",   label: "Outbound AI calls (welcome + renewal)", kind: "toggle", icon: <Phone size={15} /> },
@@ -607,7 +609,8 @@ export default function PlansPage() {
       adminCreatePlan({
         name: d.name, tagline: d.tagline, price: d.price,
         cycle: d.cycle, billing_cycle: d.cycle, plan_type: d.plan_type,
-        popular: d.popular, status: d.status, benefits: d.benefits, benefits_json: d.benefits,
+        popular: d.popular, status: d.status, max_claim_value: d.max_claim_value,
+        benefits: d.benefits, benefits_json: d.benefits,
       }),
     onSuccess: () => { toast.success("Plan created"); invalidatePlans(); setMode("list"); },
     onError: (err: any) => toast.error(getApiError(err, "Failed to create plan")),
@@ -618,7 +621,8 @@ export default function PlansPage() {
       adminUpdatePlan(id, {
         name: d.name, tagline: d.tagline, price: d.price,
         cycle: d.cycle, billing_cycle: d.cycle, plan_type: d.plan_type,
-        status: d.status, popular: d.popular, benefits: d.benefits, benefits_json: d.benefits,
+        status: d.status, popular: d.popular, max_claim_value: d.max_claim_value,
+        benefits: d.benefits, benefits_json: d.benefits,
       }),
     onSuccess: () => { toast.success("Plan updated"); invalidatePlans(); setMode("list"); },
     onError: (err: any) => toast.error(getApiError(err, "Failed to update plan")),
@@ -661,6 +665,7 @@ export default function PlansPage() {
       status: plan.status ?? "Draft",
       popular: plan.popular ?? false,
       plan_type: plan.plan_type ?? "partner",
+      max_claim_value: plan.capping?.max_claim_value ?? plan.max_claim_value ?? null,
       benefits: { ...BLANK_BENEFITS, ...b },
     });
     setMode("builder");
@@ -842,6 +847,90 @@ export default function PlansPage() {
                 </FieldWrap>
               </ThreeCol>
             </FieldGrid>
+          </FormCard>
+
+          {/* Plan capping */}
+          <FormCard>
+            <div style={{ marginBottom: 6 }}>
+              <FormCardTitle style={{ margin: 0 }}>Plan capping</FormCardTitle>
+              <FormCardSub>Maximum limits enforced for members enrolled on this plan.</FormCardSub>
+            </div>
+            <ThreeCol style={{ marginTop: 14 }}>
+              <FieldWrap>
+                <FieldLabel>Max family members</FieldLabel>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 2,
+                  background: "#f8f9fb", border: "1px solid #e2e8f0",
+                  borderRadius: 999, padding: 3,
+                }}>
+                  <button
+                    onClick={() => stepBenefit("family", -1, 1, 10)}
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%", border: "none",
+                      background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      cursor: "pointer", fontSize: 17, fontWeight: 600,
+                      color: "#3b82f6", display: "inline-flex",
+                      alignItems: "center", justifyContent: "center", lineHeight: 1,
+                    }}
+                  >−</button>
+                  <span style={{ minWidth: 34, textAlign: "center", fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                    {draft.benefits.family}
+                  </span>
+                  <button
+                    onClick={() => stepBenefit("family", 1, 1, 10)}
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%", border: "none",
+                      background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      cursor: "pointer", fontSize: 17, fontWeight: 600,
+                      color: "#3b82f6", display: "inline-flex",
+                      alignItems: "center", justifyContent: "center", lineHeight: 1,
+                    }}
+                  >+</button>
+                </div>
+              </FieldWrap>
+              <FieldWrap>
+                <FieldLabel>Max claim value (₹)</FieldLabel>
+                <StyledInput
+                  type="number"
+                  min={0}
+                  placeholder="No cap"
+                  value={draft.max_claim_value ?? ""}
+                  onChange={e => setDraftField("max_claim_value", e.target.value ? parseInt(e.target.value) : null)}
+                />
+              </FieldWrap>
+              <FieldWrap>
+                <FieldLabel>Max number of policies</FieldLabel>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 2,
+                  background: "#f8f9fb", border: "1px solid #e2e8f0",
+                  borderRadius: 999, padding: 3,
+                }}>
+                  <button
+                    onClick={() => stepBenefit("slots", -1, 1, 20)}
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%", border: "none",
+                      background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      cursor: "pointer", fontSize: 17, fontWeight: 600,
+                      color: "#3b82f6", display: "inline-flex",
+                      alignItems: "center", justifyContent: "center", lineHeight: 1,
+                    }}
+                  >−</button>
+                  <span style={{ minWidth: 34, textAlign: "center", fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 14, fontWeight: 600, color: "#0f172a" }}>
+                    {draft.benefits.slots}
+                  </span>
+                  <button
+                    onClick={() => stepBenefit("slots", 1, 1, 20)}
+                    style={{
+                      width: 28, height: 28, borderRadius: "50%", border: "none",
+                      background: "#fff", boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+                      cursor: "pointer", fontSize: 17, fontWeight: 600,
+                      color: "#3b82f6", display: "inline-flex",
+                      alignItems: "center", justifyContent: "center", lineHeight: 1,
+                    }}
+                  >+</button>
+                </div>
+              </FieldWrap>
+            </ThreeCol>
           </FormCard>
 
           {/* Benefits */}
