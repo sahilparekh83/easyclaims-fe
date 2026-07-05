@@ -525,6 +525,8 @@ export default function PartnerDetailPage() {
   const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
   const [colorDraft, setColorDraft] = useState<string>("#0050b0");
   const [downloadingCardPreview, setDownloadingCardPreview] = useState(false);
+  const [cardPreviewUrl, setCardPreviewUrl] = useState<string | null>(null);
+  const [loadingCardPreview, setLoadingCardPreview] = useState(false);
 
   const memberForm = useForm<MemberFormValues>({
     defaultValues: {
@@ -1267,21 +1269,58 @@ export default function PartnerDetailPage() {
 
             <div>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#111827", marginBottom: 8 }}>Preview</div>
-              <Button
-                label={downloadingCardPreview ? "Generating…" : "Download Preview"}
-                icon="pi pi-download"
-                size="small"
-                outlined
-                loading={downloadingCardPreview}
-                onClick={handleDownloadCardPreview}
-              />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <Button
+                  label={loadingCardPreview ? "Generating…" : "Preview"}
+                  icon="pi pi-eye"
+                  size="small"
+                  outlined
+                  loading={loadingCardPreview}
+                  onClick={async () => {
+                    setLoadingCardPreview(true);
+                    try {
+                      const blob = await adminDownloadCardPreview(id);
+                      if (cardPreviewUrl) URL.revokeObjectURL(cardPreviewUrl);
+                      setCardPreviewUrl(URL.createObjectURL(blob));
+                    } catch { toast.error("Failed to generate preview"); }
+                    finally { setLoadingCardPreview(false); }
+                  }}
+                />
+                <Button
+                  label={downloadingCardPreview ? "Generating…" : "Download"}
+                  icon="pi pi-download"
+                  size="small"
+                  outlined
+                  loading={downloadingCardPreview}
+                  onClick={handleDownloadCardPreview}
+                />
+              </div>
               <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 6 }}>
-                Generates a sample Membership Card PDF with dummy member data, using this partner's current logo and color.
+                Sample Membership Card with dummy member data, using this partner&apos;s current logo and color.
               </div>
             </div>
           </div>
         )}
       </SectionCard>
+
+      {/* Card Preview Dialog */}
+      <Dialog
+        visible={!!cardPreviewUrl}
+        onHide={() => { if (cardPreviewUrl) URL.revokeObjectURL(cardPreviewUrl); setCardPreviewUrl(null); }}
+        header="Membership Card Preview"
+        style={{ width: "min(860px, 95vw)", height: "90vh" }}
+        contentStyle={{ padding: 0, display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}
+        modal
+        draggable={false}
+      >
+        {cardPreviewUrl && (
+          <iframe
+            src={cardPreviewUrl}
+            style={{ flex: 1, width: "100%", height: "100%", border: "none", minHeight: "70vh" }}
+            title="Membership Card Preview"
+          />
+        )}
+      </Dialog>
 
       {/* Approve / Reject Dialog */}
       <Dialog

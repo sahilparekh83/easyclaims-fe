@@ -6,7 +6,7 @@ import styled from "styled-components";
 import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
-  BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet,
+  BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet, Ticket, HelpCircle,
 } from "lucide-react";
 import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
 
@@ -23,6 +23,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Partners",       href: "/admin/partners",        icon: <Briefcase size={18} /> },
   { label: "Members",        href: "/admin/members",         icon: <Users size={18} /> },
   { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} /> },
+  { label: "Tickets",        href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets" },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} /> },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} /> },
   { label: "Finance",        href: "/admin/finance",         icon: <Wallet size={18} /> },
@@ -46,7 +47,8 @@ const MEMBER_NAV: NavItem[] = [
   { label: "Profile",      href: "/member/profile",       icon: <UserCheck size={18} /> },
   { label: "Change Requests", href: "/member/change-requests", icon: <ClipboardList size={18} /> },
   { label: "Family",       href: "/member/family",        icon: <Heart size={18} /> },
-  { label: "Policies",     href: "/member/policies",      icon: <FileText size={18} /> },
+  { label: "Policies",          href: "/member/policies",      icon: <FileText size={18} /> },
+  { label: "Claim Assistance",  href: "/member/claim-assist",  icon: <HelpCircle size={18} /> },
   // { label: "Consent",      href: "/member/consent",       icon: <ShieldCheck size={18} /> },
   { label: "Notifications", href: "/member/notifications", icon: <Bell size={18} /> },
 ];

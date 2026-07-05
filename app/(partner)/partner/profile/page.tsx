@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { partnerGetProfile, partnerSubmitChangeRequest, partnerListChangeRequests } from "@/imports/core/api";
+import { partnerGetProfile, partnerSubmitChangeRequest, partnerListChangeRequests, partnerUploadCardLogo, partnerUpdateProfile, partnerDownloadCardPreview, partnerGetCardLogoUrl } from "@/imports/core/api";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Button } from "primereact/button";
@@ -322,6 +322,8 @@ interface PartnerProfile {
   api_key?: string;
   is_active?: boolean;
   created_at?: string;
+  card_color?: string | null;
+  card_logo_key?: string | null;
 }
 
 interface ChangeRequest {
@@ -332,6 +334,69 @@ interface ChangeRequest {
   admin_note: string | null;
   reviewed_at: string | null;
   created_at: string | null;
+}
+
+// ─── Card Branding Sub-components ─────────────────────────────────────────────
+
+function CardBrandingLogoSection() {
+  const qc = useQueryClient();
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  React.useEffect(() => {
+    partnerGetCardLogoUrl().then(blob => setLogoUrl(URL.createObjectURL(blob))).catch(() => {});
+  }, []);
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]; if (!file) return;
+    setUploading(true);
+    try {
+      await partnerUploadCardLogo(file);
+      const blob = await partnerGetCardLogoUrl();
+      setLogoUrl(URL.createObjectURL(blob));
+      qc.invalidateQueries({ queryKey: ["partner-profile"] });
+      toast.success("Logo uploaded successfully");
+    } catch { toast.error("Failed to upload logo"); }
+    finally { setUploading(false); }
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {logoUrl && <img src={logoUrl} alt="Partner logo" style={{ height: 60, objectFit: "contain", border: "1px solid #e0e6ec", borderRadius: 8, padding: 6, background: "#f9fafb" }} />}
+      {!logoUrl && <div style={{ height: 60, border: "1px dashed #d1d5db", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#9ca3af" }}>No logo uploaded — default EasyClaims branding will be used</div>}
+      <label style={{ cursor: uploading ? "not-allowed" : "pointer" }}>
+        <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: "none" }} onChange={handleFile} disabled={uploading} />
+        <Button label={uploading ? "Uploading…" : "Choose File"} icon="pi pi-upload" outlined size="small" disabled={uploading} style={{ pointerEvents: "none" }} />
+      </label>
+    </div>
+  );
+}
+
+function CardBrandingColorSection({ profile }: { profile: { card_color?: string | null } | undefined }) {
+  const qc = useQueryClient();
+  const [color, setColor] = useState(profile?.card_color || "#0050b0");
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => { if (profile?.card_color) setColor(profile.card_color); }, [profile?.card_color]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await partnerUpdateProfile({ card_color: color });
+      qc.invalidateQueries({ queryKey: ["partner-profile"] });
+      toast.success("Brand color saved");
+    } catch { toast.error("Invalid color — use format like #0050b0"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <input type="color" value={color} onChange={e => setColor(e.target.value)} style={{ width: 40, height: 36, border: "none", cursor: "pointer", borderRadius: 6 }} />
+      <input type="text" value={color} onChange={e => setColor(e.target.value)} placeholder="#0050b0" maxLength={7}
+        style={{ width: 100, padding: "7px 10px", border: "1px solid #e0e6ec", borderRadius: 8, fontSize: 13, fontFamily: "monospace" }} />
+      <Button label={saving ? "Saving…" : "Save"} size="small" loading={saving} onClick={save} />
+    </div>
+  );
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -372,6 +437,8 @@ export default function PartnerProfilePage() {
   const queryClient = useQueryClient();
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [showCRDialog, setShowCRDialog] = useState(false);
+  const [cardPreviewUrl, setCardPreviewUrl] = useState<string | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
   const [crFields, setCrFields] = useState<Record<string, string>>({});
   const [crReason, setCrReason] = useState("");
   const [showHistory, setShowHistory] = useState(false);
@@ -644,7 +711,76 @@ export default function PartnerProfilePage() {
             </CardBody>
           )}
         </Card>
+
+        {/* ── Card Branding ── */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Membership Card Branding</CardTitle>
+          </CardHeader>
+          <CardBody>
+            <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 16 }}>
+              Customize your members&apos; Membership Card — logo and brand color.
+            </div>
+            <FormLabel style={{ marginBottom: 6, display: "block" }}>Logo (PNG / JPEG, max 2MB)</FormLabel>
+            <CardBrandingLogoSection />
+            <div style={{ marginTop: 16 }}>
+              <FormLabel style={{ marginBottom: 6, display: "block" }}>Brand Color</FormLabel>
+              <CardBrandingColorSection profile={profile} />
+            </div>
+            <div style={{ marginTop: 16, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Button
+                label={loadingPreview ? "Generating…" : "Preview"}
+                icon="pi pi-eye"
+                outlined
+                size="small"
+                loading={loadingPreview}
+                onClick={async () => {
+                  setLoadingPreview(true);
+                  try {
+                    const blob = await partnerDownloadCardPreview();
+                    if (cardPreviewUrl) URL.revokeObjectURL(cardPreviewUrl);
+                    setCardPreviewUrl(URL.createObjectURL(blob));
+                  } catch { toast.error("Failed to generate preview"); }
+                  finally { setLoadingPreview(false); }
+                }}
+              />
+              <Button
+                label="Download"
+                icon="pi pi-download"
+                outlined
+                size="small"
+                onClick={async () => {
+                  try {
+                    const blob = await partnerDownloadCardPreview();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a"); a.href = url; a.download = "membership_card_preview.pdf"; a.click();
+                    URL.revokeObjectURL(url);
+                  } catch { toast.error("Failed to download preview"); }
+                }}
+              />
+            </div>
+          </CardBody>
+        </Card>
       </RightCol>
+
+      {/* ── Card Preview Dialog ── */}
+      <Dialog
+        visible={!!cardPreviewUrl}
+        onHide={() => { if (cardPreviewUrl) URL.revokeObjectURL(cardPreviewUrl); setCardPreviewUrl(null); }}
+        header="Membership Card Preview"
+        style={{ width: "min(860px, 95vw)", height: "90vh" }}
+        contentStyle={{ padding: 0, display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}
+        modal
+        draggable={false}
+      >
+        {cardPreviewUrl && (
+          <iframe
+            src={cardPreviewUrl}
+            style={{ flex: 1, width: "100%", height: "100%", border: "none", minHeight: "70vh" }}
+            title="Membership Card Preview"
+          />
+        )}
+      </Dialog>
 
       {/* ── Request Change Dialog ── */}
       <Dialog
