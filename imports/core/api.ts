@@ -247,6 +247,15 @@ export const partnerListChangeRequests = (params?: { skip?: number; limit?: numb
 export const partnerUpdateProfile = (data: object) =>
   apiClient.patch("/partner/profile", data).then((r) => r.data);
 
+export const partnerUploadCardLogo = (file: File) => {
+  const fd = new FormData(); fd.append("file", file);
+  return apiClient.post("/partner/profile/card-logo", fd).then((r) => r.data);
+};
+export const partnerGetCardLogoUrl = () =>
+  apiClient.get("/partner/profile/card-logo/view", { responseType: "blob" }).then((r) => r.data);
+export const partnerDownloadCardPreview = () =>
+  apiClient.get("/partner/profile/card-preview", { responseType: "blob" }).then((r) => r.data);
+
 // ─────────────────────────────────────────────
 // PARTNER — MEMBERS
 // ─────────────────────────────────────────────
@@ -574,6 +583,15 @@ export const adminRejectChangeRequest = (id: string, admin_note?: string) =>
   apiClient.post(`/admin/members/change-requests/${id}/reject`, { admin_note }).then((r) => r.data);
 
 // ─────────────────────────────────────────────
+// ADMIN — TICKETS
+// ─────────────────────────────────────────────
+export const adminListTickets = (params?: { status?: string; category?: string; skip?: number; limit?: number }) =>
+  apiClient.get("/admin/tickets", { params }).then((r) => r.data);
+
+export const adminUpdateTicketStatus = (id: string, status: string) =>
+  apiClient.patch(`/admin/tickets/${id}/status`, null, { params: { status } }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
 // ADMIN — AUDIT LOGS
 // ─────────────────────────────────────────────
 export const adminListAuditLogs = (params?: { entity_type?: string; entity_id?: string; skip?: number; limit?: number }) =>
@@ -587,3 +605,9 @@ export const memberListChangeRequests = (params?: { skip?: number; limit?: numbe
 
 export const memberCreateChangeRequest = (data: { requested_fields: object; reason?: string }) =>
   apiClient.post("/member/change-requests", data).then((r) => r.data);
+
+export const memberClaimAssist = (body: { claim_type: string; incident_details: string; language?: string }) =>
+  apiClient.post("/member/ai/claim", body).then((r) => r.data);
+
+export const memberListTickets = (params?: { skip?: number; limit?: number }) =>
+  apiClient.get("/member/ai/tickets", { params }).then((r) => r.data);

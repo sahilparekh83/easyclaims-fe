@@ -670,6 +670,7 @@ export default function PartnersPage() {
                 <Th>Partner</Th>
                 <ThSm>Members</ThSm>
                 <Th style={{ paddingLeft: 8 }}>Status</Th>
+                <Th style={{ paddingLeft: 8 }}>Actions</Th>
               </tr>
             </thead>
             <tbody>
@@ -709,8 +710,16 @@ export default function PartnersPage() {
                     <Td style={{ paddingLeft: 8 }}>
                       <StatusPill $active={p.status === "Active"}>
                         <span style={{ width: 7, height: 7, borderRadius: "50%", background: p.status === "Active" ? "#16a34a" : "#f59e0b", display: "inline-block" }} />
-                        {p.status === "Active" ? "Active" : p.status === "Inactive" ? "Onboarding" : p.status}
+                        {p.status === "Active" ? "Active" : p.status === "Inactive" ? "Inactive" : p.status}
                       </StatusPill>
+                    </Td>
+                    <Td style={{ paddingLeft: 8 }}>
+                      <OutlineBtn
+                        style={{ fontSize: 12, padding: "5px 12px" }}
+                        onClick={e => { e.stopPropagation(); openEdit(p); }}
+                      >
+                        Edit
+                      </OutlineBtn>
                     </Td>
                   </tr>
                 );

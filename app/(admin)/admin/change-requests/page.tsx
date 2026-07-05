@@ -182,7 +182,7 @@ export default function AdminChangeRequestsPage() {
     queryFn: () => adminListChangeRequests({ status: statusFilter || undefined, skip, limit }),
   });
 
-  const rows: any[] = data?.data?.data ?? [];
+  const rows: any[] = data?.data?.items ?? [];
   const total: number = data?.data?.total ?? 0;
 
   const approveMutation = useMutation({
