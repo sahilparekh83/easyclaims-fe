@@ -22,6 +22,12 @@ export const listPolicyTypes = (active_only = false) =>
   apiClient.get("/policy-types", { params: { active_only } }).then((r) => r.data);
 
 // ─────────────────────────────────────────────
+// PARTNER TYPES (public)
+// ─────────────────────────────────────────────
+export const listPartnerTypes = (active_only = false) =>
+  apiClient.get("/partner-types", { params: { active_only } }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
 // ADMIN — PLANS
 // ─────────────────────────────────────────────
 export const adminListPlans = (params?: { skip?: number; limit?: number }) =>
@@ -192,6 +198,20 @@ export const adminUpdatePolicyType = (id: string, data: object) =>
 
 export const adminTogglePolicyType = (id: string, is_active: boolean) =>
   apiClient.patch(`/admin/policy-types/${id}/toggle`, { is_active }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — PARTNER TYPES
+// ─────────────────────────────────────────────
+export const adminCreatePartnerType = (data: object) =>
+  apiClient.post("/admin/partner-types", data).then((r) => r.data);
+
+export const adminUpdatePartnerType = (id: string, data: object) =>
+  apiClient.patch(`/admin/partner-types/${id}`, data).then((r) => r.data);
+
+export const adminTogglePartnerType = (id: string, is_active: boolean) =>
+  apiClient
+    .patch(`/admin/partner-types/${id}/${is_active ? "activate" : "deactivate"}`, {})
+    .then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — NOTIFICATIONS
@@ -546,10 +566,9 @@ export const adminBulkUploadMembers = (file: File, partnerId: string, planId?: s
   return apiClient.post("/admin/members/bulk-upload", form).then((r) => r.data);
 };
 
-export async function adminBulkUploadPartners(file: File, planIds?: string[]) {
+export async function adminBulkUploadPartners(file: File) {
   const form = new FormData();
   form.append("file", file);
-  if (planIds && planIds.length > 0) form.append("plan_ids", planIds.join(","));
   const res = await apiClient.post("/admin/partners/bulk-upload", form);
   return res.data;
 }

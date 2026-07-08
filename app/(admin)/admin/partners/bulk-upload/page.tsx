@@ -3,11 +3,9 @@
 import React, { useCallback, useRef, useState } from "react";
 import styled from "styled-components";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
 import { Button } from "primereact/button";
-import { MultiSelect } from "primereact/multiselect";
 import { toast } from "react-toastify";
-import { adminBulkUploadPartners, adminDownloadPartnerBulkReport, adminDownloadPartnerSample, adminListPlans } from "@/imports/core/api";
+import { adminBulkUploadPartners, adminDownloadPartnerBulkReport, adminDownloadPartnerSample } from "@/imports/core/api";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -161,20 +159,11 @@ export default function PartnerBulkUploadPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloadingSample, setDownloadingSample] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
-
-  const { data: plansData } = useQuery({
-    queryKey: ["admin", "all-plans"],
-    queryFn: () => adminListPlans({ limit: 100 }),
-  });
-  const planOptions = ((plansData as any)?.data ?? [])
-    .filter((p: any) => p.status === "Active")
-    .map((p: any) => ({ label: p.name, value: p.id }));
 
   const handleFile = (f: File) => {
     if (!f.name.endsWith(".xlsx") && !f.name.endsWith(".xls")) {
@@ -198,14 +187,10 @@ export default function PartnerBulkUploadPage() {
 
   const handleUpload = async () => {
     if (!selectedFile) return;
-    if (selectedPlanIds.length === 0) {
-      setUploadError("Please select at least one membership plan to assign to uploaded partners.");
-      return;
-    }
     setUploading(true);
     setUploadError(null);
     try {
-      const res = await adminBulkUploadPartners(selectedFile, selectedPlanIds);
+      const res = await adminBulkUploadPartners(selectedFile);
       const payload: UploadResult = (res as any)?.data ?? res;
       setResult(payload);
       toast.success(`Upload complete — ${payload.created?.length ?? 0} partner(s) created`);
@@ -280,7 +265,7 @@ export default function PartnerBulkUploadPage() {
             <div style={{ fontWeight: 700, marginBottom: 8 }}>Mandatory columns (must be present in Excel header row):</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
               {[
-                "Legal Company Name", "Trade Name/Brand Name", "Registered Office Address",
+                "Partner Type", "Plan Code", "Legal Company Name", "Trade Name/Brand Name", "Registered Office Address",
                 "City", "State", "Pin Code", "GSTIN", "PAN",
                 "Authorized Signatory Name", "Designation", "Mobile Number", "Email ID",
               ].map(col => (
@@ -290,7 +275,11 @@ export default function PartnerBulkUploadPage() {
               ))}
             </div>
             <div style={{ marginTop: 10, color: "#0369a1", fontSize: 12 }}>
-              Optional columns: <strong>Partner Type</strong>, <strong>Data 1</strong>, <strong>Data 2</strong>, <strong>Data 3</strong>
+              Optional columns: <strong>Data 1</strong>, <strong>Data 2</strong>, <strong>Data 3</strong>
+            </div>
+            <div style={{ marginTop: 10, color: "#0369a1", fontSize: 12 }}>
+              <strong>Plan Code</strong> accepts multiple plans as a comma-separated list, e.g. <code>EIAM-001, EPIAM-001</code>.
+              Copy valid codes from the <strong>plan_details</strong> sheet in the sample Excel — only Active plans are accepted.
             </div>
           </RequiredCols>
         </CardBody>
@@ -339,24 +328,6 @@ export default function PartnerBulkUploadPage() {
               </>
             )}
           </DropZone>
-
-          <div style={{ marginTop: 16 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-              Assign Plans to Uploaded Partners <span style={{ color: "#ef4444" }}>*</span>
-            </label>
-            <MultiSelect
-              inputId="partner-bulk-plan-select"
-              value={selectedPlanIds}
-              onChange={e => setSelectedPlanIds(e.value)}
-              options={planOptions}
-              placeholder="Select at least one plan"
-              filter
-              style={{ width: "100%" }}
-            />
-            {selectedPlanIds.length === 0 && (
-              <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>All uploaded partners will be assigned the selected plans</div>
-            )}
-          </div>
 
           {uploadError && (
             <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#dc2626", fontSize: 13 }}>

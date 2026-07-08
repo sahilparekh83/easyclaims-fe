@@ -28,6 +28,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} /> },
   { label: "Finance",        href: "/admin/finance",         icon: <Wallet size={18} /> },
   { label: "Policy Types",   href: "/admin/policy-types",    icon: <Package size={18} /> },
+  { label: "Partner Types",  href: "/admin/partner-types",   icon: <Package size={18} /> },
   { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} />, badgeKey: "total" },
   { label: "Email Templates", href: "/admin/email-templates", icon: <Mail size={18} /> },
   { label: "Settings",        href: "/admin/settings",        icon: <Settings size={18} /> },

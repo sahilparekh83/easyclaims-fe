@@ -9,6 +9,7 @@ import { Dialog } from "primereact/dialog";
 import { toast } from "react-toastify";
 import { memberGetPlan, memberSwitchPlan } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
+import PlanFeaturesBlock from "@/components/ui/PlanFeaturesBlock";
 import {
   CreditCard, CheckCircle2, Minus, AlertTriangle, XCircle,
   Users, FolderOpen, Headphones, MessageSquare, Phone,
@@ -357,6 +358,13 @@ export default function MemberPlanPage() {
                 </BenefitRow>
               ))}
             </BenefitsList>
+
+            {(currentPlan.fee_slabs?.length || currentPlan.basic_features?.length || currentPlan.advanced_features?.length) ? (
+              <>
+                <Divider />
+                <PlanFeaturesBlock plan={currentPlan} />
+              </>
+            ) : null}
           </CardBody>
         </PlanCard>
       ) : (

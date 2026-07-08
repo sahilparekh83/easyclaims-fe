@@ -23,6 +23,7 @@ import {
   adminUpdatePartner,
   adminRegenPartnerKey,
   adminListPlans,
+  listPartnerTypes,
 } from "@/imports/core/api";
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
@@ -359,6 +360,7 @@ interface EditFormValues {
 interface Partner {
   id: string;
   user_id?: string;
+  partner_code?: string | null;
   name: string;
   partner_type?: string | null;
   city?: string | null;
@@ -387,13 +389,6 @@ interface Partner {
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const PARTNER_TYPES = [
-  { label: "Broker", value: "Broker" },
-  { label: "Corporate", value: "Corporate" },
-  { label: "NGO", value: "NGO" },
-  { label: "Other", value: "Other" },
-];
 
 const STATUS_OPTIONS = [
   { label: "Active", value: "Active" },
@@ -474,9 +469,19 @@ export default function PartnersPage() {
     .filter((p: any) => p.status === "Active")
     .map((p: any) => ({ label: p.name, value: p.id }));
 
+  const { data: partnerTypesData } = useQuery({
+    queryKey: ["partner-types"],
+    queryFn: () => listPartnerTypes(true),
+  });
+  // Dropdown shows the actual partner type name; matching against the managed
+  // partner_types table (lowercase `code`) happens server-side.
+  const PARTNER_TYPES = ((partnerTypesData as any)?.data ?? []).map(
+    (pt: { id: string; name: string }) => ({ label: pt.name, value: pt.name })
+  );
+
   const createForm = useForm<PartnerFormValues>({
     defaultValues: {
-      name: "", email: "", mobile_no: "", partner_type: "Broker",
+      name: "", email: "", mobile_no: "", partner_type: "Other",
       legal_company_name: "", trade_name: "", registered_address: "",
       city: "", state: "", pin_code: "", gstin: "", pan: "",
       authorized_signatory_name: "", designation: "",
@@ -486,7 +491,7 @@ export default function PartnersPage() {
 
   const editForm = useForm<EditFormValues>({
     defaultValues: {
-      name: "", mobile_no: "", partner_type: "Broker", city: "", state: "", status: "Active",
+      name: "", mobile_no: "", partner_type: "Other", city: "", state: "", status: "Active",
       legal_company_name: "", trade_name: "", registered_address: "",
       pin_code: "", gstin: "", pan: "",
       authorized_signatory_name: "", designation: "",
@@ -516,7 +521,7 @@ export default function PartnersPage() {
         name: values.authorized_signatory_name,
         email: values.email,
         mobile_no: values.mobile_no,
-        partner_type: values.partner_type || "Broker",
+        partner_type: values.partner_type || "Other",
         legal_company_name: values.legal_company_name,
         trade_name: values.trade_name,
         registered_address: values.registered_address,
@@ -586,7 +591,7 @@ export default function PartnersPage() {
 
   const openCreate = () => {
     createForm.reset({
-      name: "", email: "", mobile_no: "", partner_type: "Broker",
+      name: "", email: "", mobile_no: "", partner_type: "Other",
       legal_company_name: "", trade_name: "", registered_address: "",
       city: "", state: "", pin_code: "", gstin: "", pan: "",
       authorized_signatory_name: "", designation: "",
@@ -605,7 +610,7 @@ export default function PartnersPage() {
       editForm.reset({
         name: p.name ?? "",
         mobile_no: (p.mobile_no as string) ?? "",
-        partner_type: (p.partner_type as string) ?? "Broker",
+        partner_type: (p.partner_type as string) ?? "Other",
         city: (p.city as string) ?? "",
         state: (p.state as string) ?? "",
         status: p.status ?? "Active",
@@ -679,7 +684,7 @@ export default function PartnersPage() {
               ) : partners.length === 0 ? (
                 <tr><Td colSpan={3} style={{ color: "#9ca3af", textAlign: "center" }}>No partners found</Td></tr>
               ) : partners.map((p) => {
-                const isBroker = (p.partner_type || "Broker") === "Broker";
+                const isBroker = (p.partner_type || "Other") === "Insurance Broker";
                 return (
                   <tr
                     key={p.id}
@@ -700,7 +705,12 @@ export default function PartnersPage() {
                               </span>
                             )}
                           </div>
-                          <PartnerMeta>{p.partner_type || "Broker"}{p.city ? ` · ${p.city}` : ""}</PartnerMeta>
+                          <PartnerMeta>
+                            {p.partner_code && (
+                              <span style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", color: "#94a3b8" }}>{p.partner_code}</span>
+                            )}
+                            {p.partner_code ? " · " : ""}{p.partner_type || "Other"}{p.city ? ` · ${p.city}` : ""}
+                          </PartnerMeta>
                         </div>
                       </div>
                     </Td>

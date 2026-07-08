@@ -173,7 +173,6 @@ export default function MemberFamilyPage() {
   const familyMembers: FamilyMember[] = (data as any)?.data?.family ?? [];
   const planLimit: number | null = (data as any)?.data?.plan_family_limit ?? null;
   const childAgeLimit: number = (data as any)?.data?.child_age_limit ?? 21;
-  const atLimit = planLimit !== null && familyMembers.length >= planLimit;
 
   // Watch relation + dob in add/edit form to determine if save should be blocked
   const watchedRelation = useWatch({ control: form.control, name: "relation" });
@@ -227,7 +226,6 @@ export default function MemberFamilyPage() {
   });
 
   const openAddDialog = () => {
-    if (atLimit) { toast.warn(`Your plan allows max ${planLimit} family members.`); return; }
     setEditingMember(null); form.reset(DEFAULT_FORM); setDialogVisible(true);
   };
   const openEditDialog = (member: FamilyMember) => {
@@ -262,16 +260,16 @@ export default function MemberFamilyPage() {
     <PageWrap>
       <PageHeader>
         <PageTitle>Family Members</PageTitle>
-        <AccentBtn onClick={openAddDialog} disabled={atLimit}>
+        <AccentBtn onClick={openAddDialog}>
           <i className="pi pi-plus" style={{ fontSize: 12 }} />
-          {atLimit ? `Limit reached (${planLimit})` : "Request to add member"}
+          Request to add member
         </AccentBtn>
       </PageHeader>
 
       {planLimit !== null && (
         <LimitBar>
           <span>{familyMembers.length} of {planLimit} family members used</span>
-          <LimitFill $pct={Math.min(100, (familyMembers.length / planLimit) * 100)} $full={atLimit} />
+          <LimitFill $pct={Math.min(100, (familyMembers.length / planLimit) * 100)} $full={false} />
         </LimitBar>
       )}
 

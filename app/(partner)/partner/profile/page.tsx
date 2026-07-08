@@ -96,8 +96,8 @@ const TypeBadge = styled.span<{ $type: string }>`
   font-weight: 600;
   border-radius: 999px;
   padding: 3px 11px;
-  background: ${p => p.$type === 'Broker' ? '#eff6ff' : '#f0fdf4'};
-  color: ${p => p.$type === 'Broker' ? '#1d4ed8' : '#15803d'};
+  background: ${p => p.$type === 'Insurance Broker' ? '#eff6ff' : '#f0fdf4'};
+  color: ${p => p.$type === 'Insurance Broker' ? '#1d4ed8' : '#15803d'};
 `;
 
 const StatusPill = styled.span<{ $active: boolean }>`

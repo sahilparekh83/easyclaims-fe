@@ -226,6 +226,7 @@ const CRStatusChip = styled.span<{ $status: string }>`
 interface Partner {
   id: string;
   user_id: string;
+  partner_code?: string | null;
   name: string;
   partner_type: string;
   city: string | null;
@@ -855,6 +856,7 @@ export default function PartnerDetailPage() {
         <InfoSection>
           <InfoSectionTitle>Company Details</InfoSectionTitle>
           <InfoGrid>
+            <InfoField label="Partner Code" value={partner.partner_code} mono />
             <InfoField label="Legal Company Name" value={partner.legal_company_name} fullWidth />
             <InfoField label="Trade Name / Brand" value={partner.trade_name} />
             <InfoField label="Partner Type" value={partner.partner_type} />

@@ -6,6 +6,7 @@ import styled from "styled-components";
 import { Check, Minus, Users, Copy, CopyCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import { partnerListPlans } from "@/imports/core/api";
+import PlanFeaturesBlock from "@/components/ui/PlanFeaturesBlock";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -165,8 +166,8 @@ interface Benefits {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const BLANK_BENEFITS: Benefits = {
-  family: 2, slots: 3, claim: "Standard", aiqa: true, aicalls: false,
-  voice: "English", vault: true, rm: false, concierge: false,
+  family: 2, slots: 3, claim: "Standard", aiqa: false, aicalls: false,
+  voice: "English", vault: false, rm: false, concierge: false,
 };
 
 function fmtINR(n: number) {
@@ -311,6 +312,11 @@ export default function PlansPage() {
                     </BenefitLine>
                   ))}
                 </BenefitsList>
+                {(plan.fee_slabs?.length || plan.basic_features?.length || plan.advanced_features?.length) ? (
+                  <div style={{ padding: "0 22px 18px" }}>
+                    <PlanFeaturesBlock plan={plan} />
+                  </div>
+                ) : null}
                 <CardFooter>
                   <StatusPill $s={status}>{status}</StatusPill>
                   <span style={{ fontSize: 12, color: "#64748b", fontWeight: 500 }}>

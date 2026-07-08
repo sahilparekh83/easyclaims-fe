@@ -12,6 +12,7 @@ import { getApiError } from "@/imports/core/errors";
 import {
   adminListPlans, adminCreatePlan, adminUpdatePlan, adminActivatePlan, adminArchivePlan, adminDeletePlan,
 } from "@/imports/core/api";
+import PlanFeaturesBlock, { FeeSlab } from "@/components/ui/PlanFeaturesBlock";
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
@@ -402,6 +403,7 @@ interface Benefits {
 interface Plan {
   id: string;
   name: string;
+  plan_code?: string;
   tagline?: string;
   description?: string;
   price?: number;
@@ -416,6 +418,12 @@ interface Plan {
   capping?: { max_family_members?: number; max_claim_value?: number | null; max_policies?: number };
   benefits?: Partial<Benefits>;
   benefits_json?: Partial<Benefits>;
+  fee_slabs?: FeeSlab[];
+  basic_features_note?: string;
+  basic_features?: string[];
+  advanced_features_note?: string;
+  advanced_features?: string[];
+  co_powered_by_easyclaims?: boolean;
 }
 
 interface Draft {
@@ -428,13 +436,19 @@ interface Draft {
   plan_type: string;
   max_claim_value: number | null;
   benefits: Benefits;
+  fee_slabs: FeeSlab[];
+  basic_features_note: string;
+  basic_features: string[];
+  advanced_features_note: string;
+  advanced_features: string[];
+  co_powered_by_easyclaims: boolean;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const BLANK_BENEFITS: Benefits = {
-  family: 2, slots: 3, claim: "Standard", aiqa: true, aicalls: false,
-  voice: "English", vault: true, rm: false, concierge: false,
+  family: 2, slots: 3, claim: "Standard", aiqa: false, aicalls: false,
+  voice: "English", vault: false, rm: false, concierge: false,
 };
 
 const BLANK_DRAFT: Draft = {
@@ -442,6 +456,12 @@ const BLANK_DRAFT: Draft = {
   price: 1999, cycle: "Annual", status: "Draft", popular: false, plan_type: "partner",
   max_claim_value: null,
   benefits: { ...BLANK_BENEFITS },
+  fee_slabs: [],
+  basic_features_note: "",
+  basic_features: [],
+  advanced_features_note: "",
+  advanced_features: [],
+  co_powered_by_easyclaims: true,
 };
 
 const BENEFIT_DEFS: Array<{
@@ -526,6 +546,11 @@ function PlanCardDisplay({
           </h3>
           {plan.popular && <PopularBadge>Most popular</PopularBadge>}
         </div>
+        {plan.plan_code && (
+          <div style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>
+            {plan.plan_code}
+          </div>
+        )}
         <p style={{ fontSize: 12.5, color: "#64748b", margin: 0 }}>{tagline}</p>
         <PriceRow>
           <PriceNum>{fmtINR(price)}</PriceNum>
@@ -548,6 +573,11 @@ function PlanCardDisplay({
           </BenefitLine>
         ))}
       </BenefitsList>
+      {(plan.fee_slabs?.length || plan.basic_features?.length || plan.advanced_features?.length) ? (
+        <div style={{ padding: "0 22px 18px" }}>
+          <PlanFeaturesBlock plan={plan} />
+        </div>
+      ) : null}
       <CardFooter>
         <StatusPill $s={status}>{status}</StatusPill>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -611,6 +641,10 @@ export default function PlansPage() {
         cycle: d.cycle, billing_cycle: d.cycle, plan_type: d.plan_type,
         popular: d.popular, status: d.status, max_claim_value: d.max_claim_value,
         benefits: d.benefits, benefits_json: d.benefits,
+        fee_slabs: d.fee_slabs,
+        basic_features_note: d.basic_features_note, basic_features: d.basic_features,
+        advanced_features_note: d.advanced_features_note, advanced_features: d.advanced_features,
+        co_powered_by_easyclaims: d.co_powered_by_easyclaims,
       }),
     onSuccess: () => { toast.success("Plan created"); invalidatePlans(); setMode("list"); },
     onError: (err: any) => toast.error(getApiError(err, "Failed to create plan")),
@@ -623,6 +657,10 @@ export default function PlansPage() {
         cycle: d.cycle, billing_cycle: d.cycle, plan_type: d.plan_type,
         status: d.status, popular: d.popular, max_claim_value: d.max_claim_value,
         benefits: d.benefits, benefits_json: d.benefits,
+        fee_slabs: d.fee_slabs,
+        basic_features_note: d.basic_features_note, basic_features: d.basic_features,
+        advanced_features_note: d.advanced_features_note, advanced_features: d.advanced_features,
+        co_powered_by_easyclaims: d.co_powered_by_easyclaims,
       }),
     onSuccess: () => { toast.success("Plan updated"); invalidatePlans(); setMode("list"); },
     onError: (err: any) => toast.error(getApiError(err, "Failed to update plan")),
@@ -667,6 +705,12 @@ export default function PlansPage() {
       plan_type: plan.plan_type ?? "partner",
       max_claim_value: plan.capping?.max_claim_value ?? plan.max_claim_value ?? null,
       benefits: { ...BLANK_BENEFITS, ...b },
+      fee_slabs: plan.fee_slabs ?? [],
+      basic_features_note: plan.basic_features_note ?? "",
+      basic_features: plan.basic_features ?? [],
+      advanced_features_note: plan.advanced_features_note ?? "",
+      advanced_features: plan.advanced_features ?? [],
+      co_powered_by_easyclaims: plan.co_powered_by_easyclaims ?? true,
     });
     setMode("builder");
   }
@@ -677,6 +721,31 @@ export default function PlansPage() {
 
   function setBenefit<K extends keyof Benefits>(k: K, v: Benefits[K]) {
     setDraft(d => ({ ...d, benefits: { ...d.benefits, [k]: v } }));
+  }
+
+  // ── Fee slabs (Advanced Assistance Service Fee) ──────────────────────────────
+  function addFeeSlab() {
+    setDraft(d => ({ ...d, fee_slabs: [...d.fee_slabs, { slab: "", fee: "" }] }));
+  }
+  function updateFeeSlab(idx: number, field: keyof FeeSlab, value: string) {
+    setDraft(d => ({
+      ...d,
+      fee_slabs: d.fee_slabs.map((row, i) => (i === idx ? { ...row, [field]: value } : row)),
+    }));
+  }
+  function removeFeeSlab(idx: number) {
+    setDraft(d => ({ ...d, fee_slabs: d.fee_slabs.filter((_, i) => i !== idx) }));
+  }
+
+  // ── Feature lists (Basic / Advanced Assistance Services) ─────────────────────
+  function addFeature(key: "basic_features" | "advanced_features") {
+    setDraft(d => ({ ...d, [key]: [...d[key], ""] }));
+  }
+  function updateFeature(key: "basic_features" | "advanced_features", idx: number, value: string) {
+    setDraft(d => ({ ...d, [key]: d[key].map((f, i) => (i === idx ? value : f)) }));
+  }
+  function removeFeature(key: "basic_features" | "advanced_features", idx: number) {
+    setDraft(d => ({ ...d, [key]: d[key].filter((_, i) => i !== idx) }));
   }
 
   function stepBenefit(id: keyof Benefits, delta: number, min: number, max: number) {
@@ -707,6 +776,12 @@ export default function PlansPage() {
     status: draft.status,
     popular: draft.popular,
     benefits: draft.benefits,
+    fee_slabs: draft.fee_slabs,
+    basic_features_note: draft.basic_features_note,
+    basic_features: draft.basic_features,
+    advanced_features_note: draft.advanced_features_note,
+    advanced_features: draft.advanced_features,
+    co_powered_by_easyclaims: draft.co_powered_by_easyclaims,
   };
 
   // ── List view ────────────────────────────────────────────────────────────────
@@ -999,6 +1074,138 @@ export default function PlansPage() {
                 </BenefitRow>
               ))}
             </div>
+          </FormCard>
+
+          {/* Advanced Assistance Service Fee */}
+          <FormCard>
+            <div style={{ marginBottom: 6 }}>
+              <FormCardTitle style={{ margin: 0 }}>Advanced Assistance Service Fee</FormCardTitle>
+              <FormCardSub>Claim amount slabs and the additional service fee charged above the basic cover.</FormCardSub>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 14 }}>
+              {draft.fee_slabs.map((row, idx) => (
+                <div key={idx} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <StyledInput
+                    placeholder="e.g. INR 50,001 – INR 1,00,000"
+                    value={row.slab}
+                    onChange={e => updateFeeSlab(idx, "slab", e.target.value)}
+                  />
+                  <StyledInput
+                    placeholder="e.g. INR 5000 + applicable taxes"
+                    value={row.fee}
+                    onChange={e => updateFeeSlab(idx, "fee", e.target.value)}
+                  />
+                  <button
+                    onClick={() => removeFeeSlab(idx)}
+                    title="Remove slab"
+                    style={{
+                      background: "none", border: "1px solid #fecaca", borderRadius: 8,
+                      padding: "10px", cursor: "pointer", color: "#dc2626", flex: "none",
+                      display: "inline-flex", alignItems: "center",
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
+              <SecondaryBtn onClick={addFeeSlab} style={{ alignSelf: "flex-start" }}>
+                <Plus size={14} /> Add slab
+              </SecondaryBtn>
+            </div>
+          </FormCard>
+
+          {/* Plan Features */}
+          <FormCard>
+            <div style={{ marginBottom: 6 }}>
+              <FormCardTitle style={{ margin: 0 }}>Plan Features</FormCardTitle>
+              <FormCardSub>Basic and advanced assistance services included in this plan.</FormCardSub>
+            </div>
+
+            <div style={{ marginTop: 14 }}>
+              <FieldLabel style={{ marginBottom: 6 }}>Basic Assistance Services</FieldLabel>
+              <StyledInput
+                placeholder="e.g. For claims value up to INR 50,000/-"
+                value={draft.basic_features_note}
+                onChange={e => setDraftField("basic_features_note", e.target.value)}
+                style={{ marginBottom: 10 }}
+              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {draft.basic_features.map((f, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <StyledInput
+                      placeholder={`Basic feature #${idx + 1}`}
+                      value={f}
+                      onChange={e => updateFeature("basic_features", idx, e.target.value)}
+                    />
+                    <button
+                      onClick={() => removeFeature("basic_features", idx)}
+                      title="Remove feature"
+                      style={{
+                        background: "none", border: "1px solid #fecaca", borderRadius: 8,
+                        padding: "10px", cursor: "pointer", color: "#dc2626", flex: "none",
+                        display: "inline-flex", alignItems: "center",
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                <SecondaryBtn onClick={() => addFeature("basic_features")} style={{ alignSelf: "flex-start" }}>
+                  <Plus size={14} /> Add basic feature
+                </SecondaryBtn>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 24 }}>
+              <FieldLabel style={{ marginBottom: 6 }}>Advanced Assistance Service</FieldLabel>
+              <StyledInput
+                placeholder="e.g. For claims exceeding INR 50,000/- subject to payment of additional fee"
+                value={draft.advanced_features_note}
+                onChange={e => setDraftField("advanced_features_note", e.target.value)}
+                style={{ marginBottom: 10 }}
+              />
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {draft.advanced_features.map((f, idx) => (
+                  <div key={idx} style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                    <StyledInput
+                      placeholder={`Advanced feature #${idx + 1}`}
+                      value={f}
+                      onChange={e => updateFeature("advanced_features", idx, e.target.value)}
+                    />
+                    <button
+                      onClick={() => removeFeature("advanced_features", idx)}
+                      title="Remove feature"
+                      style={{
+                        background: "none", border: "1px solid #fecaca", borderRadius: 8,
+                        padding: "10px", cursor: "pointer", color: "#dc2626", flex: "none",
+                        display: "inline-flex", alignItems: "center",
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+                <SecondaryBtn onClick={() => addFeature("advanced_features")} style={{ alignSelf: "flex-start" }}>
+                  <Plus size={14} /> Add advanced feature
+                </SecondaryBtn>
+              </div>
+            </div>
+          </FormCard>
+
+          {/* Branding */}
+          <FormCard>
+            <BenefitRow style={{ borderTop: "none", padding: "0" }}>
+              <BIconBox><Sparkles size={15} /></BIconBox>
+              <BLabel>Co-powered by EasyClaims</BLabel>
+              <ToggleWrap>
+                <ToggleInput
+                  type="checkbox"
+                  checked={draft.co_powered_by_easyclaims}
+                  onChange={e => setDraftField("co_powered_by_easyclaims", e.target.checked)}
+                />
+                <ToggleTrack $on={draft.co_powered_by_easyclaims} />
+              </ToggleWrap>
+            </BenefitRow>
           </FormCard>
         </div>
 
