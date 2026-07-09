@@ -5,11 +5,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "primereact/button";
 import { Dropdown } from "primereact/dropdown";
-import { ChevronLeft, Upload, CheckCircle2, XCircle, AlertCircle, Download } from "lucide-react";
+import { ChevronLeft, Upload, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "react-toastify";
 import styled from "styled-components";
-import * as XLSX from "xlsx";
-import { adminListPartners, adminBulkUploadMembers, adminGetPartnerPlansOverview } from "@/imports/core/api";
+import { adminListPartners, adminBulkUploadMembers, adminDownloadMemberBulkSample } from "@/imports/core/api";
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
@@ -162,37 +172,15 @@ interface UploadResult {
   errors: Array<{ row: number; email?: string; reason: string }>;
 }
 
-function downloadSampleExcel() {
-  const headers = [
-    "Sale Date", "Primary Member Full Name", "Gender", "Primary Mobile No.",
-    "Primary Email ID", "Plan Name", "Address Line1", "City", "State", "Pin Code",
-    "Sales Channel", "Partner Branch Code", "Sales Person Name", "Employee Code",
-    "Data 1", "Data 2", "Data 3",
-  ];
-  const sample = [
-    ["2024-01-15", "Rajesh Kumar", "Male", "9876543210", "rajesh@example.com", "Gold Plan",
-     "123 MG Road", "Mumbai", "Maharashtra", "400001",
-     "Direct", "BR001", "Amit Shah", "EMP123", "", "", ""],
-    ["2024-02-20", "Priya Sharma", "Female", "9123456780", "priya@example.com", "Silver Plan",
-     "45 Gandhi Nagar", "Pune", "Maharashtra", "411001",
-     "Online", "BR002", "Ritu Mehta", "EMP456", "", "", ""],
-  ];
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...sample]);
-  ws["!cols"] = headers.map(() => ({ wch: 22 }));
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Members");
-  XLSX.writeFile(wb, "easyclaims_member_upload_template.xlsx");
-}
-
 export default function BulkUploadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [partnerId, setPartnerId] = useState<string>("");
-  const [selectedPlanId, setSelectedPlanId] = useState<string>("");
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [downloadingSample, setDownloadingSample] = useState(false);
 
   const { data: partnersData } = useQuery({
     queryKey: ["admin", "partners", "list"],
@@ -204,24 +192,27 @@ export default function BulkUploadPage() {
     value: p.id,
   }));
 
-  const { data: partnerPlansData } = useQuery({
-    queryKey: ["admin", "partner-plans-overview", partnerId],
-    queryFn: () => adminGetPartnerPlansOverview(partnerId),
-    enabled: !!partnerId,
-  });
-
-  const planOptions = ((partnerPlansData as any)?.data ?? [])
-    .filter((p: any) => p.linked && p.status === "Active")
-    .map((p: any) => ({ label: p.name, value: p.id }));
-
   // Pre-select partner from URL query param
   useEffect(() => {
     const pid = searchParams.get("partner_id");
     if (pid && !partnerId) setPartnerId(pid);
   }, [searchParams, partnersData]);
 
+  const handleDownloadSample = async () => {
+    if (!partnerId) return;
+    setDownloadingSample(true);
+    try {
+      const blob = await adminDownloadMemberBulkSample(partnerId);
+      triggerDownload(blob, "member_upload_sample.xlsx");
+    } catch {
+      toast.error("Failed to download sample file");
+    } finally {
+      setDownloadingSample(false);
+    }
+  };
+
   const uploadMutation = useMutation({
-    mutationFn: () => adminBulkUploadMembers(selectedFile!, partnerId, selectedPlanId || undefined),
+    mutationFn: () => adminBulkUploadMembers(selectedFile!, partnerId),
     onSuccess: (res) => {
       setResult(res.data);
       toast.success(`Upload complete: ${res.data.created?.length ?? 0} members created`);
@@ -261,12 +252,15 @@ export default function BulkUploadPage() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.35rem" }}>
         <PageTitle>Bulk Upload Members</PageTitle>
         <Button
-          label="Download Sample Template"
+          label={downloadingSample ? "Downloading…" : "Download Sample Template"}
           icon="pi pi-download"
           size="small"
           outlined
           severity="secondary"
-          onClick={downloadSampleExcel}
+          loading={downloadingSample}
+          disabled={!partnerId || downloadingSample}
+          title={!partnerId ? "Select a partner first" : "Includes this partner's plans (name + Plan Code)"}
+          onClick={handleDownloadSample}
           style={{ fontSize: 12 }}
         />
       </div>
@@ -275,35 +269,18 @@ export default function BulkUploadPage() {
       <Card>
         <CardTitle>Upload Settings</CardTitle>
 
-        <FormRow>
+        <FormRow style={{ gridTemplateColumns: "1fr" }}>
           <Field>
             <FieldLabel>Partner <span style={{ color: "#ef4444" }}>*</span></FieldLabel>
             <Dropdown
               inputId="admin-member-bulk-partner-select"
               value={partnerId}
               options={partners}
-              onChange={(e) => { setPartnerId(e.value); setSelectedPlanId(""); }}
+              onChange={(e) => setPartnerId(e.value)}
               placeholder="Select partner"
               filter
               style={{ width: "100%" }}
             />
-          </Field>
-          <Field>
-            <FieldLabel>Default Plan <span style={{ color: "#9ca3af", fontWeight: 400 }}>(optional — used for rows without a Plan Name)</span></FieldLabel>
-            <Dropdown
-              inputId="admin-member-bulk-plan-select"
-              value={selectedPlanId}
-              options={planOptions}
-              onChange={(e) => setSelectedPlanId(e.value)}
-              placeholder={partnerId ? (planOptions.length === 0 ? "No active plans linked" : "Select plan") : "Select a partner first"}
-              disabled={!partnerId || planOptions.length === 0}
-              showClear
-              filter
-              style={{ width: "100%" }}
-            />
-            {partnerId && planOptions.length === 0 && (
-              <span style={{ fontSize: 11.5, color: "#d97706" }}>No active plans linked to this partner — add a Plan Name column instead</span>
-            )}
           </Field>
         </FormRow>
 
@@ -352,23 +329,23 @@ export default function BulkUploadPage() {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {[
-              "Sale Date", "Primary Member Full Name", "Gender", "Primary Mobile No.",
-              "Primary Email ID", "Address Line1", "City", "State", "Pin Code",
+              "Primary Member Full Name", "Primary Mobile No.", "Primary Email ID", "Plan Code",
             ].map(c => (
               <span key={c} style={{ fontSize: 11.5, padding: "2px 8px", borderRadius: 6, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", fontWeight: 600 }}>
                 {c}
               </span>
             ))}
             <span style={{ fontSize: 11.5, color: "#9ca3af", padding: "2px 4px" }}>+ optional:</span>
-            {["Plan Name", "Sales Channel", "Partner Branch Code", "Sales Person Name", "Employee Code", "Data 1", "Data 2", "Data 3"].map(c => (
+            {["Sale Date", "Gender", "Address Line1", "City", "State", "Pin Code", "Sales Channel", "Partner Branch Code", "Sales Person Name", "Employee Code", "Data 1", "Data 2", "Data 3"].map(c => (
               <span key={c} style={{ fontSize: 11.5, padding: "2px 8px", borderRadius: 6, background: "#f3f4f6", color: "#6b7280", border: "1px solid #e5e7eb" }}>
                 {c}
               </span>
             ))}
           </div>
           <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 8 }}>
-            Add a <strong>Plan Name</strong> column to enroll different rows into different plans — it overrides the
-            default plan selected above for that row.
+            Every row must set its own <strong>Plan Code</strong> — one member, one plan. Select a partner and
+            download the sample above; it includes a <strong>Partner Plans</strong> tab listing that partner's
+            plan names and codes to copy from.
           </div>
         </div>
 

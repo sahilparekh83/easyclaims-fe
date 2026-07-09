@@ -1,12 +1,26 @@
 "use client";
 
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import AppShell from "@/components/layout/AppShell";
-import { adminListNotifications } from "@/imports/core/api";
+import { adminListNotifications, getMe } from "@/imports/core/api";
+import { useAuthStore } from "@/stores/AuthStore";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const setPermissions = useAuthStore((s) => s.setPermissions);
+
+  const { data: meData } = useQuery({
+    queryKey: ["admin", "me"],
+    queryFn: getMe,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    const me = meData?.data;
+    if (me) setPermissions(me.permissions ?? [], !!me.is_superadmin);
+  }, [meData, setPermissions]);
 
   const { data } = useQuery({
     queryKey: ["admin", "notifications", "unread"],

@@ -44,8 +44,9 @@ export default function AdminMemberBulkUploadPage() {
       dropdownPlaceholder="Select a plan (partner's linked plans only)"
       noPlansMessage="No active plans linked to this partner. Go to the Plans tab to assign plans first."
       planOptions={planOptions}
+      planCodeMode
       onBack={() => router.push(`/admin/partners/${id}`)}
-      uploadFn={(file, planId) => adminBulkUploadMembersToPartner(id, file, planId)}
+      uploadFn={(file) => adminBulkUploadMembersToPartner(id, file)}
       downloadSampleFn={() => adminDownloadMemberBulkSample(id)}
       downloadReportFn={(file) => adminDownloadMemberBulkReport(id, file)}
     />

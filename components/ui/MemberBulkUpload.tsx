@@ -169,6 +169,9 @@ export interface MemberBulkUploadProps {
   uploadFn: (file: File, planId: string) => Promise<any>;
   downloadSampleFn: () => Promise<Blob>;
   downloadReportFn: (file: File) => Promise<Blob>;
+  /** When true, each row assigns its own plan via a mandatory "Plan Code" column —
+   *  hides the Default Plan dropdown and updates the required-columns copy. */
+  planCodeMode?: boolean;
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -197,6 +200,7 @@ export default function MemberBulkUpload({
   uploadFn,
   downloadSampleFn,
   downloadReportFn,
+  planCodeMode = false,
 }: MemberBulkUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -293,7 +297,7 @@ export default function MemberBulkUpload({
           <RequiredCols>
             <div style={{ fontWeight: 700, marginBottom: 8 }}>Mandatory columns:</div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              {["Email ID", "Name", "Mobile Number"].map(col => (
+              {(planCodeMode ? ["Email ID", "Name", "Mobile Number", "Plan Code"] : ["Email ID", "Name", "Mobile Number"]).map(col => (
                 <span key={col} style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd", borderRadius: 6, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>
                   {col}
                 </span>
@@ -301,14 +305,22 @@ export default function MemberBulkUpload({
             </div>
             <div style={{ marginTop: 10, color: "#0369a1", fontSize: 12 }}>
               Optional columns:{" "}
-              <strong>Plan Name</strong>, <strong>Gender</strong>, <strong>Address</strong>, <strong>City</strong>, <strong>State</strong>, <strong>PIN Code</strong>,{" "}
+              {!planCodeMode && <><strong>Plan Name</strong>, </>}
+              <strong>Gender</strong>, <strong>Address</strong>, <strong>City</strong>, <strong>State</strong>, <strong>PIN Code</strong>,{" "}
               <strong>Sale Date</strong>, <strong>Sales Channel</strong>, <strong>Branch Code</strong>, <strong>Salesperson Name</strong>,{" "}
               <strong>Employee Code</strong>, <strong>Data 1</strong>, <strong>Data 2</strong>, <strong>Data 3</strong>
             </div>
-            <div style={{ marginTop: 8, color: "#0369a1", fontSize: 12 }}>
-              Add a <strong>Plan Name</strong> column to enroll different rows into different plans — a row's own
-              Plan Name overrides the default plan selected below. Copy exact plan names from the Plans page.
-            </div>
+            {planCodeMode ? (
+              <div style={{ marginTop: 8, color: "#0369a1", fontSize: 12 }}>
+                Every row must set its own <strong>Plan Code</strong> — one member, one plan. See the
+                "Partner Plans" tab in the downloaded sample for this partner's plan names and codes.
+              </div>
+            ) : (
+              <div style={{ marginTop: 8, color: "#0369a1", fontSize: 12 }}>
+                Add a <strong>Plan Name</strong> column to enroll different rows into different plans — a row's own
+                Plan Name overrides the default plan selected below. Copy exact plan names from the Plans page.
+              </div>
+            )}
           </RequiredCols>
         </CardBody>
       </Card>
@@ -357,24 +369,26 @@ export default function MemberBulkUpload({
             )}
           </DropZone>
 
-          <div style={{ marginTop: 16 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
-              Default Plan <span style={{ color: "#9ca3af", fontWeight: 500 }}>(optional — used only for rows without a Plan Name)</span>
-            </label>
-            <Dropdown
-              inputId={dropdownInputId}
-              value={selectedPlanId}
-              onChange={e => setSelectedPlanId(e.value)}
-              options={planOptions}
-              placeholder={dropdownPlaceholder}
-              filter
-              showClear
-              style={{ width: "100%" }}
-            />
-            {planOptions.length === 0 && (
-              <div style={{ fontSize: 12, color: "#d97706", marginTop: 4 }}>{noPlansMessage}</div>
-            )}
-          </div>
+          {!planCodeMode && (
+            <div style={{ marginTop: 16 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: "#374151", display: "block", marginBottom: 6 }}>
+                Default Plan <span style={{ color: "#9ca3af", fontWeight: 500 }}>(optional — used only for rows without a Plan Name)</span>
+              </label>
+              <Dropdown
+                inputId={dropdownInputId}
+                value={selectedPlanId}
+                onChange={e => setSelectedPlanId(e.value)}
+                options={planOptions}
+                placeholder={dropdownPlaceholder}
+                filter
+                showClear
+                style={{ width: "100%" }}
+              />
+              {planOptions.length === 0 && (
+                <div style={{ fontSize: 12, color: "#d97706", marginTop: 4 }}>{noPlansMessage}</div>
+              )}
+            </div>
+          )}
 
           {uploadError && (
             <div style={{ marginTop: 12, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#dc2626", fontSize: 13 }}>

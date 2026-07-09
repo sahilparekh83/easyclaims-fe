@@ -27,6 +27,7 @@ const STATUS_MAP: Record<string, Variant> = {
   renewal_pending: "warning",
   renewed: "success",
   processing: "info", Processing: "info",
+  accepted: "success", Accepted: "success",
   draft: "info", Draft: "info", DRAFT: "info",
   global: "info",
 };

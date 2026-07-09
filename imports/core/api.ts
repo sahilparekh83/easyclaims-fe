@@ -249,6 +249,36 @@ export const adminUpdateUser = (id: string, data: object) =>
 export const adminDeleteUser = (id: string) =>
   apiClient.delete(`/users/${id}`).then((r) => r.data);
 
+export const getMe = () =>
+  apiClient.get("/users/me").then((r) => r.data);
+
+export const adminAssignUserRole = (userId: string, roleId: string) =>
+  apiClient.post(`/users/${userId}/roles`, { role_id: roleId }).then((r) => r.data);
+
+export const adminRemoveUserRole = (userId: string, roleId: string) =>
+  apiClient.delete(`/users/${userId}/roles/${roleId}`).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — ROLES & PERMISSIONS
+// ─────────────────────────────────────────────
+export const adminListRoles = () =>
+  apiClient.get("/roles").then((r) => r.data);
+
+export const adminGetPermissionCatalog = () =>
+  apiClient.get("/roles/permissions/catalog").then((r) => r.data);
+
+export const adminCreateRole = (data: object) =>
+  apiClient.post("/roles", data).then((r) => r.data);
+
+export const adminUpdateRole = (id: string, data: object) =>
+  apiClient.patch(`/roles/${id}`, data).then((r) => r.data);
+
+export const adminSetRolePermissions = (id: string, permissionIds: string[]) =>
+  apiClient.put(`/roles/${id}/permissions`, { permission_ids: permissionIds }).then((r) => r.data);
+
+export const adminDeleteRole = (id: string) =>
+  apiClient.delete(`/roles/${id}`).then((r) => r.data);
+
 export const adminDeletePolicy = (id: string) =>
   apiClient.delete(`/admin/policies/${id}`).then((r) => r.data);
 
@@ -412,6 +442,34 @@ export const memberViewPolicyPdf = (policyId: string) =>
 
 export const memberDownloadPolicyPdf = (policyId: string) =>
   apiClient.get(`/member/policies/${policyId}/download`, { responseType: "blob" }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// MEMBER — CLAIMS
+// ─────────────────────────────────────────────
+export const memberListClaimDocTypes = () =>
+  apiClient.get("/member/claims/document-types").then((r) => r.data);
+
+export const memberCreateClaim = (data: object) =>
+  apiClient.post("/member/claims", data).then((r) => r.data);
+
+export const memberListClaims = () =>
+  apiClient.get("/member/claims").then((r) => r.data);
+
+export const memberGetClaim = (id: string) =>
+  apiClient.get(`/member/claims/${id}`).then((r) => r.data);
+
+export const memberUploadClaimDocument = (claimId: string, docType: string, file: File) => {
+  const form = new FormData();
+  form.append("doc_type", docType);
+  form.append("file", file);
+  return apiClient.post(`/member/claims/${claimId}/documents`, form).then((r) => r.data);
+};
+
+export const memberViewClaimDocument = (claimId: string, documentId: string) =>
+  apiClient.get(`/member/claims/${claimId}/documents/${documentId}/view`, { responseType: "blob" }).then((r) => r.data);
+
+export const memberDownloadClaimDocument = (claimId: string, documentId: string) =>
+  apiClient.get(`/member/claims/${claimId}/documents/${documentId}/download`, { responseType: "blob" }).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // MEMBER — PLAN
@@ -609,6 +667,43 @@ export const adminListTickets = (params?: { status?: string; category?: string; 
 
 export const adminUpdateTicketStatus = (id: string, status: string) =>
   apiClient.patch(`/admin/tickets/${id}/status`, null, { params: { status } }).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — CLAIM TICKETS
+// ─────────────────────────────────────────────
+export const adminListClaims = (params?: object) =>
+  apiClient.post("/admin/claims/list", params || {}).then((r) => r.data);
+
+export const adminGetClaim = (id: string) =>
+  apiClient.get(`/admin/claims/${id}`).then((r) => r.data);
+
+export const adminListClaimAgents = () =>
+  apiClient.get("/admin/claims/agents").then((r) => r.data);
+
+export const adminUpdateClaimStatus = (id: string, status: string, remark?: string) =>
+  apiClient.patch(`/admin/claims/${id}/status`, { status, remark }).then((r) => r.data);
+
+export const adminReassignClaim = (id: string, agentId: string) =>
+  apiClient.patch(`/admin/claims/${id}/reassign`, { agent_id: agentId }).then((r) => r.data);
+
+export const adminBulkAssignClaims = (claimIds: string[], agentId: string) =>
+  apiClient.patch("/admin/claims/bulk-assign", { claim_ids: claimIds, agent_id: agentId }).then((r) => r.data);
+
+export const adminAddClaimRemark = (id: string, message: string) =>
+  apiClient.post(`/admin/claims/${id}/remarks`, { message }).then((r) => r.data);
+
+export const adminUploadClaimDocument = (claimId: string, docType: string, file: File) => {
+  const form = new FormData();
+  form.append("doc_type", docType);
+  form.append("file", file);
+  return apiClient.post(`/admin/claims/${claimId}/documents`, form).then((r) => r.data);
+};
+
+export const adminViewClaimDocument = (claimId: string, documentId: string) =>
+  apiClient.get(`/admin/claims/${claimId}/documents/${documentId}/view`, { responseType: "blob" }).then((r) => r.data);
+
+export const adminDownloadClaimDocument = (claimId: string, documentId: string) =>
+  apiClient.get(`/admin/claims/${claimId}/documents/${documentId}/download`, { responseType: "blob" }).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — AUDIT LOGS

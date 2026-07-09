@@ -10,15 +10,20 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { InputSwitch } from "primereact/inputswitch";
+import { MultiSelect } from "primereact/multiselect";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
+import { getApiError } from "@/imports/core/errors";
 import {
   adminListUsers,
   adminCreateUser,
   adminUpdateUser,
   adminDeleteUser,
+  adminListRoles,
+  adminAssignUserRole,
+  adminRemoveUserRole,
 } from "@/imports/core/api";
 
 interface User {
@@ -28,6 +33,12 @@ interface User {
   user_type: string;
   is_active: boolean;
   created_at: string;
+  roles?: string[];
+}
+
+interface RoleOption {
+  id: string;
+  role_name: string;
 }
 
 interface CreateUserFormValues {
@@ -44,7 +55,8 @@ interface EditUserFormValues {
 }
 
 const USER_TYPE_OPTIONS = [
-  { label: "Super Admin", value: "SUPERADMIN" },
+  { label: "Super Admin (full access)", value: "SUPERADMIN" },
+  { label: "Admin (access set by role)", value: "ADMIN" },
   { label: "Partner", value: "PARTNER" },
   { label: "Member", value: "MEMBER" },
 ];
@@ -55,6 +67,8 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [rolesDialogUser, setRolesDialogUser] = useState<User | null>(null);
+  const [selectedRoleNames, setSelectedRoleNames] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "users"],
@@ -66,6 +80,35 @@ export default function UsersPage() {
   const items: User[] = Array.isArray(rawData)
     ? rawData
     : rawData?.data ?? [];
+
+  const { data: rolesData } = useQuery({
+    queryKey: ["admin", "roles"],
+    queryFn: adminListRoles,
+  });
+  const availableRoles: RoleOption[] = rolesData?.data ?? [];
+  const roleOptions = availableRoles.map((r) => ({ label: r.role_name, value: r.role_name }));
+
+  const setRolesMutation = useMutation({
+    mutationFn: async ({ user, nextRoleNames }: { user: User; nextRoleNames: string[] }) => {
+      const current = new Set(user.roles ?? []);
+      const next = new Set(nextRoleNames);
+      const toAdd = availableRoles.filter((r) => next.has(r.role_name) && !current.has(r.role_name));
+      const toRemove = availableRoles.filter((r) => current.has(r.role_name) && !next.has(r.role_name));
+      for (const r of toAdd) await adminAssignUserRole(user.id, r.id);
+      for (const r of toRemove) await adminRemoveUserRole(user.id, r.id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
+      toast.success("Roles updated");
+      setRolesDialogUser(null);
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to update roles")),
+  });
+
+  const openRolesDialog = (user: User) => {
+    setRolesDialogUser(user);
+    setSelectedRoleNames(user.roles ?? []);
+  };
 
   const createForm = useForm<CreateUserFormValues>({
     defaultValues: { name: "", email: "", user_type: "MEMBER", password: "" },
@@ -154,8 +197,31 @@ export default function UsersPage() {
   const createdAtBody = (row: User) =>
     dayjs(row.created_at).format("DD MMM YYYY");
 
+  const rolesBody = (row: User) => (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      {(row.roles ?? []).length === 0 && <span style={{ color: "#9ca3af", fontSize: 12.5 }}>No roles</span>}
+      {(row.roles ?? []).map((r) => (
+        <span
+          key={r}
+          style={{
+            background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe",
+            borderRadius: 999, padding: "2px 9px", fontSize: 11.5, fontWeight: 600,
+          }}
+        >
+          {r}
+        </span>
+      ))}
+    </div>
+  );
+
   const actionsBody = (row: User) => (
     <div style={{ display: "flex", gap: "0.5rem" }}>
+      <Button
+        label="Roles"
+        size="small"
+        severity="info"
+        onClick={() => openRolesDialog(row)}
+      />
       <Button
         label="Edit"
         size="small"
@@ -196,6 +262,7 @@ export default function UsersPage() {
         <Column field="name" header="Name" sortable />
         <Column field="email" header="Email" sortable />
         <Column field="user_type" header="User Type" sortable />
+        <Column header="Roles" body={rolesBody} />
         <Column header="Is Active" body={isActiveBody} />
         <Column header="Created At" body={createdAtBody} sortable sortField="created_at" />
         <Column header="Actions" body={actionsBody} />
@@ -392,6 +459,42 @@ export default function UsersPage() {
             <Button type="submit" label="Save Changes" loading={updateMutation.isPending} />
           </div>
         </form>
+      </Dialog>
+
+      {/* Manage Roles Dialog */}
+      <Dialog
+        header={rolesDialogUser ? `Roles — ${rolesDialogUser.name}` : "Roles"}
+        visible={!!rolesDialogUser}
+        onHide={() => setRolesDialogUser(null)}
+        style={{ width: "480px" }}
+        modal
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <div style={{ fontSize: 12.5, color: "#6b7280" }}>
+            What this user can access is controlled by their roles. Manage what each role can do
+            on the <strong>Roles &amp; Permissions</strong> page.
+          </div>
+          <div>
+            <label style={{ display: "block", marginBottom: "0.25rem", fontWeight: 500 }}>Assigned roles</label>
+            <MultiSelect
+              value={selectedRoleNames}
+              onChange={(e) => setSelectedRoleNames(e.value)}
+              options={roleOptions}
+              placeholder="Select roles"
+              filter
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "0.5rem" }}>
+            <Button type="button" label="Cancel" severity="secondary" onClick={() => setRolesDialogUser(null)} />
+            <Button
+              type="button"
+              label="Save"
+              loading={setRolesMutation.isPending}
+              onClick={() => rolesDialogUser && setRolesMutation.mutate({ user: rolesDialogUser, nextRoleNames: selectedRoleNames })}
+            />
+          </div>
+        </div>
       </Dialog>
     </>
   );

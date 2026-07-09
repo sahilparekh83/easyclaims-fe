@@ -42,6 +42,8 @@ export interface PoliciesTableProps {
   onView?: (policy: PolicyRow) => void;
   onDelete?: (policy: PolicyRow) => void;
   onLinked?: (policy: PolicyRow) => void;
+  /** "Claim Policy" action — member portal only */
+  onClaim?: (policy: PolicyRow) => void;
   /** Column filter state — admin/policies page only */
   typeFilter?: string;
   onTypeFilter?: (v: string) => void;
@@ -150,6 +152,21 @@ const LinkBadgeBtn = styled.button`
   &:hover { background: #ecfdf5; }
 `;
 
+const ClaimBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  background: #0050b0;
+  border: none;
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  &:hover { background: #0046a0; }
+`;
+
 const Skeleton = styled.div`
   height: 40px;
   background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
@@ -253,6 +270,7 @@ export default function PoliciesTable({
   onView,
   onDelete,
   onLinked,
+  onClaim,
   typeFilter = "",
   onTypeFilter,
   aiFilter = "",
@@ -430,6 +448,9 @@ export default function PoliciesTable({
                     <LinkBadgeBtn onClick={() => onLinked(row)} title="View linked family members">
                       🔗 {row.linked_family_members!.length}
                     </LinkBadgeBtn>
+                  )}
+                  {onClaim && isMember && effectiveStatus === "active" && (
+                    <ClaimBtn onClick={() => onClaim(row)}>Claim Policy</ClaimBtn>
                   )}
                 </div>
               </Td>

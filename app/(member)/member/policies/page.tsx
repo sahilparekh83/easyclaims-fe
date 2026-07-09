@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Eye, Download, Upload, CheckCircle2, X, AlertTriangle, RefreshCw } from "lucide-react";
 import PoliciesTable from "@/components/ui/PoliciesTable";
+import ClaimPolicyModal from "@/components/ui/ClaimPolicyModal";
 import {
   memberListPolicies, memberUploadPolicy, memberUpdatePolicy,
   memberDeletePolicy, memberViewPolicyPdf, memberDownloadPolicyPdf,
@@ -355,6 +356,9 @@ export default function MemberPoliciesPage() {
   // View linked members dialog state
   const [viewLinkedPolicy, setViewLinkedPolicy] = useState<Policy | null>(null);
 
+  // Claim policy modal state
+  const [claimingPolicy, setClaimingPolicy] = useState<Policy | null>(null);
+
   const { data: policiesData, isLoading, isFetching } = useQuery({
     queryKey: ["member", "policies", debouncedSearch, page],
     queryFn: () => memberListPolicies({ global_filter: debouncedSearch, sort_field: "created_at", sort_order: -1, limit: ROWS, skip: page * ROWS }),
@@ -494,6 +498,7 @@ export default function MemberPoliciesPage() {
           onView={p => router.push(`/member/policies/${p.id}`)}
           onDelete={p => handleDelete(p as any)}
           onLinked={p => setViewLinkedPolicy(p as any)}
+          onClaim={p => setClaimingPolicy(p as any)}
         />
 
         {total > ROWS && (
@@ -703,6 +708,18 @@ export default function MemberPoliciesPage() {
           </div>
         )}
       </Dialog>
+
+      {claimingPolicy && (
+        <ClaimPolicyModal
+          policyId={claimingPolicy.id}
+          policyNumber={claimingPolicy.policy_number}
+          onClose={() => setClaimingPolicy(null)}
+          onSuccess={() => {
+            setClaimingPolicy(null);
+            router.push("/member/claims");
+          }}
+        />
+      )}
     </PageWrap>
   );
 }

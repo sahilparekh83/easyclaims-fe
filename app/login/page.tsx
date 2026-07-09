@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import styled, { keyframes } from "styled-components";
 import { InputText } from "primereact/inputtext";
 import Image from "next/image";
+import { useQueryClient } from "@tanstack/react-query";
 import { sendOtp, verifyOtp } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
 import { useAuthStore } from "@/stores/AuthStore";
@@ -452,6 +453,7 @@ const LOGO_SVG = (
 
 const REDIRECT: Record<string, string> = {
   SUPERADMIN: "/admin/dashboard",
+  ADMIN:      "/admin/dashboard",
   PARTNER:    "/partner/dashboard",
   MEMBER:     "/member/dashboard",
 };
@@ -517,7 +519,7 @@ export default function LoginPage() {
       const nextPath = getNextPath();
       const allowedNext =
         nextPath &&
-        ((userType === "SUPERADMIN" && nextPath.startsWith("/admin")) ||
+        (((userType === "SUPERADMIN" || userType === "ADMIN") && nextPath.startsWith("/admin")) ||
          (userType === "PARTNER"    && nextPath.startsWith("/partner")) ||
          (userType === "MEMBER"     && (nextPath.startsWith("/member") || nextPath === "/upload")))
           ? nextPath : null;

@@ -16,7 +16,9 @@ import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { adminGetMember, adminRenewMemberEnrollment, adminSwitchMemberPlan, adminCancelMemberEnrollment, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminListPlans, adminViewPolicyPdf, adminDownloadPolicyPdf, adminDeletePolicy } from "@/imports/core/api";
+import { adminGetMember, adminRenewMemberEnrollment, adminSwitchMemberPlan, adminCancelMemberEnrollment, adminUpdateMember, adminListChangeRequests, adminApproveChangeRequest, adminRejectChangeRequest, adminListPlans, adminViewPolicyPdf, adminDownloadPolicyPdf, adminDeletePolicy, adminListClaims } from "@/imports/core/api";
+import AssignClaimAgentDialog from "@/components/ui/AssignClaimAgentDialog";
+import { useAuthStore } from "@/stores/AuthStore";
 import { getApiError } from "@/imports/core/errors";
 import { InputTextarea } from "primereact/inputtextarea";
 
@@ -348,7 +350,7 @@ const FieldPill = styled.span`
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const TABS = ["Profile", "Family", "Policies", "Change Requests", "Communication"] as const;
+const TABS = ["Profile", "Family", "Policies", "Claims", "Change Requests", "Communication"] as const;
 type TabKey = (typeof TABS)[number];
 
 const GENDER_OPTIONS = [
@@ -389,6 +391,12 @@ export default function MemberDetailPage() {
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>("Profile");
+  const isSuperadmin = useAuthStore(s => s.isSuperadmin);
+  const [claimSearch, setClaimSearch] = useState("");
+  const [claimPage, setClaimPage] = useState(0);
+  const [selectedClaimIds, setSelectedClaimIds] = useState<string[]>([]);
+  const [claimAssignOpen, setClaimAssignOpen] = useState(false);
+  const CLAIM_ROWS = 10;
 
   const fromPartnerId = searchParams.get("partner_id") ?? "";
   const fromPartnerName = searchParams.get("partner_name") ? decodeURIComponent(searchParams.get("partner_name")!) : "";
@@ -418,6 +426,13 @@ export default function MemberDetailPage() {
     enabled: activeTab === "Change Requests" && !!id,
   });
   const changeRequests: any[] = (crData as any)?.data?.data ?? [];
+
+  const { data: claimsData, isLoading: claimsLoading } = useQuery({
+    queryKey: ["admin", "member-claims", id],
+    queryFn: () => adminListClaims({ user_id: id, limit: 100 }),
+    enabled: activeTab === "Claims" && !!id,
+  });
+  const memberClaims: any[] = (claimsData as any)?.data?.data ?? [];
 
   const { data: familyCrData, refetch: refetchFamilyCr } = useQuery({
     queryKey: ["admin", "family-crs", id],
@@ -976,6 +991,127 @@ export default function MemberDetailPage() {
           </Card>
         </div>
       )}
+
+      {/* Claims Tab */}
+      {activeTab === "Claims" && (() => {
+        const filtered = memberClaims.filter(c =>
+          !claimSearch.trim() ||
+          c.claim_number?.toLowerCase().includes(claimSearch.toLowerCase()) ||
+          c.policy_number?.toLowerCase().includes(claimSearch.toLowerCase())
+        );
+        const totalPages = Math.max(1, Math.ceil(filtered.length / CLAIM_ROWS));
+        const pageRows = filtered.slice(claimPage * CLAIM_ROWS, (claimPage + 1) * CLAIM_ROWS);
+        const allPageSelected = pageRows.length > 0 && pageRows.every(c => selectedClaimIds.includes(c.id));
+        const toggleAll = () => {
+          setSelectedClaimIds(prev => allPageSelected
+            ? prev.filter(id => !pageRows.some(c => c.id === id))
+            : [...new Set([...prev, ...pageRows.map(c => c.id)])]);
+        };
+        const toggleOne = (claimId: string) => {
+          setSelectedClaimIds(prev => prev.includes(claimId) ? prev.filter(id => id !== claimId) : [...prev, claimId]);
+        };
+        const goToClaim = (claimId: string) => {
+          const qs = new URLSearchParams();
+          qs.set("member_id", id);
+          if (member?.name) qs.set("member_name", encodeURIComponent(member.name));
+          router.push(`/admin/claim-tickets/${claimId}?${qs.toString()}`);
+        };
+
+        return (
+          <Card style={{ padding: 0, overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", borderBottom: "1px solid #f3f4f6", gap: 12, flexWrap: "wrap" }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: "#0f172a" }}>Claim Tickets</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                {isSuperadmin && selectedClaimIds.length > 0 && (
+                  <button
+                    onClick={() => setClaimAssignOpen(true)}
+                    style={{ background: "#0a2257", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Assign Claim Agent ({selectedClaimIds.length})
+                  </button>
+                )}
+                <input
+                  value={claimSearch}
+                  onChange={e => { setClaimSearch(e.target.value); setClaimPage(0); }}
+                  placeholder="Search claim or policy #…"
+                  style={{ height: 32, border: "1px solid #e0e6ec", borderRadius: 8, padding: "0 10px", fontSize: 12.5, outline: "none", width: 200 }}
+                />
+                <span style={{ fontFamily: "monospace", fontSize: 12, color: "#64748b" }}>{filtered.length} total</span>
+              </div>
+            </div>
+            {claimsLoading ? (
+              <div style={{ padding: 24, textAlign: "center", color: "#9ca3af" }}>Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ padding: 32, textAlign: "center", color: "#9ca3af" }}>
+                {memberClaims.length === 0 ? "No claims filed by this member yet." : "No claims match your search."}
+              </div>
+            ) : (
+              <>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13.5 }}>
+                  <thead>
+                    <tr style={{ background: "#f8f9fb" }}>
+                      {isSuperadmin && (
+                        <th style={{ padding: "9px 12px", width: 34 }}>
+                          <input type="checkbox" checked={allPageSelected} onChange={toggleAll} />
+                        </th>
+                      )}
+                      {["Claim #", "Policy", "Insurer", "Claimed Amount", "Status", "Assigned Agent", "Submitted"].map(h => (
+                        <th key={h} style={{ padding: "9px 20px", textAlign: "left", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#6b7a8c" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pageRows.map(c => (
+                      <tr
+                        key={c.id}
+                        style={{ borderTop: "1px solid #f1f3f6", cursor: "pointer" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#f8f9fb")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "")}
+                      >
+                        {isSuperadmin && (
+                          <td style={{ padding: "12px" }} onClick={e => e.stopPropagation()}>
+                            <input type="checkbox" checked={selectedClaimIds.includes(c.id)} onChange={() => toggleOne(c.id)} />
+                          </td>
+                        )}
+                        <td style={{ padding: "12px 20px", fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }} onClick={() => goToClaim(c.id)}>{c.claim_number}</td>
+                        <td style={{ padding: "12px 20px" }} onClick={() => goToClaim(c.id)}>
+                          <div>{c.policy_number ?? "—"}</div>
+                          <div style={{ fontSize: 11.5, color: "#9ca3af" }}>{c.policy_type}</div>
+                        </td>
+                        <td style={{ padding: "12px 20px" }} onClick={() => goToClaim(c.id)}>{c.insurer ?? "—"}</td>
+                        <td style={{ padding: "12px 20px" }} onClick={() => goToClaim(c.id)}>{c.claimed_amount ? `₹${Number(c.claimed_amount).toLocaleString("en-IN")}` : "—"}</td>
+                        <td style={{ padding: "12px 20px" }} onClick={() => goToClaim(c.id)}><StatusBadge value={c.status.charAt(0).toUpperCase() + c.status.slice(1)} /></td>
+                        <td style={{ padding: "12px 20px" }} onClick={() => goToClaim(c.id)}>{c.assigned_agent_name || <span style={{ color: "#9ca3af" }}>Unassigned</span>}</td>
+                        <td style={{ padding: "12px 20px" }} onClick={() => goToClaim(c.id)}>{dayjs(c.created_at).format("DD MMM YYYY")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {totalPages > 1 && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderTop: "1px solid #f1f3f6", fontSize: 12.5, color: "#6b7a8c" }}>
+                    <span>Page {claimPage + 1} of {totalPages}</span>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button disabled={claimPage === 0} onClick={() => setClaimPage(p => p - 1)} style={{ background: "none", border: "1px solid #e0e6ec", borderRadius: 8, padding: "6px 12px", cursor: claimPage === 0 ? "default" : "pointer", opacity: claimPage === 0 ? 0.4 : 1 }}>← Prev</button>
+                      <button disabled={claimPage >= totalPages - 1} onClick={() => setClaimPage(p => p + 1)} style={{ background: "none", border: "1px solid #e0e6ec", borderRadius: 8, padding: "6px 12px", cursor: claimPage >= totalPages - 1 ? "default" : "pointer", opacity: claimPage >= totalPages - 1 ? 0.4 : 1 }}>Next →</button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            <AssignClaimAgentDialog
+              visible={claimAssignOpen}
+              claimIds={selectedClaimIds}
+              onHide={() => setClaimAssignOpen(false)}
+              onAssigned={() => {
+                setClaimAssignOpen(false);
+                setSelectedClaimIds([]);
+                queryClient.invalidateQueries({ queryKey: ["admin", "member-claims", id] });
+              }}
+            />
+          </Card>
+        );
+      })()}
 
       {/* Change Requests Tab */}
       {activeTab === "Change Requests" && (

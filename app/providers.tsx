@@ -9,48 +9,21 @@ import "primereact/resources/themes/lara-light-purple/theme.css";
 import "primeicons/primeicons.css";
 import { getQueryClient } from "@/lib/query-client";
 import { useAuthStore } from "@/stores/AuthStore";
-import axios from "axios";
-import { setAccessToken } from "@/lib/api-client";
-import Cookies from "js-cookie";
 
+// Restores userType/userId/isAuthenticated from cookies synchronously on app boot.
+// Does NOT fetch a fresh access token itself — apiClient's response interceptor
+// already does that (with proper single-flight/queueing) the moment the first
+// real request 401s because the in-memory access token is empty after a reload.
+// A second, independent refresh call here used to race that interceptor for the
+// same single-use refresh token — whichever lost got "session expired", which is
+// why the menu (and anything else needing a fresh token) intermittently vanished
+// after a hard refresh.
 function AuthRestorer() {
-  const { setAuth, restoreFromCookie } = useAuthStore();
+  const { restoreFromCookie } = useAuthStore();
 
   useEffect(() => {
-    const userType = Cookies.get("ec_user_type");
-    const userId = Cookies.get("ec_user_id");
-    const refreshToken = Cookies.get("ec_refresh_token");
-
-    if (!userType || !refreshToken) return;
-
-    // Silently refresh to get a fresh access token
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
-    axios
-      .post(`${apiUrl}/auth/refresh`, {}, {
-        headers: { Authorization: `Bearer ${refreshToken}` },
-        withCredentials: true,
-      })
-      .then((res) => {
-        const data = res.data?.data;
-        if (data?.access_token) {
-          setAccessToken(data.access_token);
-          if (data.refresh_token && data.refresh_token !== "undefined") {
-            Cookies.set("ec_refresh_token", data.refresh_token, { expires: 1, sameSite: "strict" });
-          }
-          useAuthStore.setState({
-            accessToken: data.access_token,
-            userType: userType as "SUPERADMIN" | "PARTNER" | "MEMBER",
-            userId,
-            isAuthenticated: true,
-          });
-        }
-      })
-      .catch(() => {
-        Cookies.remove("ec_refresh_token");
-        Cookies.remove("ec_user_type");
-        Cookies.remove("ec_user_id");
-      });
-  }, [setAuth]);
+    restoreFromCookie();
+  }, [restoreFromCookie]);
 
   return null;
 }

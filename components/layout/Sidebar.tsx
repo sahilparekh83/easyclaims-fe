@@ -7,31 +7,38 @@ import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
   BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet, Ticket, HelpCircle,
+  KeyRound, UserCog,
 } from "lucide-react";
 import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
+import { useAuthStore } from "@/stores/AuthStore";
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
   badgeKey?: string;
+  // Which permission module gates this link. Omit to always show (no backend module yet).
+  moduleKey?: string;
 }
 
 const ADMIN_NAV: NavItem[] = [
-  { label: "Dashboard",      href: "/admin/dashboard",       icon: <LayoutDashboard size={18} /> },
-  { label: "Membership plans", href: "/admin/plans",         icon: <CreditCard size={18} /> },
-  { label: "Partners",       href: "/admin/partners",        icon: <Briefcase size={18} /> },
-  { label: "Members",        href: "/admin/members",         icon: <Users size={18} /> },
-  { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} /> },
-  { label: "Tickets",        href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets" },
-  { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} /> },
-  { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} /> },
-  { label: "Finance",        href: "/admin/finance",         icon: <Wallet size={18} /> },
-  { label: "Policy Types",   href: "/admin/policy-types",    icon: <Package size={18} /> },
-  { label: "Partner Types",  href: "/admin/partner-types",   icon: <Package size={18} /> },
-  { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} />, badgeKey: "total" },
-  { label: "Email Templates", href: "/admin/email-templates", icon: <Mail size={18} /> },
-  { label: "Settings",        href: "/admin/settings",        icon: <Settings size={18} /> },
+  { label: "Dashboard",      href: "/admin/dashboard",       icon: <LayoutDashboard size={18} />, moduleKey: "dashboard" },
+  { label: "Membership plans", href: "/admin/plans",         icon: <CreditCard size={18} />, moduleKey: "plans" },
+  { label: "Partners",       href: "/admin/partners",        icon: <Briefcase size={18} />, moduleKey: "partners" },
+  { label: "Members",        href: "/admin/members",         icon: <Users size={18} />, moduleKey: "members" },
+  { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} />, moduleKey: "members" },
+  { label: "Tickets",        href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets", moduleKey: "tickets" },
+  { label: "Claim Tickets",  href: "/admin/claim-tickets",   icon: <FileText size={18} />, moduleKey: "claims" },
+  { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, moduleKey: "policies" },
+  { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} />, moduleKey: "dashboard" },
+  { label: "Finance",        href: "/admin/finance",         icon: <Wallet size={18} />, moduleKey: "finance" },
+  { label: "Policy Types",   href: "/admin/policy-types",    icon: <Package size={18} />, moduleKey: "policy_types" },
+  { label: "Partner Types",  href: "/admin/partner-types",   icon: <Package size={18} />, moduleKey: "partner_types" },
+  { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} />, badgeKey: "total", moduleKey: "notifications" },
+  { label: "Email Templates", href: "/admin/email-templates", icon: <Mail size={18} />, moduleKey: "email_templates" },
+  { label: "Admin Users",     href: "/admin/users",           icon: <UserCog size={18} />, moduleKey: "users" },
+  { label: "Roles & Permissions", href: "/admin/roles",       icon: <KeyRound size={18} />, moduleKey: "roles" },
+  { label: "Settings",        href: "/admin/settings",        icon: <Settings size={18} />, moduleKey: "settings" },
 ];
 
 const PARTNER_NAV: NavItem[] = [
@@ -49,6 +56,7 @@ const MEMBER_NAV: NavItem[] = [
   { label: "Change Requests", href: "/member/change-requests", icon: <ClipboardList size={18} /> },
   { label: "Family",       href: "/member/family",        icon: <Heart size={18} /> },
   { label: "Policies",          href: "/member/policies",      icon: <FileText size={18} /> },
+  { label: "My Claims",         href: "/member/claims",        icon: <BadgeCheck size={18} /> },
   { label: "Claim Assistance",  href: "/member/claim-assist",  icon: <HelpCircle size={18} /> },
   // { label: "Consent",      href: "/member/consent",       icon: <ShieldCheck size={18} /> },
   { label: "Notifications", href: "/member/notifications", icon: <Bell size={18} /> },
@@ -195,7 +203,19 @@ function useBadgeCounts(portal: "admin" | "partner" | "member") {
 export default function Sidebar({ portal }: { portal: "admin" | "partner" | "member" }) {
   const pathname = usePathname();
   const router = useRouter();
-  const navItems = NAV_MAP[portal] || [];
+  // Subscribe to the raw values (not the `hasPermission` function) — a zustand
+  // selector only triggers a re-render when the SELECTED value's identity changes.
+  // `hasPermission` is a stable function reference for the whole session, so
+  // selecting it never re-renders this component when permissions actually load.
+  const permissions = useAuthStore((s) => s.permissions);
+  const isSuperadmin = useAuthStore((s) => s.isSuperadmin);
+  const allNavItems = NAV_MAP[portal] || [];
+  // Admin nav is gated by the logged-in user's permission grid — items with no
+  // moduleKey (e.g. Change Requests today) are always shown. Partner/member nav
+  // is unaffected — this RBAC system only covers the admin portal.
+  const navItems = portal === "admin"
+    ? allNavItems.filter((item) => !item.moduleKey || isSuperadmin || permissions.includes(`${item.moduleKey}:view`))
+    : allNavItems;
   const badgeCounts = useBadgeCounts(portal);
 
   return (

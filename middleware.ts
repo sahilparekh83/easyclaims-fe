@@ -5,6 +5,7 @@ const PUBLIC_PATHS = ["/login", "/", "/upload"];
 
 const PORTAL_MAP: Record<string, string[]> = {
   SUPERADMIN: ["/admin"],
+  ADMIN: ["/admin"],
   PARTNER: ["/partner"],
   MEMBER: ["/member"],
 };
@@ -35,7 +36,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (isAuthenticated && isPublic && pathname !== "/upload") {
-    const redirectTo = userType === "SUPERADMIN"
+    const redirectTo = userType === "SUPERADMIN" || userType === "ADMIN"
       ? "/admin/dashboard"
       : userType === "PARTNER"
         ? "/partner/dashboard"

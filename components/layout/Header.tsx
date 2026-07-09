@@ -6,8 +6,8 @@ import { Bell, LogOut, ChevronDown, User, Mail, Shield, ChevronsUpDown } from "l
 import { useAuthStore } from "@/stores/AuthStore";
 import { useMemberStore } from "@/stores/MemberStore";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { logout, memberGetProfile, partnerGetProfile, memberListPartners } from "@/imports/core/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { logout, memberGetProfile, partnerGetProfile, memberListPartners, getMe } from "@/imports/core/api";
 import { toast } from "react-toastify";
 
 // ─── Styled Components ───────────────────────────────────────────────────────
@@ -333,6 +333,7 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
   const { clearAuth, accessToken, userType } = useAuthStore();
   const { activePartnerId, activePartnerName, partners, setActivePartner, setPartners } = useMemberStore();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [profileOpen, setProfileOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -341,6 +342,7 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
 
   const isMember = userType === "MEMBER";
   const isPartner = userType === "PARTNER";
+  const isAdminPortal = userType === "SUPERADMIN" || userType === "ADMIN";
   const label = userType ? PORTAL_LABELS[userType] || userType : "—";
 
   // Fetch profile (member or partner)
@@ -366,6 +368,14 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
     staleTime: 5 * 60 * 1000,
   });
 
+  // Fetch admin/superadmin's own profile — email + assigned roles
+  const { data: meData } = useQuery({
+    queryKey: ["header", "me"],
+    queryFn: getMe,
+    enabled: isAdminPortal,
+    staleTime: 60 * 1000,
+  });
+
   // Sync partners into store and pick default
   useEffect(() => {
     if (!partnersData) return;
@@ -379,9 +389,12 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
   // Resolve display name + email
   const memberProfile: any = (memberProfileData as any)?.data;
   const partnerProfile: any = (partnerProfileData as any)?.data;
+  const meProfile: any = (meData as any)?.data;
 
   let displayName = label;
   let displayEmail = "";
+  let adminRoles: string[] = [];
+  let isSuperadminUser = false;
 
   if (isMember && memberProfile) {
     displayName = memberProfile.name || memberProfile.email || label;
@@ -389,6 +402,11 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
   } else if (isPartner && partnerProfile) {
     displayName = partnerProfile.name || partnerProfile.user?.name || label;
     displayEmail = partnerProfile.email || partnerProfile.user?.email || "";
+  } else if (isAdminPortal && meProfile) {
+    displayName = meProfile.name || meProfile.email || label;
+    displayEmail = meProfile.email || "";
+    adminRoles = meProfile.roles ?? [];
+    isSuperadminUser = !!meProfile.is_superadmin;
   }
 
   const initial = displayName.charAt(0).toUpperCase();
@@ -411,6 +429,9 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
     setProfileOpen(false);
     try { if (accessToken) await logout(accessToken); } catch {}
     clearAuth();
+    // Wipe every cached query (roles, permissions, lists, etc.) — otherwise the next
+    // person to log in on this browser/tab can be served the previous user's stale data.
+    queryClient.clear();
     toast.info("Signed out");
     router.push("/login");
   };
@@ -497,10 +518,33 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
                     {displayEmail}
                   </DropEmail>
                 )}
-                <RoleBadge>
-                  <Shield size={10} />
-                  {label}
-                </RoleBadge>
+                {isAdminPortal ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
+                    {isSuperadminUser ? (
+                      <RoleBadge>
+                        <Shield size={10} />
+                        Super Admin — full access
+                      </RoleBadge>
+                    ) : adminRoles.length > 0 ? (
+                      adminRoles.map((r) => (
+                        <RoleBadge key={r}>
+                          <Shield size={10} />
+                          {r}
+                        </RoleBadge>
+                      ))
+                    ) : (
+                      <RoleBadge>
+                        <Shield size={10} />
+                        No role assigned
+                      </RoleBadge>
+                    )}
+                  </div>
+                ) : (
+                  <RoleBadge>
+                    <Shield size={10} />
+                    {label}
+                  </RoleBadge>
+                )}
               </DropHeader>
 
               <DropItem className="danger" onClick={handleLogout}>
