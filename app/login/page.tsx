@@ -10,7 +10,7 @@ import { sendOtp, verifyOtp } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
 import { useAuthStore } from "@/stores/AuthStore";
 import { toast } from "react-toastify";
-import { Mail, ArrowLeft, Sparkles, CheckCircle2, Shield, Activity, Headphones } from "lucide-react";
+import { Mail, ArrowLeft, Sparkles, CheckCircle2, Shield, Activity, Headphones, Eye, EyeOff } from "lucide-react";
 
 // ─── Animations ───────────────────────────────────────────────────────────────
 
@@ -360,12 +360,14 @@ const InputWrap = styled.div`
 `;
 
 const OtpInputWrap = styled.div`
+  position: relative;
+
   .p-inputtext {
     width: 100%;
     font-family: 'IBM Plex Mono', ui-monospace, monospace !important;
-    font-size: 2rem !important; font-weight: 700 !important;
-    letter-spacing: 0.45em !important; text-align: center !important;
-    padding: 14px !important; border-radius: 12px !important;
+    font-size: clamp(1.25rem, 6vw, 2rem) !important; font-weight: 700 !important;
+    letter-spacing: clamp(0.2em, 4vw, 0.45em) !important; text-align: center !important;
+    padding: 14px 44px !important; border-radius: 12px !important;
     border: 2px solid #e2e8f0 !important; color: #0f172a !important;
     background: #f8fafc !important;
     &:focus, &:enabled:focus {
@@ -373,6 +375,28 @@ const OtpInputWrap = styled.div`
       box-shadow: 0 0 0 3px rgba(109,40,217,0.1) !important;
       background: #fff !important;
     }
+  }
+`;
+
+const OtpToggleBtn = styled.button`
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 8px;
+  transition: color 0.15s, background 0.15s;
+
+  &:hover {
+    color: #6d28d9;
+    background: #f5f3ff;
   }
 `;
 
@@ -476,6 +500,7 @@ export default function LoginPage() {
   const [step, setStep]       = useState<"email" | "otp">("email");
   const [email, setEmail]     = useState("");
   const [otp, setOtp]         = useState("");
+  const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [devOtp, setDevOtp]   = useState<string | null>(null);
 
@@ -672,12 +697,23 @@ export default function LoginPage() {
                 <OtpInputWrap>
                   <InputText
                     id="ec-otp" value={otp}
+                    type={showOtp ? "text" : "password"}
                     onChange={e => setOtp(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && handleVerifyOtp()}
                     placeholder="······"
                     maxLength={6}
                     keyfilter="int"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
                   />
+                  <OtpToggleBtn
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowOtp(v => !v)}
+                    title={showOtp ? "Hide OTP" : "Show OTP"}
+                  >
+                    {showOtp ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </OtpToggleBtn>
                 </OtpInputWrap>
               </FieldGroup>
 
