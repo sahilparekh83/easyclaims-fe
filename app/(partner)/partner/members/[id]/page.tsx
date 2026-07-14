@@ -384,7 +384,7 @@ async function downloadPdf(memberId: string, policyId: string, fileName?: string
   }
 }
 
-const TABS = ["Profile", "Family", "History"] as const;
+const TABS = ["Profile", "Policies", "Family", "History"] as const;
 type TabKey = (typeof TABS)[number];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

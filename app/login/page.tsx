@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import styled, { keyframes } from "styled-components";
 import { InputText } from "primereact/inputtext";
 import Image from "next/image";
+import Cookies from "js-cookie";
 import { useQueryClient } from "@tanstack/react-query";
 import { sendOtp, verifyOtp } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
 import { useAuthStore } from "@/stores/AuthStore";
-import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { Mail, ArrowLeft, Sparkles, CheckCircle2, Shield, Activity, Headphones } from "lucide-react";
 
@@ -480,7 +480,24 @@ export default function LoginPage() {
   const [devOtp, setDevOtp]   = useState<string | null>(null);
 
   const { setAuth } = useAuthStore();
-  const router = useRouter();
+
+  // Already logged in (e.g. opened /login directly with a valid session)?
+  // Bounce to the right dashboard — this used to be middleware's job, but
+  // middleware's cookie visibility isn't reliable on this host, so it's
+  // handled client-side here instead (see hooks/useAuthGuard.ts).
+  useEffect(() => {
+    const userType = Cookies.get("ec_user_type");
+    if (!userType) return;
+    const nextPath = getNextPath();
+    const allowedNext =
+      nextPath &&
+      (((userType === "SUPERADMIN" || userType === "ADMIN") && nextPath.startsWith("/admin")) ||
+       (userType === "PARTNER"    && nextPath.startsWith("/partner")) ||
+       (userType === "MEMBER"     && (nextPath.startsWith("/member") || nextPath === "/upload")))
+        ? nextPath : null;
+    window.location.href = allowedNext || REDIRECT[userType] || "/member/dashboard";
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const getNextPath = () => {
     if (typeof window === "undefined") return null;
@@ -523,7 +540,7 @@ export default function LoginPage() {
          (userType === "PARTNER"    && nextPath.startsWith("/partner")) ||
          (userType === "MEMBER"     && (nextPath.startsWith("/member") || nextPath === "/upload")))
           ? nextPath : null;
-      router.push(allowedNext || REDIRECT[userType] || "/member/dashboard");
+      window.location.href = allowedNext || REDIRECT[userType] || "/member/dashboard";
     } catch (err: unknown) {
       toast.error(getApiError(err, "Invalid or expired OTP"));
     } finally { setLoading(false); }

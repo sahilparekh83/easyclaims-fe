@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { Suspense, useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "primereact/button";
@@ -567,6 +567,14 @@ const STATUS_LABELS_MAP: Record<string, string> = {
 };
 
 export default function PoliciesPage() {
+  return (
+    <Suspense fallback={null}>
+      <PoliciesPageContent />
+    </Suspense>
+  );
+}
+
+function PoliciesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const statusFilter = searchParams.get("status") ?? "";

@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "source": ".",
+    "frameworksBackend": {
+      "region": "asia-south1"
+    },
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "run": {
+          "serviceId": "easyclaims-backend",
+          "region": "asia-south1"
+        }
+      }
+    ]
+  }
+}

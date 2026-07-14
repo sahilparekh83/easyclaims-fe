@@ -6,8 +6,10 @@ import { useQuery } from "@tanstack/react-query";
 import AppShell from "@/components/layout/AppShell";
 import { adminListNotifications, getMe } from "@/imports/core/api";
 import { useAuthStore } from "@/stores/AuthStore";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  useAuthGuard("/admin");
   const router = useRouter();
   const setPermissions = useAuthStore((s) => s.setPermissions);
 

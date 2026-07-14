@@ -5,8 +5,10 @@ import AppShell from "@/components/layout/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import { memberListNotifications } from "@/imports/core/api";
 import { useRouter } from "next/navigation";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 export default function MemberLayout({ children }: { children: React.ReactNode }) {
+  useAuthGuard("/member");
   const router = useRouter();
 
   const { data } = useQuery({

@@ -14,8 +14,11 @@ export interface LinkedMember { id: string; name: string; relation: string; }
 export interface PolicyRow {
   id: string;
   policy_number?: string | null;
+  member_id?: string | null;
   member_name?: string | null;
   member_email?: string | null;
+  partner_id?: string | null;
+  partner_name?: string | null;
   policy_type?: string | null;
   insurer?: string | null;
   sum_insured?: number | null;

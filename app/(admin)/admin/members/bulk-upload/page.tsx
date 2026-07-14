@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "primereact/button";
@@ -173,6 +173,14 @@ interface UploadResult {
 }
 
 export default function BulkUploadPage() {
+  return (
+    <Suspense fallback={null}>
+      <BulkUploadContent />
+    </Suspense>
+  );
+}
+
+function BulkUploadContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const fileRef = useRef<HTMLInputElement>(null);

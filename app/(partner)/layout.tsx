@@ -5,6 +5,7 @@ import AppShell from "@/components/layout/AppShell";
 import { useQuery } from "@tanstack/react-query";
 import { partnerListNotifications } from "@/imports/core/api";
 import { useRouter, usePathname } from "next/navigation";
+import { useAuthGuard } from "@/hooks/useAuthGuard";
 
 function deriveTitle(pathname: string): string {
   const segments = pathname.split("/").filter(Boolean);
@@ -14,6 +15,7 @@ function deriveTitle(pathname: string): string {
 }
 
 export default function PartnerLayout({ children }: { children: React.ReactNode }) {
+  useAuthGuard("/partner");
   const router = useRouter();
   const pathname = usePathname();
 
