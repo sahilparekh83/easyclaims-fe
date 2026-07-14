@@ -365,10 +365,10 @@ const OtpInputWrap = styled.div`
   .p-inputtext {
     width: 100%;
     font-family: 'IBM Plex Mono', ui-monospace, monospace !important;
-    font-size: clamp(1.25rem, 6vw, 2rem) !important; font-weight: 700 !important;
-    letter-spacing: clamp(0.2em, 4vw, 0.45em) !important; text-align: center !important;
-    padding: 14px 44px !important; border-radius: 12px !important;
-    border: 2px solid #e2e8f0 !important; color: #0f172a !important;
+    font-size: clamp(1rem, 4.5vw, 1.375rem) !important; font-weight: 700 !important;
+    letter-spacing: clamp(0.15em, 3vw, 0.3em) !important; text-align: center !important;
+    padding: 11px 40px !important; border-radius: 10px !important;
+    border: 1.5px solid #e2e8f0 !important; color: #0f172a !important;
     background: #f8fafc !important;
     &:focus, &:enabled:focus {
       border-color: #6d28d9 !important;
@@ -381,7 +381,7 @@ const OtpInputWrap = styled.div`
 const OtpToggleBtn = styled.button`
   position: absolute;
   top: 50%;
-  right: 10px;
+  right: 8px;
   transform: translateY(-50%);
   background: none;
   border: none;
@@ -390,8 +390,8 @@ const OtpToggleBtn = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 6px;
-  border-radius: 8px;
+  padding: 5px;
+  border-radius: 7px;
   transition: color 0.15s, background 0.15s;
 
   &:hover {
@@ -712,7 +712,7 @@ export default function LoginPage() {
                     onClick={() => setShowOtp(v => !v)}
                     title={showOtp ? "Hide OTP" : "Show OTP"}
                   >
-                    {showOtp ? <EyeOff size={18} /> : <Eye size={18} />}
+                    {showOtp ? <EyeOff size={16} /> : <Eye size={16} />}
                   </OtpToggleBtn>
                 </OtpInputWrap>
               </FieldGroup>
