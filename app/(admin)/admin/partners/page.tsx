@@ -1083,19 +1083,24 @@ export default function PartnersPage() {
           {/* Section: Plans */}
           <SectionDivider>Membership Plans</SectionDivider>
           <FormField style={{ gridColumn: "1 / -1" }}>
-            <Lbl>Assign Plans <span style={{ color: "#9ca3af", fontWeight: 400 }}>(select at least one)</span></Lbl>
+            <Lbl>Assign Plans <Required>*</Required></Lbl>
             <Controller
               name="plan_ids"
               control={createForm.control}
-              render={({ field }) => (
-                <MultiSelect
-                  value={field.value ?? []}
-                  onChange={e => field.onChange(e.value)}
-                  options={planOptions}
-                  placeholder="Select plans to assign to this partner"
-                  filter
-                  style={{ width: "100%" }}
-                />
+              rules={{ validate: (value) => (value && value.length > 0) || "Select at least one plan" }}
+              render={({ field, fieldState }) => (
+                <>
+                  <MultiSelect
+                    value={field.value ?? []}
+                    onChange={e => field.onChange(e.value)}
+                    options={planOptions}
+                    placeholder="Select plans to assign to this partner"
+                    filter
+                    invalid={!!fieldState.error}
+                    style={{ width: "100%" }}
+                  />
+                  {fieldState.error && <Err>{fieldState.error.message}</Err>}
+                </>
               )}
             />
           </FormField>

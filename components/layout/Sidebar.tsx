@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
   BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet, Ticket, HelpCircle,
-  KeyRound, UserCog,
+  KeyRound, UserCog, Headphones,
 } from "lucide-react";
 import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
 import { useAuthStore } from "@/stores/AuthStore";
@@ -29,6 +29,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} />, moduleKey: "members" },
   { label: "Tickets",        href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets", moduleKey: "tickets" },
   { label: "Claim Tickets",  href: "/admin/claim-tickets",   icon: <FileText size={18} />, moduleKey: "claims" },
+  { label: "Claim Agents",   href: "/admin/claim-agents",    icon: <Headphones size={18} />, moduleKey: "claims" },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, moduleKey: "policies" },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} />, moduleKey: "dashboard" },
   { label: "Finance",        href: "/admin/finance",         icon: <Wallet size={18} />, moduleKey: "finance" },
@@ -68,7 +69,8 @@ const NAV_MAP: Record<string, NavItem[]> = { admin: ADMIN_NAV, partner: PARTNER_
 
 const Wrap = styled.aside`
   width: 256px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: #0a2a57;
   display: flex;
   flex-direction: column;

@@ -190,6 +190,9 @@ export const adminUploadPolicy = (formData: FormData) =>
 // ─────────────────────────────────────────────
 // ADMIN — POLICY TYPES
 // ─────────────────────────────────────────────
+export const adminListPolicyTypes = () =>
+  apiClient.get("/admin/policy-types").then((r) => r.data);
+
 export const adminCreatePolicyType = (data: object) =>
   apiClient.post("/admin/policy-types", data).then((r) => r.data);
 
@@ -197,11 +200,19 @@ export const adminUpdatePolicyType = (id: string, data: object) =>
   apiClient.patch(`/admin/policy-types/${id}`, data).then((r) => r.data);
 
 export const adminTogglePolicyType = (id: string, is_active: boolean) =>
-  apiClient.patch(`/admin/policy-types/${id}/toggle`, { is_active }).then((r) => r.data);
+  apiClient
+    .patch(`/admin/policy-types/${id}/${is_active ? "activate" : "deactivate"}`, {})
+    .then((r) => r.data);
+
+export const adminDeletePolicyType = (id: string) =>
+  apiClient.delete(`/admin/policy-types/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — PARTNER TYPES
 // ─────────────────────────────────────────────
+export const adminListPartnerTypes = () =>
+  apiClient.get("/admin/partner-types").then((r) => r.data);
+
 export const adminCreatePartnerType = (data: object) =>
   apiClient.post("/admin/partner-types", data).then((r) => r.data);
 
@@ -212,6 +223,9 @@ export const adminTogglePartnerType = (id: string, is_active: boolean) =>
   apiClient
     .patch(`/admin/partner-types/${id}/${is_active ? "activate" : "deactivate"}`, {})
     .then((r) => r.data);
+
+export const adminDeletePartnerType = (id: string) =>
+  apiClient.delete(`/admin/partner-types/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — NOTIFICATIONS
@@ -679,6 +693,12 @@ export const adminGetClaim = (id: string) =>
 
 export const adminListClaimAgents = () =>
   apiClient.get("/admin/claims/agents").then((r) => r.data);
+
+export const adminListClaimAgentsOverview = (params?: { skip?: number; limit?: number; active_only?: boolean }) =>
+  apiClient.get("/admin/claims/agents/overview", { params }).then((r) => r.data);
+
+export const adminGetClaimAgentOverview = (id: string) =>
+  apiClient.get(`/admin/claims/agents/overview/${id}`).then((r) => r.data);
 
 export const adminUpdateClaimStatus = (id: string, status: string, remark?: string) =>
   apiClient.patch(`/admin/claims/${id}/status`, { status, remark }).then((r) => r.data);

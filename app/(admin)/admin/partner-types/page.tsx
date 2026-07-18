@@ -12,11 +12,13 @@ import { toast } from "react-toastify";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
-  listPartnerTypes,
+  adminListPartnerTypes,
   adminCreatePartnerType,
   adminUpdatePartnerType,
   adminTogglePartnerType,
+  adminDeletePartnerType,
 } from "@/imports/core/api";
+import { getApiError } from "@/imports/core/errors";
 
 interface PartnerType {
   id: string;
@@ -24,6 +26,8 @@ interface PartnerType {
   code: string;
   description?: string;
   is_active: boolean;
+  linked_count?: number | null;
+  can_delete?: boolean | null;
 }
 
 interface PartnerTypeFormValues {
@@ -39,8 +43,8 @@ export default function PartnerTypesPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["partner-types"],
-    queryFn: () => listPartnerTypes(),
+    queryKey: ["admin-partner-types"],
+    queryFn: () => adminListPartnerTypes(),
   });
 
   const items: PartnerType[] = data?.data ?? [];
@@ -57,7 +61,7 @@ export default function PartnerTypesPage() {
   const createMutation = useMutation({
     mutationFn: (values: PartnerTypeFormValues) => adminCreatePartnerType(values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["partner-types"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-partner-types"] });
       toast.success("Partner type created successfully");
       setDialogOpen(false);
       reset();
@@ -71,7 +75,7 @@ export default function PartnerTypesPage() {
     mutationFn: ({ id, values }: { id: string; values: PartnerTypeFormValues }) =>
       adminUpdatePartnerType(id, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["partner-types"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-partner-types"] });
       toast.success("Partner type updated successfully");
       setDialogOpen(false);
       reset();
@@ -86,7 +90,7 @@ export default function PartnerTypesPage() {
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       adminTogglePartnerType(id, is_active),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["partner-types"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-partner-types"] });
       toast.success("Partner type status updated");
       setTogglingId(null);
     },
@@ -94,6 +98,15 @@ export default function PartnerTypesPage() {
       toast.error("Failed to update status");
       setTogglingId(null);
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminDeletePartnerType(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-partner-types"] });
+      toast.success("Partner type permanently deleted");
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to delete partner type")),
   });
 
   const openCreate = () => {
@@ -121,27 +134,51 @@ export default function PartnerTypesPage() {
     toggleMutation.mutate({ id: item.id, is_active: !item.is_active });
   };
 
-  const actionsBody = (row: PartnerType) => (
-    <div style={{ display: "flex", gap: "0.5rem" }}>
-      <Button
-        label="Edit"
-        size="small"
-        severity="secondary"
-        onClick={() => openEdit(row)}
-      />
-      <Button
-        label={row.is_active ? "Deactivate" : "Activate"}
-        size="small"
-        severity={row.is_active ? "warning" : "success"}
-        onClick={() => handleToggle(row)}
-        loading={togglingId === row.id}
-      />
-    </div>
-  );
+  const handleDelete = (item: PartnerType) => {
+    if (window.confirm(`Permanently delete "${item.name}"? This cannot be undone.`)) {
+      deleteMutation.mutate(item.id);
+    }
+  };
+
+  const actionsBody = (row: PartnerType) => {
+    const isLinked = (row.linked_count ?? 0) > 0;
+    return (
+      <div style={{ display: "flex", gap: "0.5rem" }}>
+        <Button
+          label="Edit"
+          size="small"
+          severity="secondary"
+          onClick={() => openEdit(row)}
+        />
+        <Button
+          label={row.is_active ? "Deactivate" : "Activate"}
+          size="small"
+          severity={row.is_active ? "warning" : "success"}
+          onClick={() => handleToggle(row)}
+          loading={togglingId === row.id}
+        />
+        <Button
+          label="Delete"
+          size="small"
+          severity="danger"
+          disabled={isLinked}
+          title={isLinked
+            ? `Cannot delete — ${row.linked_count} partner${row.linked_count === 1 ? "" : "s"} linked to this type`
+            : "Delete partner type permanently"}
+          onClick={() => handleDelete(row)}
+          loading={deleteMutation.isPending && deleteMutation.variables === row.id}
+        />
+      </div>
+    );
+  };
 
   const isActiveBody = (row: PartnerType) => (
     <StatusBadge value={row.is_active} trueLabel="Active" falseLabel="Inactive" />
   );
+
+  const linkedBody = (row: PartnerType) => (row.linked_count ?? 0) > 0
+    ? `${row.linked_count} partner${row.linked_count === 1 ? "" : "s"}`
+    : "None";
 
   const isMutating = createMutation.isPending || updateMutation.isPending;
 
@@ -167,6 +204,7 @@ export default function PartnerTypesPage() {
         <Column field="code" header="Code" sortable />
         <Column field="description" header="Description" />
         <Column header="Is Active" body={isActiveBody} />
+        <Column header="Linked" body={linkedBody} />
         <Column header="Actions" body={actionsBody} />
       </DataTable>
 

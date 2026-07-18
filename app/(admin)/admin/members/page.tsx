@@ -9,6 +9,7 @@ import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
+import { Calendar } from "primereact/calendar";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
@@ -153,6 +154,8 @@ const PlanBadge = styled.span`
   border-radius: 999px; padding: 3px 10px;
   white-space: nowrap;
 `;
+
+const Required = styled.span`color: #dc2626;`;
 
 const JoinedCell = styled.div`
   display: inline-flex; align-items: center; gap: 10px;
@@ -463,7 +466,7 @@ export default function MembersPage() {
           {/* ── Basic info ── */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <Field>
-              <FieldLabel htmlFor="m-name">Full Name *</FieldLabel>
+              <FieldLabel htmlFor="m-name">Full Name <Required>*</Required></FieldLabel>
               <Controller name="name" control={form.control} rules={{ required: "Name is required" }}
                 render={({ field, fieldState }) => (
                   <><InputText id="m-name" {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
@@ -471,7 +474,7 @@ export default function MembersPage() {
                 )} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="m-email">Email *</FieldLabel>
+              <FieldLabel htmlFor="m-email">Email <Required>*</Required></FieldLabel>
               <Controller name="email" control={form.control} rules={{ required: "Email is required", pattern: { value: /^\S+@\S+\.\S+$/, message: "Invalid email" } }}
                 render={({ field, fieldState }) => (
                   <><InputText id="m-email" type="email" {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
@@ -479,7 +482,7 @@ export default function MembersPage() {
                 )} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="m-mobile">Mobile No. *</FieldLabel>
+              <FieldLabel htmlFor="m-mobile">Mobile No. <Required>*</Required></FieldLabel>
               <Controller name="mobile_no" control={form.control} rules={{ required: "Mobile is required", pattern: { value: /^\+?[\d\s\-()]{7,15}$/, message: "Invalid mobile (7–15 digits)" } }}
                 render={({ field, fieldState }) => (
                   <><InputText id="m-mobile" {...field} placeholder="+91 98765 43210" invalid={!!fieldState.error} style={{ width: "100%" }} />
@@ -487,7 +490,7 @@ export default function MembersPage() {
                 )} />
             </Field>
             <Field>
-              <FieldLabel>Gender *</FieldLabel>
+              <FieldLabel>Gender <Required>*</Required></FieldLabel>
               <Controller name="gender" control={form.control} rules={{ required: "Gender is required" }}
                 render={({ field, fieldState }) => (
                   <><Dropdown value={field.value} options={GENDER_OPTIONS} onChange={e => field.onChange(e.value)} placeholder="Select gender" style={{ width: "100%" }} invalid={!!fieldState.error} />
@@ -501,7 +504,7 @@ export default function MembersPage() {
             <FieldLabel style={{ fontSize: "0.72rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Address</FieldLabel>
           </div>
           <Field>
-            <FieldLabel htmlFor="m-addr">Address Line *</FieldLabel>
+            <FieldLabel htmlFor="m-addr">Address Line <Required>*</Required></FieldLabel>
             <Controller name="address_line" control={form.control} rules={{ required: "Address is required" }}
               render={({ field, fieldState }) => (
                 <><InputText id="m-addr" {...field} style={{ width: "100%" }} invalid={!!fieldState.error} />
@@ -510,7 +513,7 @@ export default function MembersPage() {
           </Field>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
             <Field>
-              <FieldLabel>City *</FieldLabel>
+              <FieldLabel>City <Required>*</Required></FieldLabel>
               <Controller name="address_city" control={form.control} rules={{ required: "City is required" }}
                 render={({ field, fieldState }) => (
                   <><InputText {...field} style={{ width: "100%" }} invalid={!!fieldState.error} />
@@ -518,7 +521,7 @@ export default function MembersPage() {
                 )} />
             </Field>
             <Field>
-              <FieldLabel>State *</FieldLabel>
+              <FieldLabel>State <Required>*</Required></FieldLabel>
               <Controller name="address_state" control={form.control} rules={{ required: "State is required" }}
                 render={({ field, fieldState }) => (
                   <><InputText {...field} style={{ width: "100%" }} invalid={!!fieldState.error} />
@@ -526,7 +529,7 @@ export default function MembersPage() {
                 )} />
             </Field>
             <Field>
-              <FieldLabel>PIN Code *</FieldLabel>
+              <FieldLabel>PIN Code <Required>*</Required></FieldLabel>
               <Controller name="address_pin" control={form.control} rules={{ required: "PIN is required", pattern: { value: /^\d{6}$/, message: "6-digit PIN" } }}
                 render={({ field, fieldState }) => (
                   <><InputText {...field} placeholder="400001" maxLength={6} style={{ width: "100%" }} invalid={!!fieldState.error} />
@@ -543,7 +546,12 @@ export default function MembersPage() {
             <Field>
               <FieldLabel>Sale Date</FieldLabel>
               <Controller name="sale_date" control={form.control}
-                render={({ field }) => <InputText {...field} placeholder="YYYY-MM-DD" style={{ width: "100%" }} />} />
+                render={({ field }) => (
+                  <Calendar value={field.value ? new Date(field.value) : null}
+                    onChange={e => { const v = e.value; field.onChange(v instanceof Date ? dayjs(v).format("YYYY-MM-DD") : ""); }}
+                    dateFormat="dd M yy" showIcon style={{ width: "100%" }} inputStyle={{ width: "100%" }}
+                    placeholder="Select date" maxDate={new Date()} />
+                )} />
             </Field>
             <Field>
               <FieldLabel>Sales Channel</FieldLabel>
