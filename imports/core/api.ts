@@ -630,13 +630,19 @@ export const partnerGetMemberEnrollmentHistory = (memberId: string) =>
 export const adminUpdateMember = (id: string, data: object) =>
   apiClient.patch(`/admin/members/${id}`, data).then((r) => r.data);
 
-export const adminBulkUploadMembers = (file: File, partnerId: string, planId?: string) => {
+export const adminBulkUploadMembers = (file: File, partnerId?: string, planId?: string) => {
   const form = new FormData();
   form.append("file", file);
-  form.append("partner_id", partnerId);
+  if (partnerId) form.append("partner_id", partnerId);
   if (planId) form.append("plan_id", planId);
   return apiClient.post("/admin/members/bulk-upload", form).then((r) => r.data);
 };
+
+export const adminDownloadMemberBulkSampleMulti = (partnerIds: string[]): Promise<Blob> =>
+  apiClient.get("/admin/members/bulk-upload/sample", {
+    params: { partner_ids: partnerIds.join(",") },
+    responseType: "blob",
+  }).then((r) => r.data);
 
 export async function adminBulkUploadPartners(file: File) {
   const form = new FormData();

@@ -4,11 +4,11 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "primereact/button";
-import { Dropdown } from "primereact/dropdown";
+import { MultiSelect } from "primereact/multiselect";
 import { ChevronLeft, Upload, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
 import { toast } from "react-toastify";
 import styled from "styled-components";
-import { adminListPartners, adminBulkUploadMembers, adminDownloadMemberBulkSample } from "@/imports/core/api";
+import { adminListPartners, adminBulkUploadMembers, adminDownloadMemberBulkSampleMulti } from "@/imports/core/api";
 
 function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -185,14 +185,17 @@ function BulkUploadContent() {
   const searchParams = useSearchParams();
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [partnerId, setPartnerId] = useState<string>("");
+  const [partnerIds, setPartnerIds] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [result, setResult] = useState<UploadResult | null>(null);
   const [downloadingSample, setDownloadingSample] = useState(false);
 
   const { data: partnersData } = useQuery({
-    queryKey: ["admin", "partners", "list"],
-    queryFn: () => adminListPartners({ skip: 0, limit: 200 }),
+    queryKey: ["admin", "partners", "list", "active"],
+    queryFn: () => adminListPartners({
+      skip: 0, limit: 200,
+      filters: [{ field: "status", operator: "equals", value: "Active" }],
+    }),
   });
 
   const partners = (partnersData?.data?.data ?? []).map((p: any) => ({
@@ -203,14 +206,14 @@ function BulkUploadContent() {
   // Pre-select partner from URL query param
   useEffect(() => {
     const pid = searchParams.get("partner_id");
-    if (pid && !partnerId) setPartnerId(pid);
+    if (pid && partnerIds.length === 0) setPartnerIds([pid]);
   }, [searchParams, partnersData]);
 
   const handleDownloadSample = async () => {
-    if (!partnerId) return;
+    if (partnerIds.length === 0) return;
     setDownloadingSample(true);
     try {
-      const blob = await adminDownloadMemberBulkSample(partnerId);
+      const blob = await adminDownloadMemberBulkSampleMulti(partnerIds);
       triggerDownload(blob, "member_upload_sample.xlsx");
     } catch {
       toast.error("Failed to download sample file");
@@ -220,7 +223,10 @@ function BulkUploadContent() {
   };
 
   const uploadMutation = useMutation({
-    mutationFn: () => adminBulkUploadMembers(selectedFile!, partnerId),
+    // A single selected partner is passed as a fallback for sheets that omit
+    // the Partner Code column; with multiple partners selected, every row
+    // must carry its own Partner Code instead.
+    mutationFn: () => adminBulkUploadMembers(selectedFile!, partnerIds.length === 1 ? partnerIds[0] : undefined),
     onSuccess: (res) => {
       setResult(res.data);
       toast.success(`Upload complete: ${res.data.created?.length ?? 0} members created`);
@@ -248,7 +254,7 @@ function BulkUploadContent() {
     if (file) handleFileSelect(file);
   };
 
-  const canUpload = !!selectedFile && !!partnerId && !uploadMutation.isPending;
+  const canUpload = !!selectedFile && partnerIds.length > 0 && !uploadMutation.isPending;
 
   return (
     <div style={{ maxWidth: "860px" }}>
@@ -266,8 +272,8 @@ function BulkUploadContent() {
           outlined
           severity="secondary"
           loading={downloadingSample}
-          disabled={!partnerId || downloadingSample}
-          title={!partnerId ? "Select a partner first" : "Includes this partner's plans (name + Plan Code)"}
+          disabled={partnerIds.length === 0 || downloadingSample}
+          title={partnerIds.length === 0 ? "Select at least one partner first" : "Includes the selected partners' plans (partner name + code, plan name + code)"}
           onClick={handleDownloadSample}
           style={{ fontSize: 12 }}
         />
@@ -279,16 +285,21 @@ function BulkUploadContent() {
 
         <FormRow style={{ gridTemplateColumns: "1fr" }}>
           <Field>
-            <FieldLabel>Partner <span style={{ color: "#ef4444" }}>*</span></FieldLabel>
-            <Dropdown
+            <FieldLabel>Partner(s) <span style={{ color: "#ef4444" }}>*</span></FieldLabel>
+            <MultiSelect
               inputId="admin-member-bulk-partner-select"
-              value={partnerId}
+              value={partnerIds}
               options={partners}
-              onChange={(e) => setPartnerId(e.value)}
-              placeholder="Select partner"
+              onChange={(e) => setPartnerIds(e.value)}
+              placeholder="Select one or more active partners"
               filter
+              display="chip"
               style={{ width: "100%" }}
             />
+            <div style={{ fontSize: 11.5, color: "#9ca3af", marginTop: 2 }}>
+              Only Active partners are shown. Selecting more than one lets the sample/upload span
+              members for multiple partners in a single file, using the Partner Code column below.
+            </div>
           </Field>
         </FormRow>
 
@@ -337,7 +348,7 @@ function BulkUploadContent() {
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
             {[
-              "Primary Member Full Name", "Primary Mobile No.", "Primary Email ID", "Plan Code",
+              "Primary Member Full Name", "Primary Mobile No.", "Primary Email ID", "Partner Code", "Plan Code",
             ].map(c => (
               <span key={c} style={{ fontSize: 11.5, padding: "2px 8px", borderRadius: 6, background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", fontWeight: 600 }}>
                 {c}
@@ -351,9 +362,11 @@ function BulkUploadContent() {
             ))}
           </div>
           <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 8 }}>
-            Every row must set its own <strong>Plan Code</strong> — one member, one plan. Select a partner and
-            download the sample above; it includes a <strong>Partner Plans</strong> tab listing that partner's
-            plan names and codes to copy from.
+            Every row must set its own <strong>Partner Code</strong> and <strong>Plan Code</strong> — one member,
+            one partner, one plan. The partner must be Active. Select the partner(s) above and download the sample;
+            it includes a <strong>Partner Plans</strong> tab listing each selected partner's name, code, and
+            active plan names/codes to copy from. (If you select exactly one partner and your sheet has no
+            Partner Code column, that partner is used as a fallback for the whole file.)
           </div>
         </div>
 

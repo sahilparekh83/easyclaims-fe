@@ -277,8 +277,11 @@ export default function MembersPage() {
   const selectedPartnerId = useWatch({ control: form.control, name: "partner_id" });
 
   const { data: partnersData } = useQuery({
-    queryKey: ["admin", "partners", "select"],
-    queryFn: () => adminListPartners({ limit: 200, skip: 0 }),
+    queryKey: ["admin", "partners", "select", "active"],
+    queryFn: () => adminListPartners({
+      limit: 200, skip: 0,
+      filters: [{ field: "status", operator: "equals", value: "Active" }],
+    }),
     enabled: createOpen,
   });
 

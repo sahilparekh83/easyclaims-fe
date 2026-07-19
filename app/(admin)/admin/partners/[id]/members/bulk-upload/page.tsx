@@ -31,6 +31,10 @@ export default function AdminMemberBulkUploadPage() {
     (partnerRes as any)?.data?.legal_company_name ||
     (partnerRes as any)?.data?.name ||
     "";
+  const partnerStatus = (partnerRes as any)?.data?.status;
+  const disabledReason = partnerStatus && partnerStatus !== "Active"
+    ? `This partner is ${partnerStatus} — bulk upload is disabled.`
+    : null;
 
   const planOptions = ((plansRes as any)?.data ?? [])
     .filter((p: any) => p.linked && p.status === "Active")
@@ -45,6 +49,7 @@ export default function AdminMemberBulkUploadPage() {
       noPlansMessage="No active plans linked to this partner. Go to the Plans tab to assign plans first."
       planOptions={planOptions}
       planCodeMode
+      disabledReason={disabledReason}
       onBack={() => router.push(`/admin/partners/${id}`)}
       uploadFn={(file) => adminBulkUploadMembersToPartner(id, file)}
       downloadSampleFn={() => adminDownloadMemberBulkSample(id)}

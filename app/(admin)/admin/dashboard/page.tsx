@@ -450,27 +450,33 @@ export default function DashboardPage() {
 
   return (
     <Page>
-      {/* ── KPI Row 1 ─────────────────────────────────────────────────────── */}
-      <KpiGrid>
-        {KPIS.slice(0, 4).map(k => (
-          <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
-            <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
-            {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
-            <KpiLabel>{k.label}</KpiLabel>
-          </KpiCard>
-        ))}
-      </KpiGrid>
+      {/* Org-wide KPIs/charts are hidden for Claims Agent users — they only
+          see their own claim workload below, not business-wide metrics. */}
+      {!myAgent && (
+        <>
+          {/* ── KPI Row 1 ─────────────────────────────────────────────────── */}
+          <KpiGrid>
+            {KPIS.slice(0, 4).map(k => (
+              <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
+                <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
+                {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
+                <KpiLabel>{k.label}</KpiLabel>
+              </KpiCard>
+            ))}
+          </KpiGrid>
 
-      {/* ── KPI Row 2 — Members breakdown ─────────────────────────────────── */}
-      <KpiGrid2>
-        {KPIS.slice(4).map(k => (
-          <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
-            <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
-            {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
-            <KpiLabel>{k.label}</KpiLabel>
-          </KpiCard>
-        ))}
-      </KpiGrid2>
+          {/* ── KPI Row 2 — Members breakdown ───────────────────────────────── */}
+          <KpiGrid2>
+            {KPIS.slice(4).map(k => (
+              <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
+                <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
+                {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
+                <KpiLabel>{k.label}</KpiLabel>
+              </KpiCard>
+            ))}
+          </KpiGrid2>
+        </>
+      )}
 
       {/* ── My Claims — only shown to users holding the Claims Agent role ─── */}
       {myAgent && (
@@ -523,6 +529,8 @@ export default function DashboardPage() {
         </Card>
       )}
 
+      {!myAgent && (
+      <>
       {/* ── Members Growth — Month Tiles + Calendar Drill-down ───────────── */}
       <Card>
         <GrowthHeader>
@@ -746,6 +754,8 @@ export default function DashboardPage() {
           </ModalOverlay>
         );
       })()}
+      </>
+      )}
     </Page>
   );
 }
