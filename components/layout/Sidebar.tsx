@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
   BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet, Ticket, HelpCircle,
-  KeyRound, UserCog, MessageCircle,
+  KeyRound, UserCog, MessageCircle, Headphones,
 } from "lucide-react";
 import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
 import { useAuthStore } from "@/stores/AuthStore";
@@ -19,6 +19,9 @@ interface NavItem {
   badgeKey?: string;
   // Which permission module gates this link. Omit to always show (no backend module yet).
   moduleKey?: string;
+  // Restricts this link to SUPERADMIN regardless of moduleKey permissions —
+  // for views that manage/see across all agents/partners, not scoped to "your own".
+  superadminOnly?: boolean;
 }
 
 const ADMIN_NAV: NavItem[] = [
@@ -29,6 +32,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} />, moduleKey: "members" },
   { label: "Tickets",        href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets", moduleKey: "tickets" },
   { label: "Claim Tickets",  href: "/admin/claim-tickets",   icon: <FileText size={18} />, moduleKey: "claims" },
+  { label: "Claim Agents",   href: "/admin/claim-agents",    icon: <Headphones size={18} />, superadminOnly: true },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, moduleKey: "policies" },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} />, moduleKey: "dashboard" },
   { label: "Finance",        href: "/admin/finance",         icon: <Wallet size={18} />, moduleKey: "finance" },
@@ -69,7 +73,8 @@ const NAV_MAP: Record<string, NavItem[]> = { admin: ADMIN_NAV, partner: PARTNER_
 
 const Wrap = styled.aside`
   width: 256px;
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: #0a2a57;
   display: flex;
   flex-direction: column;
@@ -215,7 +220,10 @@ export default function Sidebar({ portal }: { portal: "admin" | "partner" | "mem
   // moduleKey (e.g. Change Requests today) are always shown. Partner/member nav
   // is unaffected — this RBAC system only covers the admin portal.
   const navItems = portal === "admin"
-    ? allNavItems.filter((item) => !item.moduleKey || isSuperadmin || permissions.includes(`${item.moduleKey}:view`))
+    ? allNavItems.filter((item) =>
+        (!item.superadminOnly || isSuperadmin) &&
+        (!item.moduleKey || isSuperadmin || permissions.includes(`${item.moduleKey}:view`))
+      )
     : allNavItems;
   const badgeCounts = useBadgeCounts(portal);
 

@@ -260,7 +260,7 @@ export default function MemberFamilyPage() {
     <PageWrap>
       <PageHeader>
         <PageTitle>Family Members</PageTitle>
-        <AccentBtn onClick={openAddDialog}>
+        <AccentBtn disabled onClick={undefined} title="Temporarily unavailable">
           <i className="pi pi-plus" style={{ fontSize: 12 }} />
           Request to add member
         </AccentBtn>

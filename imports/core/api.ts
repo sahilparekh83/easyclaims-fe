@@ -193,6 +193,9 @@ export const adminUploadPolicy = (formData: FormData) =>
 // ─────────────────────────────────────────────
 // ADMIN — POLICY TYPES
 // ─────────────────────────────────────────────
+export const adminListPolicyTypes = () =>
+  apiClient.get("/admin/policy-types").then((r) => r.data);
+
 export const adminCreatePolicyType = (data: object) =>
   apiClient.post("/admin/policy-types", data).then((r) => r.data);
 
@@ -200,11 +203,19 @@ export const adminUpdatePolicyType = (id: string, data: object) =>
   apiClient.patch(`/admin/policy-types/${id}`, data).then((r) => r.data);
 
 export const adminTogglePolicyType = (id: string, is_active: boolean) =>
-  apiClient.patch(`/admin/policy-types/${id}/toggle`, { is_active }).then((r) => r.data);
+  apiClient
+    .patch(`/admin/policy-types/${id}/${is_active ? "activate" : "deactivate"}`, {})
+    .then((r) => r.data);
+
+export const adminDeletePolicyType = (id: string) =>
+  apiClient.delete(`/admin/policy-types/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — PARTNER TYPES
 // ─────────────────────────────────────────────
+export const adminListPartnerTypes = () =>
+  apiClient.get("/admin/partner-types").then((r) => r.data);
+
 export const adminCreatePartnerType = (data: object) =>
   apiClient.post("/admin/partner-types", data).then((r) => r.data);
 
@@ -215,6 +226,9 @@ export const adminTogglePartnerType = (id: string, is_active: boolean) =>
   apiClient
     .patch(`/admin/partner-types/${id}/${is_active ? "activate" : "deactivate"}`, {})
     .then((r) => r.data);
+
+export const adminDeletePartnerType = (id: string) =>
+  apiClient.delete(`/admin/partner-types/${id}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — NOTIFICATIONS
@@ -640,13 +654,19 @@ export const partnerGetMemberEnrollmentHistory = (memberId: string) =>
 export const adminUpdateMember = (id: string, data: object) =>
   apiClient.patch(`/admin/members/${id}`, data).then((r) => r.data);
 
-export const adminBulkUploadMembers = (file: File, partnerId: string, planId?: string) => {
+export const adminBulkUploadMembers = (file: File, partnerId?: string, planId?: string) => {
   const form = new FormData();
   form.append("file", file);
-  form.append("partner_id", partnerId);
+  if (partnerId) form.append("partner_id", partnerId);
   if (planId) form.append("plan_id", planId);
   return apiClient.post("/admin/members/bulk-upload", form).then((r) => r.data);
 };
+
+export const adminDownloadMemberBulkSampleMulti = (partnerIds: string[]): Promise<Blob> =>
+  apiClient.get("/admin/members/bulk-upload/sample", {
+    params: { partner_ids: partnerIds.join(",") },
+    responseType: "blob",
+  }).then((r) => r.data);
 
 export async function adminBulkUploadPartners(file: File) {
   const form = new FormData();
@@ -703,6 +723,12 @@ export const adminGetClaim = (id: string) =>
 
 export const adminListClaimAgents = () =>
   apiClient.get("/admin/claims/agents").then((r) => r.data);
+
+export const adminListClaimAgentsOverview = (params?: { skip?: number; limit?: number; active_only?: boolean }) =>
+  apiClient.get("/admin/claims/agents/overview", { params }).then((r) => r.data);
+
+export const adminGetClaimAgentOverview = (id: string) =>
+  apiClient.get(`/admin/claims/agents/overview/${id}`).then((r) => r.data);
 
 export const adminUpdateClaimStatus = (id: string, status: string, remark?: string) =>
   apiClient.patch(`/admin/claims/${id}/status`, { status, remark }).then((r) => r.data);

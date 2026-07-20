@@ -12,6 +12,7 @@ import { Tag } from "primereact/tag";
 import { InputText } from "primereact/inputtext";
 import { InputTextarea } from "primereact/inputtextarea";
 import { Dropdown } from "primereact/dropdown";
+import { Calendar as CalendarPicker } from "primereact/calendar";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
@@ -209,6 +210,8 @@ const FieldLabel = styled.label`
 const FieldErr = styled.small`
   color: #dc2626; font-size: 0.75rem;
 `;
+
+const Required = styled.span`color: #dc2626;`;
 
 const CRStatusChip = styled.span<{ $status: string }>`
   display: inline-flex;
@@ -963,6 +966,8 @@ export default function PartnerDetailPage() {
                   label="Add Member"
                   icon="pi pi-plus"
                   size="small"
+                  disabled={partner?.status !== "Active"}
+                  title={partner?.status !== "Active" ? `This partner is ${partner?.status} — cannot add members` : undefined}
                   onClick={() => { memberForm.reset(); setAddMemberOpen(true); }}
                   style={{ fontSize: 12, height: 30 }}
                 />
@@ -972,6 +977,8 @@ export default function PartnerDetailPage() {
                   size="small"
                   severity="secondary"
                   outlined
+                  disabled={partner?.status !== "Active"}
+                  title={partner?.status !== "Active" ? `This partner is ${partner?.status} — cannot bulk upload` : undefined}
                   onClick={() => router.push(`/admin/partners/${id}/members/bulk-upload`)}
                   style={{ fontSize: 12, height: 30 }}
                 />
@@ -1428,7 +1435,7 @@ export default function PartnerDetailPage() {
           {/* Basic */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
             <Field>
-              <FieldLabel>Full Name *</FieldLabel>
+              <FieldLabel>Full Name <Required>*</Required></FieldLabel>
               <Controller name="name" control={memberForm.control} rules={{ required: "Name is required" }}
                 render={({ field, fieldState }) => (
                   <><InputText {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
@@ -1436,7 +1443,7 @@ export default function PartnerDetailPage() {
                 )} />
             </Field>
             <Field>
-              <FieldLabel>Email *</FieldLabel>
+              <FieldLabel>Email <Required>*</Required></FieldLabel>
               <Controller name="email" control={memberForm.control} rules={{ required: "Email is required", pattern: { value: /^\S+@\S+\.\S+$/, message: "Invalid email" } }}
                 render={({ field, fieldState }) => (
                   <><InputText type="email" {...field} invalid={!!fieldState.error} style={{ width: "100%" }} />
@@ -1444,7 +1451,7 @@ export default function PartnerDetailPage() {
                 )} />
             </Field>
             <Field>
-              <FieldLabel>Mobile No. *</FieldLabel>
+              <FieldLabel>Mobile No. <Required>*</Required></FieldLabel>
               <Controller name="mobile_no" control={memberForm.control} rules={{ required: "Mobile is required", pattern: { value: /^\+?[\d\s\-()]{7,15}$/, message: "Invalid mobile" } }}
                 render={({ field, fieldState }) => (
                   <><InputText {...field} placeholder="+91 98765 43210" invalid={!!fieldState.error} style={{ width: "100%" }} />
@@ -1498,7 +1505,12 @@ export default function PartnerDetailPage() {
             <Field>
               <FieldLabel>Sale Date</FieldLabel>
               <Controller name="sale_date" control={memberForm.control}
-                render={({ field }) => <InputText {...field} placeholder="YYYY-MM-DD" style={{ width: "100%" }} />} />
+                render={({ field }) => (
+                  <CalendarPicker value={field.value ? new Date(field.value) : null}
+                    onChange={e => { const v = e.value; field.onChange(v instanceof Date ? dayjs(v).format("YYYY-MM-DD") : ""); }}
+                    dateFormat="dd M yy" showIcon style={{ width: "100%" }} inputStyle={{ width: "100%" }}
+                    placeholder="Select date" maxDate={new Date()} />
+                )} />
             </Field>
             <Field>
               <FieldLabel>Sales Channel</FieldLabel>
@@ -1542,7 +1554,7 @@ export default function PartnerDetailPage() {
             <FieldLabel style={{ fontSize: "0.72rem", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.05em" }}>Enrollment</FieldLabel>
           </div>
           <Field>
-            <FieldLabel>Plan * (partner&apos;s linked plans only)</FieldLabel>
+            <FieldLabel>Plan <Required>*</Required> (partner&apos;s linked plans only)</FieldLabel>
             <Controller name="plan_id" control={memberForm.control} rules={{ required: "Plan is required" }}
               render={({ field, fieldState }) => (
                 <><Dropdown value={field.value} onChange={e => field.onChange(e.value)} options={linkedPlanOptions} placeholder="Select a plan" showClear filter invalid={!!fieldState.error} style={{ width: "100%" }} />

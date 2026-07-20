@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { DataTable } from "primereact/datatable";
 import { Column } from "primereact/column";
 import { Dropdown } from "primereact/dropdown";
@@ -47,9 +47,12 @@ const ROWS = 20;
 export default function ClaimTicketsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
   const isSuperadmin = useAuthStore(s => s.isSuperadmin);
-  const [activeTab, setActiveTab] = useState<"in_progress" | "accepted" | "rejected">("in_progress");
-  const [inProgressSubStatus, setInProgressSubStatus] = useState("");
+  const initialTab = (searchParams.get("tab") as "in_progress" | "accepted" | "rejected") || "in_progress";
+  const initialStatus = searchParams.get("status") ?? "";
+  const [activeTab, setActiveTab] = useState<"in_progress" | "accepted" | "rejected">(initialTab);
+  const [inProgressSubStatus, setInProgressSubStatus] = useState(initialStatus);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [dateRange, setDateRange] = useState<Date[] | null>(null);

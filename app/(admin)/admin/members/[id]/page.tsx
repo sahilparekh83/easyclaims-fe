@@ -616,6 +616,14 @@ export default function MemberDetailPage() {
   }
 
   const enrollment = member.enrollments?.[0];
+  const planStartDate = enrollment?.start_date ? dayjs(enrollment.start_date) : null;
+  const planEndDate = enrollment?.end_date ? dayjs(enrollment.end_date) : null;
+  const today = dayjs().startOf("day");
+  // Renew only allowed on/after the plan's expiry date — matches the backend's
+  // own "2 days out" warning threshold for what counts as near-expiry.
+  const isPlanExpired = planEndDate ? !today.isBefore(planEndDate, "day") : false;
+  const daysToExpiry = planEndDate ? planEndDate.diff(today, "day") : null;
+  const isNearExpiry = daysToExpiry !== null && daysToExpiry > 0 && daysToExpiry <= 2;
   const initials = (member.name || "M")
     .split(" ")
     .map((w: string) => w[0])
@@ -694,10 +702,31 @@ export default function MemberDetailPage() {
             )}
           </MemberMeta>
           {enrollment && (
-            <MemberId style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+            <MemberId style={{ marginTop: 2, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
               {enrollment.partner_name || "Partner"} ·{" "}
               {enrollment.plan_name || enrollment.plan_id}
               <StatusBadge value={enrollment.status} />
+              {planStartDate && planEndDate && (
+                <span style={{ color: "#9ca3af" }}>
+                  · {planStartDate.format("DD MMM YYYY")} – {planEndDate.format("DD MMM YYYY")}
+                </span>
+              )}
+              {isPlanExpired && (
+                <span style={{
+                  background: "#fee2e2", color: "#b91c1c", fontSize: 11, fontWeight: 700,
+                  borderRadius: 999, padding: "2px 9px",
+                }}>
+                  Expired
+                </span>
+              )}
+              {!isPlanExpired && isNearExpiry && (
+                <span style={{
+                  background: "#fef9c3", color: "#854d0e", fontSize: 11, fontWeight: 700,
+                  borderRadius: 999, padding: "2px 9px",
+                }}>
+                  Expiring in {daysToExpiry} day{daysToExpiry === 1 ? "" : "s"}
+                </span>
+              )}
             </MemberId>
           )}
         </HeroInfo>
@@ -718,6 +747,8 @@ export default function MemberDetailPage() {
             outlined
             size="small"
             loading={renewMutation.isPending}
+            disabled={!isPlanExpired}
+            title={isPlanExpired ? "Renew this plan" : "Renewal opens on or after the plan's expiry date"}
             onClick={() => renewMutation.mutate()}
             icon="pi pi-refresh"
           />

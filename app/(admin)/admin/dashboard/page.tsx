@@ -7,9 +7,10 @@ import { useRouter } from "next/navigation";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { adminGetDashboard, adminListMembers, adminListPlans } from "@/imports/core/api";
+import { adminGetDashboard, adminListMembers, adminListPlans, adminGetClaimAgentOverview } from "@/imports/core/api";
 import StatusBadge from "@/components/ui/StatusBadge";
-import { Users, FileText, CreditCard, ShieldCheck, Info, X, UserX, UserCheck, FileX, Calendar, ChevronDown } from "lucide-react";
+import { Users, FileText, CreditCard, ShieldCheck, Info, X, UserX, UserCheck, FileX, Calendar, ChevronDown, Headphones } from "lucide-react";
+import { useAuthStore } from "@/stores/AuthStore";
 
 // ─── Styled ────────────────────────────────────────────────────────────────────
 
@@ -409,6 +410,15 @@ export default function DashboardPage() {
     queryFn: () => adminListPlans({}),
   });
 
+  const userId = useAuthStore(s => s.userId);
+  const { data: myAgentData } = useQuery({
+    queryKey: ["admin", "my-claim-agent-overview", userId],
+    queryFn: () => adminGetClaimAgentOverview(userId!),
+    enabled: !!userId,
+    retry: false,
+  });
+  const myAgent = myAgentData?.data; // undefined (incl. on 404) if this user isn't a claims agent
+
   const d = (dash as any)?.data ?? {};
   const plans: any[] = Array.isArray(plansData?.data) ? plansData.data : [];
 
@@ -440,28 +450,87 @@ export default function DashboardPage() {
 
   return (
     <Page>
-      {/* ── KPI Row 1 ─────────────────────────────────────────────────────── */}
-      <KpiGrid>
-        {KPIS.slice(0, 4).map(k => (
-          <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
-            <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
-            {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
-            <KpiLabel>{k.label}</KpiLabel>
-          </KpiCard>
-        ))}
-      </KpiGrid>
+      {/* Org-wide KPIs/charts are hidden for Claims Agent users — they only
+          see their own claim workload below, not business-wide metrics. */}
+      {!myAgent && (
+        <>
+          {/* ── KPI Row 1 ─────────────────────────────────────────────────── */}
+          <KpiGrid>
+            {KPIS.slice(0, 4).map(k => (
+              <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
+                <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
+                {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
+                <KpiLabel>{k.label}</KpiLabel>
+              </KpiCard>
+            ))}
+          </KpiGrid>
 
-      {/* ── KPI Row 2 — Members breakdown ─────────────────────────────────── */}
-      <KpiGrid2>
-        {KPIS.slice(4).map(k => (
-          <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
-            <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
-            {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
-            <KpiLabel>{k.label}</KpiLabel>
-          </KpiCard>
-        ))}
-      </KpiGrid2>
+          {/* ── KPI Row 2 — Members breakdown ───────────────────────────────── */}
+          <KpiGrid2>
+            {KPIS.slice(4).map(k => (
+              <KpiCard key={k.label} onClick={() => router.push(k.href)} style={{ cursor: "pointer" }}>
+                <KpiIconBox $bg={k.bg} $color={k.color}>{k.icon}</KpiIconBox>
+                {dashL ? <Skeleton /> : <KpiValue>{k.value.toLocaleString("en-IN")}</KpiValue>}
+                <KpiLabel>{k.label}</KpiLabel>
+              </KpiCard>
+            ))}
+          </KpiGrid2>
+        </>
+      )}
 
+      {/* ── My Claims — only shown to users holding the Claims Agent role ─── */}
+      {myAgent && (
+        <Card>
+          <CardTitle style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Headphones size={16} /> My Claims
+          </CardTitle>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 16, marginTop: 14 }}>
+            <KpiCard
+              onClick={() => router.push("/admin/claim-tickets")}
+              style={{ cursor: "pointer" }}
+            >
+              <KpiIconBox $bg="#eff6ff" $color="#2563eb"><FileText size={18} /></KpiIconBox>
+              <KpiValue>{myAgent.total_claims}</KpiValue>
+              <KpiLabel>Total Claims</KpiLabel>
+            </KpiCard>
+            <KpiCard
+              onClick={() => router.push("/admin/claim-tickets?tab=in_progress&status=pending")}
+              style={{ cursor: "pointer" }}
+            >
+              <KpiIconBox $bg="#fefce8" $color="#ca8a04"><FileText size={18} /></KpiIconBox>
+              <KpiValue>{myAgent.status_counts.pending ?? 0}</KpiValue>
+              <KpiLabel>Pending</KpiLabel>
+            </KpiCard>
+            <KpiCard
+              onClick={() => router.push("/admin/claim-tickets?tab=in_progress&status=processing")}
+              style={{ cursor: "pointer" }}
+            >
+              <KpiIconBox $bg="#eff6ff" $color="#2563eb"><FileText size={18} /></KpiIconBox>
+              <KpiValue>{myAgent.status_counts.processing ?? 0}</KpiValue>
+              <KpiLabel>Processing</KpiLabel>
+            </KpiCard>
+            <KpiCard
+              onClick={() => router.push("/admin/claim-tickets?tab=accepted")}
+              style={{ cursor: "pointer" }}
+            >
+              <KpiIconBox $bg="#f0fdf4" $color="#16a34a"><FileText size={18} /></KpiIconBox>
+              <KpiValue>{myAgent.status_counts.accepted ?? 0}</KpiValue>
+              <KpiLabel>Accepted</KpiLabel>
+            </KpiCard>
+            <KpiCard
+              onClick={() => router.push("/admin/claim-tickets?tab=rejected")}
+              style={{ cursor: "pointer" }}
+            >
+              <KpiIconBox $bg="#fef2f2" $color="#dc2626"><FileText size={18} /></KpiIconBox>
+              <KpiValue>{myAgent.status_counts.rejected ?? 0}</KpiValue>
+              <KpiLabel>Rejected</KpiLabel>
+            </KpiCard>
+          </div>
+        </Card>
+      )}
+
+      {!myAgent && (
+      <>
       {/* ── Members Growth — Month Tiles + Calendar Drill-down ───────────── */}
       <Card>
         <GrowthHeader>
@@ -685,6 +754,8 @@ export default function DashboardPage() {
           </ModalOverlay>
         );
       })()}
+      </>
+      )}
     </Page>
   );
 }

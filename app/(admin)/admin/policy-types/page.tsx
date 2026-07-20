@@ -12,11 +12,13 @@ import { toast } from "react-toastify";
 import PageHeader from "@/components/ui/PageHeader";
 import StatusBadge from "@/components/ui/StatusBadge";
 import {
-  listPolicyTypes,
+  adminListPolicyTypes,
   adminCreatePolicyType,
   adminUpdatePolicyType,
   adminTogglePolicyType,
+  adminDeletePolicyType,
 } from "@/imports/core/api";
+import { getApiError } from "@/imports/core/errors";
 
 interface PolicyType {
   id: string;
@@ -24,6 +26,8 @@ interface PolicyType {
   code: string;
   description?: string;
   is_active: boolean;
+  linked_count?: number | null;
+  can_delete?: boolean | null;
 }
 
 interface PolicyTypeFormValues {
@@ -39,8 +43,8 @@ export default function PolicyTypesPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["policy-types"],
-    queryFn: () => listPolicyTypes(),
+    queryKey: ["admin-policy-types"],
+    queryFn: () => adminListPolicyTypes(),
   });
 
   const items: PolicyType[] = data?.data ?? [];
@@ -57,7 +61,7 @@ export default function PolicyTypesPage() {
   const createMutation = useMutation({
     mutationFn: (values: PolicyTypeFormValues) => adminCreatePolicyType(values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["policy-types"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-policy-types"] });
       toast.success("Policy type created successfully");
       setDialogOpen(false);
       reset();
@@ -71,7 +75,7 @@ export default function PolicyTypesPage() {
     mutationFn: ({ id, values }: { id: string; values: PolicyTypeFormValues }) =>
       adminUpdatePolicyType(id, values),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["policy-types"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-policy-types"] });
       toast.success("Policy type updated successfully");
       setDialogOpen(false);
       reset();
@@ -86,7 +90,7 @@ export default function PolicyTypesPage() {
     mutationFn: ({ id, is_active }: { id: string; is_active: boolean }) =>
       adminTogglePolicyType(id, is_active),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["policy-types"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-policy-types"] });
       toast.success("Policy type status updated");
       setTogglingId(null);
     },
@@ -94,6 +98,15 @@ export default function PolicyTypesPage() {
       toast.error("Failed to update status");
       setTogglingId(null);
     },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => adminDeletePolicyType(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-policy-types"] });
+      toast.success("Policy type permanently deleted");
+    },
+    onError: (err: any) => toast.error(getApiError(err, "Failed to delete policy type")),
   });
 
   const openCreate = () => {
@@ -121,27 +134,51 @@ export default function PolicyTypesPage() {
     toggleMutation.mutate({ id: item.id, is_active: !item.is_active });
   };
 
-  const actionsBody = (row: PolicyType) => (
-    <div style={{ display: "flex", gap: "0.5rem" }}>
-      <Button
-        label="Edit"
-        size="small"
-        severity="secondary"
-        onClick={() => openEdit(row)}
-      />
-      <Button
-        label={row.is_active ? "Deactivate" : "Activate"}
-        size="small"
-        severity={row.is_active ? "warning" : "success"}
-        onClick={() => handleToggle(row)}
-        loading={togglingId === row.id}
-      />
-    </div>
-  );
+  const handleDelete = (item: PolicyType) => {
+    if (window.confirm(`Permanently delete "${item.name}"? This cannot be undone.`)) {
+      deleteMutation.mutate(item.id);
+    }
+  };
+
+  const actionsBody = (row: PolicyType) => {
+    const isLinked = (row.linked_count ?? 0) > 0;
+    return (
+      <div style={{ display: "flex", gap: "0.5rem" }}>
+        <Button
+          label="Edit"
+          size="small"
+          severity="secondary"
+          onClick={() => openEdit(row)}
+        />
+        <Button
+          label={row.is_active ? "Deactivate" : "Activate"}
+          size="small"
+          severity={row.is_active ? "warning" : "success"}
+          onClick={() => handleToggle(row)}
+          loading={togglingId === row.id}
+        />
+        <Button
+          label="Delete"
+          size="small"
+          severity="danger"
+          disabled={isLinked}
+          title={isLinked
+            ? `Cannot delete — ${row.linked_count} polic${row.linked_count === 1 ? "y" : "ies"} linked to this type`
+            : "Delete policy type permanently"}
+          onClick={() => handleDelete(row)}
+          loading={deleteMutation.isPending && deleteMutation.variables === row.id}
+        />
+      </div>
+    );
+  };
 
   const isActiveBody = (row: PolicyType) => (
     <StatusBadge value={row.is_active} trueLabel="Active" falseLabel="Inactive" />
   );
+
+  const linkedBody = (row: PolicyType) => (row.linked_count ?? 0) > 0
+    ? `${row.linked_count} polic${row.linked_count === 1 ? "y" : "ies"}`
+    : "None";
 
   const isMutating = createMutation.isPending || updateMutation.isPending;
 
@@ -167,6 +204,7 @@ export default function PolicyTypesPage() {
         <Column field="code" header="Code" sortable />
         <Column field="description" header="Description" />
         <Column header="Is Active" body={isActiveBody} />
+        <Column header="Linked" body={linkedBody} />
         <Column header="Actions" body={actionsBody} />
       </DataTable>
 

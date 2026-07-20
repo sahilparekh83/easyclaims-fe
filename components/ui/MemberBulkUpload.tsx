@@ -172,6 +172,9 @@ export interface MemberBulkUploadProps {
   /** When true, each row assigns its own plan via a mandatory "Plan Code" column —
    *  hides the Default Plan dropdown and updates the required-columns copy. */
   planCodeMode?: boolean;
+  /** When set, blocks the upload (sample download still works) and shows this
+   *  reason — e.g. the target partner is Inactive/Suspended. */
+  disabledReason?: string | null;
 }
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
@@ -201,6 +204,7 @@ export default function MemberBulkUpload({
   downloadSampleFn,
   downloadReportFn,
   planCodeMode = false,
+  disabledReason = null,
 }: MemberBulkUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -329,6 +333,11 @@ export default function MemberBulkUpload({
       <Card>
         <CardHeader><CardTitle>Upload File</CardTitle></CardHeader>
         <CardBody>
+          {disabledReason && (
+            <div style={{ marginBottom: 16, padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#dc2626", fontSize: 13, fontWeight: 600 }}>
+              {disabledReason}
+            </div>
+          )}
           <Button
             label={downloadingSample ? "Downloading…" : "↓ Download Sample Excel"}
             icon="pi pi-file-excel"
@@ -350,10 +359,11 @@ export default function MemberBulkUpload({
           <DropZone
             $active={dragActive}
             $hasFile={!!selectedFile}
-            onDragOver={e => { e.preventDefault(); setDragActive(true); }}
+            onDragOver={e => { if (disabledReason) return; e.preventDefault(); setDragActive(true); }}
             onDragLeave={() => setDragActive(false)}
-            onDrop={onDrop}
-            onClick={() => inputRef.current?.click()}
+            onDrop={e => { if (disabledReason) { e.preventDefault(); return; } onDrop(e); }}
+            onClick={() => { if (!disabledReason) inputRef.current?.click(); }}
+            style={disabledReason ? { opacity: 0.5, cursor: "not-allowed" } : undefined}
           >
             <DropIcon>{selectedFile ? "📄" : "📂"}</DropIcon>
             {selectedFile ? (
@@ -401,7 +411,7 @@ export default function MemberBulkUpload({
               label={uploading ? "Uploading…" : "Upload & Import"}
               icon="pi pi-upload"
               loading={uploading}
-              disabled={!selectedFile || uploading}
+              disabled={!selectedFile || uploading || !!disabledReason}
               onClick={handleUpload}
             />
             {selectedFile && (

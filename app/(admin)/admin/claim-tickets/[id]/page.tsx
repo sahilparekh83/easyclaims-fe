@@ -39,6 +39,8 @@ export default function AdminClaimDetailPage() {
 
   const fromMemberId = searchParams.get("member_id") ?? "";
   const fromMemberName = searchParams.get("member_name") ? decodeURIComponent(searchParams.get("member_name")!) : "";
+  const fromAgentId = searchParams.get("agent_id") ?? "";
+  const fromAgentName = searchParams.get("agent_name") ? decodeURIComponent(searchParams.get("agent_name")!) : "";
 
   const [newStatus, setNewStatus] = useState("");
   const [remark, setRemark] = useState("");
@@ -168,6 +170,16 @@ export default function AdminClaimDetailPage() {
             <ChevronRight size={13} />
             <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/members/${fromMemberId}`)}>
               {fromMemberName || "Member"}
+            </span>
+            <ChevronRight size={13} />
+            <span style={{ color: "#161d26", fontWeight: 600 }}>{claim.claim_number}</span>
+          </>
+        ) : fromAgentId ? (
+          <>
+            <span style={{ cursor: "pointer" }} onClick={() => router.push("/admin/claim-agents")}>Claim Agents</span>
+            <ChevronRight size={13} />
+            <span style={{ cursor: "pointer" }} onClick={() => router.push(`/admin/claim-agents/${fromAgentId}`)}>
+              {fromAgentName || "Agent"}
             </span>
             <ChevronRight size={13} />
             <span style={{ color: "#161d26", fontWeight: 600 }}>{claim.claim_number}</span>
