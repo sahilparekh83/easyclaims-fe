@@ -12,10 +12,13 @@ import styled from "styled-components";
 import {
   adminGetPolicy, adminApprovePolicy, adminRejectPolicy,
   adminUpdatePolicyFields, adminViewPolicyPdf,
-  adminConfirmRenewal, adminDismissRenewal,
+  adminConfirmRenewal, adminDismissRenewal, adminGetPolicyHistory,
 } from "@/imports/core/api";
 import { RefreshCw } from "lucide-react";
 import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
+import CategoryConfidenceChip from "@/components/ui/CategoryConfidenceChip";
+import HistoryTimeline from "@/components/ui/HistoryTimeline";
+import { TabBar, Tab } from "@/components/ui/Tabs";
 import { getApiError } from "@/imports/core/errors";
 
 // ─── Styled ────────────────────────────────────────────────────────────────────
@@ -280,12 +283,21 @@ export default function PolicyReviewPage() {
   const fromPartnerName = searchParams.get("partner_name") ? decodeURIComponent(searchParams.get("partner_name")!) : "";
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState<Record<string, string>>({});
+  const [tab, setTab] = useState<"details" | "history">("details");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "policy", id],
     queryFn: () => adminGetPolicy(id),
     enabled: !!id,
+    refetchInterval: (query: any) => query.state.data?.data?.status === "processing" ? 4000 : false,
   });
+
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: ["admin", "policy", id, "history"],
+    queryFn: () => adminGetPolicyHistory(id),
+    enabled: !!id && tab === "history",
+  });
+  const historyEntries = (historyData as any)?.data?.data ?? [];
 
   const policy = (data as any)?.data;
   const extractedFields: Record<string, string> = policy?.extracted_fields ?? {};
@@ -351,6 +363,7 @@ export default function PolicyReviewPage() {
     onSuccess: () => {
       toast.success("Renewal confirmed — previous policy marked as superseded");
       queryClient.invalidateQueries({ queryKey: ["admin", "policy", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "policy", id, "history"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
     },
     onError: (err: any) => toast.error(getApiError(err, "Failed to confirm renewal")),
@@ -361,6 +374,7 @@ export default function PolicyReviewPage() {
     onSuccess: () => {
       toast.success("Treated as a new policy");
       queryClient.invalidateQueries({ queryKey: ["admin", "policy", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "policy", id, "history"] });
       queryClient.invalidateQueries({ queryKey: ["admin", "policies"] });
     },
     onError: (err: any) => toast.error(getApiError(err, "Failed to dismiss renewal")),
@@ -421,6 +435,7 @@ export default function PolicyReviewPage() {
           {status && (
             <PolicyStatusBadge status={status} isRenewal={!!policy?.previous_policy_id} />
           )}
+          <CategoryConfidenceChip category={policy?.policy_type} confidence={policy?.ai_confidence} status={status} />
         </TopLeft>
 
         <ActionBtns>
@@ -491,35 +506,57 @@ export default function PolicyReviewPage() {
                 </RenewalActions>
               </RenewalCard>
             )}
+            {status === "rejected" && extractedFields["validation_reason"] && (
+              <div style={{ margin: "12px 16px", padding: "10px 14px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, fontSize: 12.5, color: "#b91c1c", lineHeight: 1.5 }}>
+                <strong>Rejected</strong> — {String(extractedFields["validation_reason"])}
+              </div>
+            )}
             {policy?.previous_policy_id && status === "active" && (
               <div style={{ margin: "10px 16px", padding: "8px 14px", background: "#f0fdf4", borderRadius: 8, fontSize: 12, color: "#16a34a", display: "flex", alignItems: "center", gap: 6 }}>
                 <RefreshCw size={12} />
                 Renewal of previous policy — <a href={`/admin/policies/${policy.previous_policy_id}`} style={{ color: "#16a34a", marginLeft: 4 }}>View previous</a>
               </div>
             )}
-            <PanelHeader>Extracted Fields</PanelHeader>
-            {visibleFields.length === 0 ? (
-              <div style={{ padding: "1.5rem", color: "#94a3b8", fontSize: "0.8rem" }}>
-                No extracted data available.
-              </div>
+            <TabBar style={{ padding: "0 16px" }}>
+              <Tab $active={tab === "details"} onClick={() => setTab("details")}>Details</Tab>
+              <Tab $active={tab === "history"} onClick={() => setTab("history")}>History</Tab>
+            </TabBar>
+
+            {tab === "details" ? (
+              <>
+                <PanelHeader>Extracted Fields</PanelHeader>
+                {visibleFields.length === 0 ? (
+                  <div style={{ padding: "1.5rem", color: "#94a3b8", fontSize: "0.8rem" }}>
+                    No extracted data available.
+                  </div>
+                ) : (
+                  <FieldTable>
+                    <tbody>
+                      {visibleFields.map(([k, v]) => (
+                        <FieldRow key={k}>
+                          <FieldKey>{formatKey(k)}</FieldKey>
+                          <FieldVal>
+                            <EditableField
+                              fieldKey={k}
+                              value={pendingChanges[k] ?? toDisplayString(v)}
+                              onChange={handleFieldChange}
+                              readOnly={!canAct || typeof v === "object"}
+                            />
+                          </FieldVal>
+                        </FieldRow>
+                      ))}
+                    </tbody>
+                  </FieldTable>
+                )}
+              </>
             ) : (
-              <FieldTable>
-                <tbody>
-                  {visibleFields.map(([k, v]) => (
-                    <FieldRow key={k}>
-                      <FieldKey>{formatKey(k)}</FieldKey>
-                      <FieldVal>
-                        <EditableField
-                          fieldKey={k}
-                          value={pendingChanges[k] ?? toDisplayString(v)}
-                          onChange={handleFieldChange}
-                          readOnly={!canAct || typeof v === "object"}
-                        />
-                      </FieldVal>
-                    </FieldRow>
-                  ))}
-                </tbody>
-              </FieldTable>
+              <div style={{ padding: "8px 16px" }}>
+                {historyLoading ? (
+                  <div style={{ padding: "1.5rem", color: "#94a3b8", fontSize: "0.8rem" }}>Loading history…</div>
+                ) : (
+                  <HistoryTimeline entries={historyEntries} emptyText="No tracked events for this policy yet." />
+                )}
+              </div>
             )}
           </LeftPanel>
 
