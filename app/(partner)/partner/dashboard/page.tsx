@@ -90,8 +90,13 @@ const CardSub = styled.div`
   font-size: 12.5px; color: #64748b; margin-top: 2px;
 `;
 
+const TableScroll = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
 const Table = styled.table`
-  width: 100%; border-collapse: collapse; font-size: 13.5px;
+  width: 100%; min-width: 480px; border-collapse: collapse; font-size: 13.5px;
 `;
 
 const Th = styled.th`
@@ -246,6 +251,7 @@ export default function DashboardPage() {
             </div>
             <Ghost onClick={() => router.push("/partner/members")}>View all →</Ghost>
           </CardHeader>
+          <TableScroll>
           <Table>
             <thead>
               <tr>
@@ -282,6 +288,7 @@ export default function DashboardPage() {
               ))}
             </tbody>
           </Table>
+          </TableScroll>
         </SectionCard>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>

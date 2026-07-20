@@ -2,7 +2,9 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import styled from "styled-components";
-import { Bell, LogOut, ChevronDown, User, Mail, Shield, ChevronsUpDown } from "lucide-react";
+import { Dialog } from "primereact/dialog";
+import { Button } from "primereact/button";
+import { Bell, LogOut, ChevronDown, User, Mail, Shield, ChevronsUpDown, ArrowLeftRight, Menu } from "lucide-react";
 import { useAuthStore } from "@/stores/AuthStore";
 import { useMemberStore } from "@/stores/MemberStore";
 import { useRouter } from "next/navigation";
@@ -23,6 +25,33 @@ const Bar = styled.header`
   position: sticky;
   top: 0;
   z-index: 10;
+
+  @media (max-width: 720px) {
+    gap: 10px;
+    padding: 0 14px;
+  }
+`;
+
+const MenuBtn = styled.button`
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--ec-text-body, #374151);
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  flex-shrink: 0;
+
+  &:hover {
+    background: #f4f6fb;
+  }
+
+  @media (max-width: 880px) {
+    display: flex;
+  }
 `;
 
 const TitleArea = styled.div`
@@ -63,6 +92,10 @@ const SearchBar = styled.div`
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  @media (max-width: 640px) {
+    display: none;
   }
 `;
 
@@ -150,6 +183,10 @@ const UserName = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+
+  @media (max-width: 480px) {
+    display: none;
+  }
 `;
 
 // ─── Profile Dropdown ────────────────────────────────────────────────────────
@@ -163,6 +200,7 @@ const DropMenu = styled.div`
   top: calc(100% + 8px);
   right: 0;
   width: 240px;
+  max-width: calc(100vw - 24px);
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -256,6 +294,10 @@ const PartnerSwitcher = styled.button`
     border-color: #ede9fe;
     color: #7c3aed;
   }
+
+  @media (max-width: 560px) {
+    max-width: 110px;
+  }
 `;
 
 const PartnerLabel = styled.span`
@@ -270,6 +312,7 @@ const SwitcherMenu = styled.div`
   top: calc(100% + 8px);
   right: 0;
   min-width: 200px;
+  max-width: calc(100vw - 24px);
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
@@ -325,11 +368,12 @@ interface HeaderProps {
   subtitle?: string;
   unreadCount?: number;
   onBellClick?: () => void;
+  onMenuClick?: () => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export default function Header({ title, subtitle, unreadCount = 0, onBellClick }: HeaderProps) {
+export default function Header({ title, subtitle, unreadCount = 0, onBellClick, onMenuClick }: HeaderProps) {
   const { clearAuth, accessToken, userType } = useAuthStore();
   const { activePartnerId, activePartnerName, partners, setActivePartner, setPartners } = useMemberStore();
   const router = useRouter();
@@ -436,9 +480,18 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
     router.push("/login");
   };
 
+  const [pendingSwitch, setPendingSwitch] = useState<{ id: string; name: string | null } | null>(null);
+
   const handleSwitchPartner = (partnerId: string, partnerName: string | null) => {
-    setActivePartner(partnerId, partnerName);
     setSwitcherOpen(false);
+    if (partnerId === activePartnerId) return;
+    setPendingSwitch({ id: partnerId, name: partnerName });
+  };
+
+  const confirmSwitchPartner = () => {
+    if (!pendingSwitch) return;
+    setActivePartner(pendingSwitch.id, pendingSwitch.name);
+    setPendingSwitch(null);
     // Reload the current page so all queries refetch with the new X-Partner-Id
     window.location.reload();
   };
@@ -448,6 +501,10 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
 
   return (
     <Bar>
+      <MenuBtn onClick={onMenuClick} aria-label="Open menu" title="Menu">
+        <Menu size={20} />
+      </MenuBtn>
+
       <TitleArea>
         <Title>{title}</Title>
         {subtitle && <Subtitle>{subtitle}</Subtitle>}
@@ -555,6 +612,35 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick }
           )}
         </DropWrap>
       </Right>
+
+      <Dialog
+        visible={!!pendingSwitch}
+        onHide={() => setPendingSwitch(null)}
+        header="Switch Partner"
+        style={{ width: "min(420px, 92vw)" }}
+        modal
+        draggable={false}
+        footer={
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+            <Button label="Cancel" severity="secondary" outlined onClick={() => setPendingSwitch(null)} />
+            <Button label="Switch" icon="pi pi-arrow-right-arrow-left" onClick={confirmSwitchPartner} />
+          </div>
+        }
+      >
+        {pendingSwitch && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: "0.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <ArrowLeftRight size={18} color="#0050b0" />
+              <span style={{ fontSize: 14 }}>
+                Switch to <strong>{pendingSwitch.name || "this partner"}</strong>?
+              </span>
+            </div>
+            <div style={{ fontSize: 12.5, color: "#6b7280" }}>
+              The page will reload and any unsaved changes here will be lost.
+            </div>
+          </div>
+        )}
+      </Dialog>
     </Bar>
   );
 }

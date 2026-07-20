@@ -40,7 +40,8 @@ const KpiLabel = styled.div`font-size: 0.72rem; font-weight: 700; text-transform
 const SectionCard = styled.div`background: #fff; border: 1px solid #e0e6ec; border-radius: 14px; box-shadow: 0 1px 2px rgba(10,42,87,0.06); overflow: hidden;`;
 const CardHeader = styled.div`display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #f1f2f6;`;
 const CardTitle = styled.h3`font-size: 15px; font-weight: 700; color: #0f172a; margin: 0;`;
-const Table = styled.table`width: 100%; border-collapse: collapse; font-size: 13px;`;
+const TableScroll = styled.div`width: 100%; overflow-x: auto;`;
+const Table = styled.table`width: 100%; min-width: 560px; border-collapse: collapse; font-size: 13px;`;
 const Th = styled.th`padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; background: #f8f9fb;`;
 const Td = styled.td`padding: 11px 16px; border-top: 1px solid #f1f2f6;`;
 const Empty = styled.div`padding: 24px 20px; text-align: center; color: #9ca3af; font-size: 13px;`;
@@ -124,6 +125,7 @@ export default function AdminFinancePage() {
           <CardHeader>
             <CardTitle>Low Float Alerts</CardTitle>
           </CardHeader>
+          <TableScroll>
           <Table>
             <thead>
               <tr><Th>Partner</Th><Th>Balance</Th><Th>Threshold</Th><Th></Th></tr>
@@ -145,6 +147,7 @@ export default function AdminFinancePage() {
               ))}
             </tbody>
           </Table>
+          </TableScroll>
         </SectionCard>
       )}
 
@@ -155,6 +158,7 @@ export default function AdminFinancePage() {
         {ledger.length === 0 ? (
           <Empty>No float transactions yet</Empty>
         ) : (
+          <TableScroll>
           <Table>
             <thead>
               <tr>
@@ -191,6 +195,7 @@ export default function AdminFinancePage() {
               ))}
             </tbody>
           </Table>
+          </TableScroll>
         )}
       </SectionCard>
 

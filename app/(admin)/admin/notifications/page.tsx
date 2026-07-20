@@ -53,7 +53,8 @@ const FilterBtn = styled.button<{ $active: boolean }>`
   &:hover { border-color: #2563eb; color: #2563eb; }
 `;
 
-const Table = styled.table`width: 100%; border-collapse: collapse; font-size: 13.5px;`;
+const TableScroll = styled.div`width: 100%; overflow-x: auto;`;
+const Table = styled.table`width: 100%; min-width: 640px; border-collapse: collapse; font-size: 13.5px;`;
 const Th = styled.th`
   padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; background: #f8f9fb;
@@ -229,6 +230,7 @@ export default function NotificationsPage() {
       </Toolbar>
 
       <Card>
+        <TableScroll>
         <Table>
           <thead>
             <tr>
@@ -286,6 +288,7 @@ export default function NotificationsPage() {
             })}
           </tbody>
         </Table>
+        </TableScroll>
       </Card>
 
       {tooltip && (

@@ -53,8 +53,14 @@ const FilterBtn = styled.button<{ $active: boolean }>`
   &:hover { border-color: #0050b0; color: #0050b0; }
 `;
 
+const TableScroll = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
 const Table = styled.table`
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   background: #fff;
   border: 1px solid #e0e6ec;
@@ -241,6 +247,7 @@ export default function TicketsPage() {
         ))}
       </FilterRow>
 
+      <TableScroll>
       <Table>
         <thead>
           <tr>
@@ -299,6 +306,7 @@ export default function TicketsPage() {
           )}
         </tbody>
       </Table>
+      </TableScroll>
     </Page>
   );
 }

@@ -60,8 +60,14 @@ export interface PoliciesTableProps {
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
+const TableScroll = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
 const Table = styled.table`
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 13.5px;
 `;
@@ -271,6 +277,7 @@ export default function PoliciesTable({
   const colCount = 6 + (showMemberColumn ? 1 : 0) + (isMember ? 0 : 2);
 
   return (
+    <TableScroll>
     <Table>
       <thead>
         <tr>
@@ -443,5 +450,6 @@ export default function PoliciesTable({
         })}
       </tbody>
     </Table>
+    </TableScroll>
   );
 }

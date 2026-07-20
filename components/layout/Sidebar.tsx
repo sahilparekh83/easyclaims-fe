@@ -30,7 +30,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Partners",       href: "/admin/partners",        icon: <Briefcase size={18} />, moduleKey: "partners" },
   { label: "Members",        href: "/admin/members",         icon: <Users size={18} />, moduleKey: "members" },
   { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} />, moduleKey: "members" },
-  { label: "Tickets",        href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets", moduleKey: "tickets" },
+  // { label: "Tickets",     href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets", moduleKey: "tickets" },
   { label: "Claim Tickets",  href: "/admin/claim-tickets",   icon: <FileText size={18} />, moduleKey: "claims" },
   { label: "Claim Agents",   href: "/admin/claim-agents",    icon: <Headphones size={18} />, superadminOnly: true },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, moduleKey: "policies" },
@@ -62,7 +62,7 @@ const MEMBER_NAV: NavItem[] = [
   { label: "Family",       href: "/member/family",        icon: <Heart size={18} /> },
   { label: "Policies",          href: "/member/policies",      icon: <FileText size={18} /> },
   { label: "My Claims",         href: "/member/claims",        icon: <BadgeCheck size={18} /> },
-  { label: "Claim Assistance",  href: "/member/claim-assist",  icon: <HelpCircle size={18} /> },
+  // { label: "Claim Assistance", href: "/member/claim-assist", icon: <HelpCircle size={18} /> },
   // { label: "Consent",      href: "/member/consent",       icon: <ShieldCheck size={18} /> },
   { label: "Notifications", href: "/member/notifications", icon: <Bell size={18} /> },
 ];
@@ -71,7 +71,7 @@ const NAV_MAP: Record<string, NavItem[]> = { admin: ADMIN_NAV, partner: PARTNER_
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 
-const Wrap = styled.aside`
+const Wrap = styled.aside<{ $mobileOpen: boolean }>`
   width: 256px;
   height: 100vh;
   overflow-y: auto;
@@ -80,6 +80,15 @@ const Wrap = styled.aside`
   flex-direction: column;
   flex-shrink: 0;
   color: #fff;
+
+  @media (max-width: 880px) {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    transform: translateX(${p => (p.$mobileOpen ? "0" : "-100%")});
+    transition: transform 0.2s ease;
+    box-shadow: ${p => (p.$mobileOpen ? "8px 0 24px rgba(0,0,0,0.25)" : "none")};
+  }
 `;
 
 const LogoArea = styled.div`
@@ -206,7 +215,13 @@ function useBadgeCounts(portal: "admin" | "partner" | "member") {
   return counts;
 }
 
-export default function Sidebar({ portal }: { portal: "admin" | "partner" | "member" }) {
+interface SidebarProps {
+  portal: "admin" | "partner" | "member";
+  mobileOpen?: boolean;
+  onNavigate?: () => void;
+}
+
+export default function Sidebar({ portal, mobileOpen = false, onNavigate }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   // Subscribe to the raw values (not the `hasPermission` function) — a zustand
@@ -228,7 +243,7 @@ export default function Sidebar({ portal }: { portal: "admin" | "partner" | "mem
   const badgeCounts = useBadgeCounts(portal);
 
   return (
-    <Wrap>
+    <Wrap $mobileOpen={mobileOpen}>
       <LogoArea>
         <LogoBox>
           <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" width="28" height="28">
@@ -251,7 +266,7 @@ export default function Sidebar({ portal }: { portal: "admin" | "partner" | "mem
             <NavBtn
               key={item.href}
               $active={active}
-              onClick={() => router.push(item.href)}
+              onClick={() => { router.push(item.href); onNavigate?.(); }}
             >
               {item.icon}
               <span style={{ flex: 1 }}>{item.label}</span>

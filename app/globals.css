@@ -207,6 +207,13 @@ a { color: inherit; text-decoration: none; }
 .p-dialog {
   border-radius: 16px !important;
   box-shadow: 0 20px 60px rgba(0,0,0,0.2) !important;
+  max-width: 95vw !important;
+  max-height: 90vh !important;
+}
+@media (max-width: 600px) {
+  .p-dialog {
+    width: 95vw !important;
+  }
 }
 .p-dialog .p-dialog-header {
   border-radius: 16px 16px 0 0 !important;

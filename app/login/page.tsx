@@ -211,7 +211,7 @@ const FormPanel = styled.div`
 
   @media (max-width: 900px) {
     background: #0a2a57;
-    justify-content: flex-start;
+    justify-content: center;
     padding: 0;
     min-height: 100vh;
   }
@@ -307,9 +307,11 @@ const FormCard = styled.div`
   position: relative; z-index: 1;
 
   @media (max-width: 900px) {
-    border-radius: 20px 20px 0 0;
-    padding: 32px 26px 44px;
-    max-width: 100%; margin-top: auto;
+    border-radius: 20px;
+    padding: 32px 26px 40px;
+    width: calc(100% - 40px);
+    max-width: 420px;
+    margin: 28px auto;
   }
 `;
 

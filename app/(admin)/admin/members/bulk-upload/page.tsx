@@ -129,8 +129,14 @@ const StatValue = styled.div`
   margin-top: 2px;
 `;
 
+const TableScroll = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
 const Table = styled.table`
   width: 100%;
+  min-width: 560px;
   border-collapse: collapse;
   font-size: 0.85rem;
 `;
@@ -410,6 +416,7 @@ function BulkUploadContent() {
           {result.created?.length > 0 && (
             <Card>
               <CardTitle>Created ({result.created.length})</CardTitle>
+              <TableScroll>
               <Table>
                 <thead>
                   <tr>
@@ -430,12 +437,14 @@ function BulkUploadContent() {
                   ))}
                 </tbody>
               </Table>
+              </TableScroll>
             </Card>
           )}
 
           {(result.skipped?.length > 0 || result.errors?.length > 0) && (
             <Card>
               <CardTitle>Skipped &amp; Errors ({(result.skipped?.length ?? 0) + (result.errors?.length ?? 0)})</CardTitle>
+              <TableScroll>
               <Table>
                 <thead>
                   <tr>
@@ -456,6 +465,7 @@ function BulkUploadContent() {
                   ))}
                 </tbody>
               </Table>
+              </TableScroll>
             </Card>
           )}
         </>

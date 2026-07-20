@@ -111,8 +111,13 @@ const CardSub = styled.div`
   font-size: 12.5px; color: #64748b; margin-top: 2px;
 `;
 
+const TableScroll = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
 const Table = styled.table`
-  width: 100%; border-collapse: collapse; font-size: 13.5px;
+  width: 100%; min-width: 760px; border-collapse: collapse; font-size: 13.5px;
 `;
 
 const Th = styled.th`
@@ -669,6 +674,7 @@ export default function PartnersPage() {
               </AccentBtn>
             </div>
           </CardHeader>
+          <TableScroll>
           <Table>
             <thead>
               <tr>
@@ -736,6 +742,7 @@ export default function PartnersPage() {
               })}
             </tbody>
           </Table>
+          </TableScroll>
           {total > ROWS && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderTop: "1px solid #f1f2f6" }}>
               <span style={{ fontSize: 12.5, color: "#6b7280" }}>

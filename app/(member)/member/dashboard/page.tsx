@@ -98,8 +98,12 @@ const CardTitle = styled.h3`
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
 `;
 
+const TableScroll = styled.div`
+  width: 100%; overflow-x: auto;
+`;
+
 const Table = styled.table`
-  width: 100%; border-collapse: collapse; font-size: 13.5px;
+  width: 100%; min-width: 480px; border-collapse: collapse; font-size: 13.5px;
 `;
 
 const Th = styled.th`
@@ -270,6 +274,7 @@ export default function MemberDashboardPage() {
             <CardTitle>My policies</CardTitle>
             <Ghost onClick={() => router.push("/member/policies")}>View all →</Ghost>
           </CardHeader>
+          <TableScroll>
           <Table>
             <thead>
               <tr>
@@ -310,6 +315,7 @@ export default function MemberDashboardPage() {
               ))}
             </tbody>
           </Table>
+          </TableScroll>
         </SectionCard>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>

@@ -91,8 +91,14 @@ const SearchInput = styled.input`
   &:focus { border-color: #2563eb; background: #fff; }
 `;
 
+const TableScroll = styled.div`
+  width: 100%;
+  overflow-x: auto;
+`;
+
 const Table = styled.table`
   width: 100%;
+  min-width: 720px;
   border-collapse: collapse;
   font-size: 13.5px;
 `;
@@ -388,6 +394,7 @@ export default function MembersPage() {
           </TopActions>
         </CardTop>
 
+        <TableScroll>
         <Table>
           <thead>
             <tr>
@@ -433,6 +440,7 @@ export default function MembersPage() {
             ))}
           </tbody>
         </Table>
+        </TableScroll>
 
         {total > ROWS && (
           <Pagination>
