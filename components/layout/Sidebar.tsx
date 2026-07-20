@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
   BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet, Ticket, HelpCircle,
-  KeyRound, UserCog,
+  KeyRound, UserCog, MessageCircle,
 } from "lucide-react";
 import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
 import { useAuthStore } from "@/stores/AuthStore";
@@ -36,6 +36,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Partner Types",  href: "/admin/partner-types",   icon: <Package size={18} />, moduleKey: "partner_types" },
   { label: "Notifications",  href: "/admin/notifications",   icon: <Bell size={18} />, badgeKey: "total", moduleKey: "notifications" },
   { label: "Email Templates", href: "/admin/email-templates", icon: <Mail size={18} />, moduleKey: "email_templates" },
+  { label: "WhatsApp Templates", href: "/admin/whatsapp-templates", icon: <MessageCircle size={18} />, moduleKey: "whatsapp_templates" },
   { label: "Admin Users",     href: "/admin/users",           icon: <UserCog size={18} />, moduleKey: "users" },
   { label: "Roles & Permissions", href: "/admin/roles",       icon: <KeyRound size={18} />, moduleKey: "roles" },
   { label: "Settings",        href: "/admin/settings",        icon: <Settings size={18} />, moduleKey: "settings" },

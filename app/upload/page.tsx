@@ -2,8 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import styled, { keyframes } from "styled-components";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { listPolicyTypes, memberUploadPolicy } from "@/imports/core/api";
+import { useMutation } from "@tanstack/react-query";
+import { memberUploadPolicy } from "@/imports/core/api";
 import { getApiError } from "@/imports/core/errors";
 import { useAuthStore } from "@/stores/AuthStore";
 import { useRouter } from "next/navigation";
@@ -79,15 +79,6 @@ const FieldLabel = styled.label`
   font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 13px; font-weight: 600; color: #3a4756;
   margin-bottom: 6px;
-`;
-
-const Select = styled.select`
-  width: 100%; height: 42px;
-  border: 1.5px solid #e0e6ec; border-radius: 10px;
-  padding: 0 12px; font-size: 14px; color: #161d26;
-  background: #f7f9fb; outline: none; cursor: pointer;
-  margin-bottom: 18px;
-  &:focus { border-color: #0050b0; background: #fff; }
 `;
 
 const Dropzone = styled.div<{ $active: boolean; $hasFile: boolean }>`
@@ -166,13 +157,10 @@ const NotMemberBox = styled.div`
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-interface PolicyType { id: string; name: string; }
-
 export default function UploadPage() {
   const { isAuthenticated, userType, restoreFromCookie } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [policyTypeId, setPolicyTypeId] = useState("");
   const [dropActive, setDropActive] = useState(false);
   const [uploaded, setUploaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -181,14 +169,6 @@ export default function UploadPage() {
     restoreFromCookie();
     setHydrated(true);
   }, [restoreFromCookie]);
-
-  const { data: policyTypesData } = useQuery({
-    queryKey: ["policy-types"],
-    queryFn: () => listPolicyTypes(true),
-    enabled: isAuthenticated && userType === "MEMBER",
-  });
-
-  const policyTypes: PolicyType[] = policyTypesData?.data ?? [];
 
   const router = useRouter();
 
@@ -217,10 +197,8 @@ export default function UploadPage() {
 
   const handleSubmit = () => {
     if (!selectedFile) { toast.error("Please select a PDF file."); return; }
-    if (!policyTypeId) { toast.error("Please select a policy type."); return; }
     const fd = new FormData();
     fd.append("file", selectedFile);
-    fd.append("policy_type_id", policyTypeId);
     uploadMutation.mutate(fd);
   };
 
@@ -282,15 +260,9 @@ export default function UploadPage() {
       <Logo />
       <Card>
         <CardTitle>Upload Policy Document</CardTitle>
-        <CardSub>Upload your insurance policy PDF. We will extract and verify the details automatically.</CardSub>
+        <CardSub>Upload your insurance policy PDF. Our AI will detect the policy type and extract the details automatically.</CardSub>
 
         <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFileChange} />
-
-        <FieldLabel>Policy Type *</FieldLabel>
-        <Select value={policyTypeId} onChange={e => setPolicyTypeId(e.target.value)}>
-          <option value="">Select policy type…</option>
-          {policyTypes.map(pt => <option key={pt.id} value={pt.id}>{pt.name}</option>)}
-        </Select>
 
         <FieldLabel>Policy Document (PDF) *</FieldLabel>
         <Dropzone

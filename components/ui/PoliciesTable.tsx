@@ -6,6 +6,7 @@ import { AlertTriangle, Check, Filter, ChevronDown } from "lucide-react";
 import dayjs from "dayjs";
 import PolicyStatusBadge from "./PolicyStatusBadge";
 import PolicyActionButtons from "./PolicyActionButtons";
+import CategoryConfidenceChip from "./CategoryConfidenceChip";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ export interface PolicyRow {
   partner_id?: string | null;
   partner_name?: string | null;
   policy_type?: string | null;
+  ai_confidence?: number | null;
   insurer?: string | null;
   sum_insured?: number | null;
   start_date?: string | null;
@@ -98,25 +100,6 @@ const PolicySub = styled.div`
 
 const MemberName = styled.div`font-weight: 600; color: #161d26; font-size: 13.5px;`;
 const MemberEmail = styled.div`font-size: 12px; color: #6b7a8c; margin-top: 2px;`;
-
-const TypeBadge = styled.span<{ $type: string }>`
-  display: inline-flex;
-  align-items: center;
-  font-size: 11.5px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: ${p =>
-    p.$type === "Health" ? "#eff6ff" :
-    p.$type === "Life"   ? "#fdf4ff" :
-    p.$type === "Motor"  ? "#f1f5f9" :
-    p.$type === "Travel" ? "#f0fdf4" : "#f8fafc"};
-  color: ${p =>
-    p.$type === "Health" ? "#1d4ed8" :
-    p.$type === "Life"   ? "#9333ea" :
-    p.$type === "Motor"  ? "#475569" :
-    p.$type === "Travel" ? "#15803d" : "#475569"};
-`;
 
 const MonoAmount = styled.span`
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -379,9 +362,7 @@ export default function PoliciesTable({
 
               {/* Type */}
               <Td>
-                {pType
-                  ? <TypeBadge $type={pType}>{pType}</TypeBadge>
-                  : <span style={{ color: "#9ca3af" }}>—</span>}
+                <CategoryConfidenceChip category={pType || null} confidence={row.ai_confidence} status={row.status} />
               </Td>
 
               {/* Insurer */}

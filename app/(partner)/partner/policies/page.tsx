@@ -7,6 +7,7 @@ import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import styled from "styled-components";
 import { Download, FileSearch, Search, AlertTriangle, Check, X } from "lucide-react";
+import { Calendar } from "primereact/calendar";
 import PoliciesTable from "@/components/ui/PoliciesTable";
 import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -156,6 +157,15 @@ const PagBtn = styled.button`
   &:disabled { opacity: 0.4; cursor: default; }
 `;
 
+const FilterToggleBtn = styled.button<{ $active: boolean }>`
+  height: 34px; padding: 0 14px; border-radius: 8px; white-space: nowrap;
+  border: 1px solid ${p => p.$active ? "#0050b0" : "#e0e6ec"};
+  background: ${p => p.$active ? "#eff6ff" : "#fff"};
+  color: ${p => p.$active ? "#0050b0" : "#6b7a8c"};
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  &:hover { border-color: #0050b0; color: #0050b0; }
+`;
+
 
 
 type TabFilter = "active" | "expired";
@@ -181,16 +191,30 @@ export default function PoliciesPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [tab, setTab] = useState<TabFilter>("active");
+  const [dateRange, setDateRange] = useState<Date[] | null>(null);
+  const [expiringSoon, setExpiringSoon] = useState(false);
   const debouncedSearch = useDebounce(search, 300);
+  const dateFrom = dateRange?.[0] ? dayjs(dateRange[0]).startOf("day").format("YYYY-MM-DD") : undefined;
+  const dateTo = dateRange?.[1] ? dayjs(dateRange[1]).endOf("day").format("YYYY-MM-DD") : undefined;
 
-  useEffect(() => { setPage(0); }, [debouncedSearch, tab]);
+  useEffect(() => { setPage(0); }, [debouncedSearch, tab, dateFrom, dateTo, expiringSoon]);
+
+  const activeFilters = [
+    ...(dateFrom && dateTo ? [{ field: "created_at", operator: "between", value: [dateFrom, dateTo] }] : []),
+    ...(expiringSoon ? [{ field: "end_date", operator: "between", value: [dayjs().format("YYYY-MM-DD"), dayjs().add(30, "day").format("YYYY-MM-DD")] }] : []),
+  ];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["partner", "policies", debouncedSearch, page],
+    queryKey: ["partner", "policies", debouncedSearch, page, dateFrom, dateTo, expiringSoon],
     queryFn: () => partnerListPolicies({
       global_filter: debouncedSearch || undefined,
       sort_field: "created_at", sort_order: -1, limit: ROWS, skip: page * ROWS,
+      filters: activeFilters,
     }),
+    refetchInterval: (query: any) => {
+      const rows = query.state.data?.data?.data ?? [];
+      return rows.some((r: any) => r.status === "processing") ? 4000 : false;
+    },
   });
 
   const grouped: any[] = (data as any)?.data?.data ?? [];
@@ -235,6 +259,18 @@ export default function PoliciesPage() {
               <SearchIcon><Search size={13} /></SearchIcon>
               <SearchInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Search policies…" />
             </SearchWrap>
+            <Calendar
+              value={dateRange as any}
+              onChange={e => setDateRange(e.value as Date[])}
+              selectionMode="range"
+              readOnlyInput
+              placeholder="Filter by upload date"
+              showButtonBar
+              style={{ width: 220 }}
+            />
+            <FilterToggleBtn $active={expiringSoon} onClick={() => setExpiringSoon(v => !v)} title="Policies expiring within 30 days">
+              Expiring Soon
+            </FilterToggleBtn>
           </TopActions>
         </CardTop>
 

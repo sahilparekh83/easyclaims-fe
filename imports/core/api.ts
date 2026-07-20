@@ -182,6 +182,9 @@ export const adminListPolicies = (params?: object) =>
 export const adminGetPolicy = (id: string) =>
   apiClient.get(`/admin/policies/${id}`).then((r) => r.data);
 
+export const adminGetPolicyHistory = (id: string, params?: { skip?: number; limit?: number }) =>
+  apiClient.get(`/admin/policies/${id}/history`, { params }).then((r) => r.data);
+
 export const adminUploadPolicy = (formData: FormData) =>
   apiClient.post("/admin/policies/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
@@ -533,6 +536,27 @@ export const adminCreateTemplateOverride = (slug: string, data: { partner_id: st
 
 export const adminDeleteTemplateOverride = (templateId: string) =>
   apiClient.delete(`/admin/email-templates/overrides/${templateId}`).then((r) => r.data);
+
+// ─────────────────────────────────────────────
+// ADMIN — WHATSAPP TEMPLATES (Meta Cloud API)
+// ─────────────────────────────────────────────
+export const adminListWhatsAppTemplates = () =>
+  apiClient.get("/admin/whatsapp-templates").then((r) => r.data);
+
+export const adminGetWhatsAppTemplate = (id: string) =>
+  apiClient.get(`/admin/whatsapp-templates/${id}`).then((r) => r.data);
+
+export const adminUpdateWhatsAppTemplate = (id: string, data: object) =>
+  apiClient.patch(`/admin/whatsapp-templates/${id}`, data).then((r) => r.data);
+
+export const adminListWhatsAppTemplateOverrides = (slug: string) =>
+  apiClient.get(`/admin/whatsapp-templates/${slug}/overrides`).then((r) => r.data);
+
+export const adminCreateWhatsAppTemplateOverride = (slug: string, data: { partner_id: string; meta_template_name?: string; meta_template_language?: string; description?: string }) =>
+  apiClient.post(`/admin/whatsapp-templates/${slug}/overrides`, data).then((r) => r.data);
+
+export const adminDeleteWhatsAppTemplateOverride = (templateId: string) =>
+  apiClient.delete(`/admin/whatsapp-templates/overrides/${templateId}`).then((r) => r.data);
 
 // ─────────────────────────────────────────────
 // ADMIN — CRON

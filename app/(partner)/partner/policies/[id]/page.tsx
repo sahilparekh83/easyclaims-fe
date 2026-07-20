@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import styled from "styled-components";
 import { partnerGetPolicy, partnerViewPolicyPdf } from "@/imports/core/api";
+import CategoryConfidenceChip from "@/components/ui/CategoryConfidenceChip";
 
 // ─── Styled (same as admin policy detail page) ────────────────────────────────
 
@@ -106,6 +107,7 @@ export default function PartnerPolicyDetailPage() {
     queryKey: ["partner", "policy", id],
     queryFn: () => partnerGetPolicy(id),
     enabled: !!id,
+    refetchInterval: (query: any) => query.state.data?.data?.status === "processing" ? 4000 : false,
   });
 
   const policy = (data as any)?.data;
@@ -148,6 +150,7 @@ export default function PartnerPolicyDetailPage() {
                status === "rejected"                          ? "Rejected" : status}
             </StatusBadge>
           )}
+          <CategoryConfidenceChip category={policy?.policy_type} confidence={policy?.ai_confidence} status={status} />
         </TopLeft>
       </TopBar>
 

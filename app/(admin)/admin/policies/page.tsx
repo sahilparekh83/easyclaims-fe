@@ -5,6 +5,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
+import { Calendar } from "primereact/calendar";
 import { Download, FileSearch, FileText, CheckCircle, AlertTriangle, Sparkles, Upload, X, ChevronRight, Check, Info, ChevronDown, Filter, Users, CheckCheck } from "lucide-react";
 import PoliciesTable from "@/components/ui/PoliciesTable";
 import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
@@ -306,118 +307,6 @@ const Spinner = styled.span`
   @keyframes spin { to { transform: rotate(360deg) } }
 `;
 
-// Step 3: Review
-const ReviewGrid = styled.div`
-  display: grid; grid-template-columns: 230px 1fr; gap: 22px;
-  align-items: start; padding: 22px 24px;
-`;
-
-const DocPreview = styled.div`
-  background: #f1f5f9; border: 1px solid #e8eaf0;
-  border-radius: 12px; padding: 16px; position: relative;
-`;
-
-const DocCard = styled.div`
-  background: #fff; border: 1px solid #e8eaf0; border-radius: 6px;
-  padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-`;
-
-const DocLine = styled.div<{ $w: string; $color?: string }>`
-  height: 5px; width: ${p => p.$w}; border-radius: 2px;
-  background: ${p => p.$color || '#e2e8f0'}; margin-bottom: 6px;
-`;
-
-const PdfBadge = styled.span`
-  position: absolute; top: 10px; right: 10px;
-  font-size: 10px; font-weight: 700; color: #fff;
-  background: #ef4444; border-radius: 4px; padding: 2px 6px;
-`;
-
-const DocFilename = styled.div`
-  font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11.5px; color: #64748b;
-  margin-top: 10px; text-align: center;
-`;
-
-const ToggleRow = styled.div`
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 8px;
-`;
-
-const ToggleLabel = styled.label`
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: 13px; color: #64748b; cursor: pointer;
-`;
-
-const ToggleTrack = styled.span<{ $on: boolean }>`
-  width: 36px; height: 20px; border-radius: 999px;
-  background: ${p => p.$on ? '#22c55e' : '#e2e8f0'};
-  position: relative; transition: background 0.2s;
-  flex: none; display: inline-block; cursor: pointer;
-  &::after {
-    content: ''; position: absolute;
-    width: 16px; height: 16px; border-radius: 50%;
-    background: #fff; top: 2px;
-    left: ${p => p.$on ? '18px' : '2px'};
-    transition: left 0.2s;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
-  }
-`;
-
-const AlertBanner = styled.div`
-  background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px;
-  padding: 10px 14px; margin-bottom: 10px;
-  font-size: 12.5px; color: #92400e; display: flex; gap: 8px; align-items: flex-start;
-`;
-
-const FieldRow = styled.div`
-  display: flex; align-items: center; gap: 12px;
-  padding: 9px 0; border-top: 1px solid #f1f2f6;
-`;
-
-const FieldLabel = styled.div`
-  width: 118px; flex: none;
-  font-size: 12px; font-weight: 600; color: #64748b;
-`;
-
-const FieldInput = styled.input`
-  flex: 1; height: 36px; border-radius: 8px;
-  border: 1px solid #e2e8f0; padding: 0 10px;
-  font-size: 13px; color: #0f172a;
-  outline: none;
-  &:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-`;
-
-const ConfChip = styled.span<{ $low: boolean }>`
-  display: inline-flex; align-items: center; gap: 4px;
-  flex: none; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; font-weight: 600;
-  padding: 3px 8px; border-radius: 999px;
-  color: ${p => p.$low ? '#b45309' : '#16a34a'};
-  background: ${p => p.$low ? '#fffbeb' : '#f0fdf4'};
-`;
-
-// Step 4: Summary
-const SummaryBlock = styled.div`
-  background: #eff6ff; border: 1px solid #bfdbfe;
-  border-radius: 12px; padding: 18px 20px;
-  font-size: 14px; color: #374151; line-height: 1.65;
-`;
-
-const SummaryGrid = styled.div`
-  display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 18px;
-`;
-
-const SummaryPoint = styled.div`
-  display: flex; align-items: flex-start; gap: 9px;
-  padding: 8px 0; border-top: 1px solid #f1f2f6;
-`;
-
-const InfoNote = styled.div`
-  display: flex; align-items: flex-start; gap: 8px;
-  margin-top: 18px; padding: 12px 14px;
-  background: #f8fafc; border-radius: 10px;
-  font-size: 12px; color: #64748b; line-height: 1.5;
-`;
-
 const TabBar = styled.div`display: flex; gap: 0; border-bottom: 1px solid #e8eaf0;`;
 
 const Tab = styled.button<{ $active: boolean }>`
@@ -459,31 +348,6 @@ const AccentBtn = styled.button`
   font-size: 14px; font-weight: 700;
   &:hover { background: #0d2d6e; }
 `;
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
-const EXTRACT_FIELDS = [
-  { key: 'policyType',   label: 'Policy type',   value: 'Health',                             conf: 99 },
-  { key: 'policyNumber', label: 'Policy number',  value: 'HFL/2026/8841902',                   conf: 97 },
-  { key: 'insuredName',  label: 'Insured name',   value: 'Rohan Mehta',                        conf: 95 },
-  { key: 'insurer',      label: 'Insurer name',   value: 'Star Health & Allied Insurance',     conf: 92 },
-  { key: 'sumInsured',   label: 'Sum insured',    value: '₹10,00,000',                         conf: 88 },
-  { key: 'policyPeriod', label: 'Policy period',  value: '14 Apr 2026 – 13 Apr 2027',          conf: 61 },
-];
-
-const SUMMARY_POINTS = [
-  { label: 'Sum insured',        value: '₹10,00,000' },
-  { label: 'Policy period',      value: '14 Apr 2026 – 13 Apr 2027' },
-  { label: 'Room rent',          value: 'Up to 1% of SI / day' },
-  { label: 'No-claim bonus',     value: '10% per claim-free year' },
-];
-
-const STEP_LABELS: Record<string, string> = {
-  upload:     'Step 1 of 3 · Upload document',
-  extracting: 'Working…',
-  review:     'Step 2 of 3 · Review & confirm',
-  summary:    'Step 3 of 3 · Policy summary',
-};
 
 // ─── FilterDropdown component ─────────────────────────────────────────────────
 
@@ -585,7 +449,11 @@ function PoliciesPageContent() {
   const [viewLinkedPolicy, setViewLinkedPolicy] = useState<any>(null);
   const [typeFilter, setTypeFilter] = useState("");
   const [aiFilter, setAiFilter] = useState("");
+  const [dateRange, setDateRange] = useState<Date[] | null>(null);
+  const [expiringSoon, setExpiringSoon] = useState(false);
   const debouncedSearch = useDebounce(search, 300);
+  const dateFrom = dateRange?.[0] ? dayjs(dateRange[0]).startOf("day").format("YYYY-MM-DD") : undefined;
+  const dateTo = dateRange?.[1] ? dayjs(dateRange[1]).endOf("day").format("YYYY-MM-DD") : undefined;
 
   // Upload modal state
   const queryClient = useQueryClient();
@@ -603,20 +471,22 @@ function PoliciesPageContent() {
   const [memberQuery, setMemberQuery] = useState("");
   const [memberResults, setMemberResults] = useState<any[]>([]);
   const [selectedMember, setSelectedMember] = useState<any>(null);
-  const [uploadPolicyTypeId, setUploadPolicyTypeId] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const memberSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setFirst(0); }, [debouncedSearch, statusFilter, typeFilter, aiFilter]);
+  useEffect(() => { setFirst(0); }, [debouncedSearch, statusFilter, typeFilter, aiFilter, dateFrom, dateTo, expiringSoon]);
 
   const activeFilters = [
     ...(typeFilter ? [{ field: "policy_type", value: typeFilter }] : []),
+    ...(aiFilter ? [{ field: "status", value: aiFilter }] : []),
+    ...(dateFrom && dateTo ? [{ field: "created_at", operator: "between", value: [dateFrom, dateTo] }] : []),
+    ...(expiringSoon ? [{ field: "end_date", operator: "between", value: [dayjs().format("YYYY-MM-DD"), dayjs().add(30, "day").format("YYYY-MM-DD")] }] : []),
   ];
 
   const { data, isLoading } = useQuery({
-    queryKey: ["admin", "policies", debouncedSearch, typeFilter, first],
+    queryKey: ["admin", "policies", debouncedSearch, typeFilter, aiFilter, dateFrom, dateTo, expiringSoon, first],
     queryFn: () => adminListPolicies({
       global_filter: debouncedSearch,
       sort_field: "created_at",
@@ -625,6 +495,10 @@ function PoliciesPageContent() {
       skip: first,
       filters: activeFilters,
     }),
+    refetchInterval: (query: any) => {
+      const rows = query.state.data?.data?.data ?? [];
+      return rows.some((r: any) => r.status === "processing") ? 4000 : false;
+    },
   });
 
   const { data: policyTypesData } = useQuery({
@@ -643,7 +517,6 @@ function PoliciesPageContent() {
     setMemberQuery("");
     setMemberResults([]);
     setSelectedMember(null);
-    setUploadPolicyTypeId("");
     setUploadFile(null);
     setUploadResult(null);
     setUploadOpen(true);
@@ -665,7 +538,7 @@ function PoliciesPageContent() {
   };
 
   const doUpload = async () => {
-    if (!selectedMember || !uploadPolicyTypeId || !uploadFile) return;
+    if (!selectedMember || !uploadFile) return;
     const partnerId = selectedMember.enrollments?.[0]?.partner_id;
     if (!partnerId) { toast.error("Member has no partner enrollment"); return; }
     setStep('uploading');
@@ -673,7 +546,6 @@ function PoliciesPageContent() {
       const fd = new FormData();
       fd.append("user_id", selectedMember.id);
       fd.append("partner_id", partnerId);
-      fd.append("policy_type_id", uploadPolicyTypeId);
       fd.append("file", uploadFile);
       const res = await adminUploadPolicy(fd);
       setUploadResult(res?.data ?? {});
@@ -768,6 +640,18 @@ function PoliciesPageContent() {
               </button>
             </div>
           )}
+          <Calendar
+            value={dateRange as any}
+            onChange={e => setDateRange(e.value as Date[])}
+            selectionMode="range"
+            readOnlyInput
+            placeholder="Filter by upload date"
+            showButtonBar
+            style={{ width: 240, height: 36 }}
+          />
+          <FilterBtn $active={expiringSoon} onClick={() => setExpiringSoon(v => !v)} title="Policies expiring within 30 days">
+            Expiring Soon
+          </FilterBtn>
         </div>
 
         <PoliciesTable
@@ -783,13 +667,7 @@ function PoliciesPageContent() {
           onTypeFilter={v => { setTypeFilter(v); setFirst(0); }}
           aiFilter={aiFilter}
           onAiFilter={v => { setAiFilter(v); setFirst(0); }}
-          policyTypeOptions={[
-            { label: "Health", value: "Health" },
-            { label: "Life",   value: "Life" },
-            { label: "Motor",  value: "Motor" },
-            { label: "Travel", value: "Travel" },
-            { label: "Home",   value: "Home" },
-          ]}
+          policyTypeOptions={policyTypes.map((pt: any) => ({ label: pt.name, value: pt.name }))}
         />
 
         {/* Pagination */}
@@ -814,7 +692,7 @@ function PoliciesPageContent() {
                 <div>
                   <ModalTitle>Upload policy for member</ModalTitle>
                   <ModalStepLabel>
-                    {step === 'form' && "Select member · policy type · PDF"}
+                    {step === 'form' && "Select member · PDF"}
                     {step === 'uploading' && "Uploading & running AI extraction…"}
                     {step === 'done' && "Policy created — AI extraction running in background"}
                   </ModalStepLabel>
@@ -887,27 +765,6 @@ function PoliciesPageContent() {
                     )}
                   </div>
 
-                  {/* Policy type */}
-                  <div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
-                      Policy type
-                    </div>
-                    <select
-                      value={uploadPolicyTypeId}
-                      onChange={e => setUploadPolicyTypeId(e.target.value)}
-                      style={{
-                        width: "100%", height: 38, border: "1px solid #e0e6ec", borderRadius: 8,
-                        padding: "0 10px", fontSize: 13.5, color: uploadPolicyTypeId ? "#0f172a" : "#94a3b8",
-                        outline: "none", background: "#fff", cursor: "pointer", boxSizing: "border-box",
-                      }}
-                    >
-                      <option value="">Select policy type…</option>
-                      {policyTypes.map((pt: any) => (
-                        <option key={pt.id} value={pt.id}>{pt.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
                   {/* File upload */}
                   <div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "#374151", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 6 }}>
@@ -948,8 +805,8 @@ function PoliciesPageContent() {
                   <GhostBtn onClick={closeUploadModal}>Cancel</GhostBtn>
                   <AccentBtn
                     onClick={doUpload}
-                    disabled={!selectedMember || !uploadPolicyTypeId || !uploadFile}
-                    style={{ opacity: (!selectedMember || !uploadPolicyTypeId || !uploadFile) ? 0.5 : 1 }}
+                    disabled={!selectedMember || !uploadFile}
+                    style={{ opacity: (!selectedMember || !uploadFile) ? 0.5 : 1 }}
                   >
                     <Sparkles size={15} />
                     Upload &amp; extract
@@ -991,7 +848,7 @@ function PoliciesPageContent() {
                     padding: "12px 16px", fontSize: 13, color: "#1d4ed8", textAlign: "left", lineHeight: 1.5,
                   }}>
                     <strong>AI extraction is running in the background.</strong><br />
-                    Family members found in the policy will be added automatically within a few seconds.
+                    The policy category, extracted details, and family members will appear automatically once complete.
                   </div>
                 </div>
                 <ModalFooter>
