@@ -55,7 +55,11 @@ export interface CategoryConfidenceChipProps {
 }
 
 export default function CategoryConfidenceChip({ category, confidence, status }: CategoryConfidenceChipProps) {
-  if (!category && status === "processing") {
+  // While extraction is running, the backend has already written a placeholder
+  // fallback category (e.g. "Other Insurance") to satisfy a NOT NULL column —
+  // it is not the AI's real answer yet, so show "Detecting…" regardless of
+  // whether `category` is already a non-null string.
+  if (status === "processing") {
     return (
       <DetectingChip>
         <Loader2 size={11} /> Detecting…
