@@ -540,11 +540,11 @@ function PlanCardDisplay({
     <CardWrap $popular={!!plan.popular} $color={color}>
       <CardColorBar $color={color} />
       <CardBody>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 3 }}>
-          <h3 style={{ fontSize: 19, fontWeight: 800, color: "#0f172a", margin: 0, whiteSpace: "nowrap" }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 9, marginBottom: 3, flexWrap: "wrap" }}>
+          <h3 style={{ fontSize: 19, fontWeight: 800, color: "#0f172a", margin: 0, lineHeight: 1.25 }}>
             {plan.name}
           </h3>
-          {plan.popular && <PopularBadge>Most popular</PopularBadge>}
+          {plan.popular && <PopularBadge style={{ flex: "none" }}>Most popular</PopularBadge>}
         </div>
         {plan.plan_code && (
           <div style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>

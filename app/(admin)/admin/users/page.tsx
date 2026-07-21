@@ -10,7 +10,6 @@ import { Dialog } from "primereact/dialog";
 import { InputText } from "primereact/inputtext";
 import { Dropdown } from "primereact/dropdown";
 import { InputSwitch } from "primereact/inputswitch";
-import { MultiSelect } from "primereact/multiselect";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import PageHeader from "@/components/ui/PageHeader";
@@ -39,6 +38,7 @@ interface User {
 interface RoleOption {
   id: string;
   role_name: string;
+  is_active: boolean;
 }
 
 interface CreateUserFormValues {
@@ -54,13 +54,6 @@ interface EditUserFormValues {
   is_active: boolean;
 }
 
-const USER_TYPE_OPTIONS = [
-  { label: "Super Admin (full access)", value: "SUPERADMIN" },
-  { label: "Admin (access set by role)", value: "ADMIN" },
-  { label: "Partner", value: "PARTNER" },
-  { label: "Member", value: "MEMBER" },
-];
-
 type DialogMode = "create" | "edit" | null;
 
 export default function UsersPage() {
@@ -68,7 +61,9 @@ export default function UsersPage() {
   const [dialogMode, setDialogMode] = useState<DialogMode>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [rolesDialogUser, setRolesDialogUser] = useState<User | null>(null);
-  const [selectedRoleNames, setSelectedRoleNames] = useState<string[]>([]);
+  const [selectedRoleName, setSelectedRoleName] = useState<string | null>(null);
+  const [createRoleName, setCreateRoleName] = useState<string | null>(null);
+  const [globalFilter, setGlobalFilter] = useState("");
 
   const { data, isLoading } = useQuery({
     queryKey: ["admin", "users"],
@@ -77,37 +72,48 @@ export default function UsersPage() {
 
   // Handle both paginated { data: { data: [...] } } and array { data: [...] } responses
   const rawData = data?.data;
-  const items: User[] = Array.isArray(rawData)
+  const allItems: User[] = Array.isArray(rawData)
     ? rawData
     : rawData?.data ?? [];
+
+  // This page is "Internal Users" — partner/member accounts are managed on their own pages.
+  const items = allItems.filter((u) => u.user_type === "SUPERADMIN" || u.user_type === "ADMIN");
 
   const { data: rolesData } = useQuery({
     queryKey: ["admin", "roles"],
     queryFn: adminListRoles,
   });
+  // Full list (including inactive) so a currently-assigned-but-now-inactive role can still be
+  // looked up for removal; the dropdown options below are active-only, per role_name.
   const availableRoles: RoleOption[] = rolesData?.data ?? [];
-  const roleOptions = availableRoles.map((r) => ({ label: r.role_name, value: r.role_name }));
+  const roleOptions = availableRoles
+    .filter((r) => r.is_active)
+    .map((r) => ({ label: r.role_name, value: r.role_name }));
 
   const setRolesMutation = useMutation({
-    mutationFn: async ({ user, nextRoleNames }: { user: User; nextRoleNames: string[] }) => {
-      const current = new Set(user.roles ?? []);
-      const next = new Set(nextRoleNames);
-      const toAdd = availableRoles.filter((r) => next.has(r.role_name) && !current.has(r.role_name));
-      const toRemove = availableRoles.filter((r) => current.has(r.role_name) && !next.has(r.role_name));
-      for (const r of toAdd) await adminAssignUserRole(user.id, r.id);
-      for (const r of toRemove) await adminRemoveUserRole(user.id, r.id);
+    mutationFn: async ({ user, nextRoleName }: { user: User; nextRoleName: string | null }) => {
+      // One role per user: remove every currently-assigned role, then assign
+      // the single selected one (if any).
+      const current = availableRoles.filter((r) => (user.roles ?? []).includes(r.role_name));
+      for (const r of current) {
+        if (r.role_name !== nextRoleName) await adminRemoveUserRole(user.id, r.id);
+      }
+      const next = nextRoleName ? availableRoles.find((r) => r.role_name === nextRoleName) : null;
+      if (next && !current.some((r) => r.role_name === nextRoleName)) {
+        await adminAssignUserRole(user.id, next.id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
-      toast.success("Roles updated");
+      toast.success("Role updated");
       setRolesDialogUser(null);
     },
-    onError: (err: any) => toast.error(getApiError(err, "Failed to update roles")),
+    onError: (err: any) => toast.error(getApiError(err, "Failed to update role")),
   });
 
   const openRolesDialog = (user: User) => {
     setRolesDialogUser(user);
-    setSelectedRoleNames(user.roles ?? []);
+    setSelectedRoleName((user.roles ?? [])[0] ?? null);
   };
 
   const createForm = useForm<CreateUserFormValues>({
@@ -119,12 +125,32 @@ export default function UsersPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (values: CreateUserFormValues) => adminCreateUser(values),
+    mutationFn: async (values: CreateUserFormValues) => {
+      const res: any = await adminCreateUser(values);
+      const newUser = res?.data;
+      // Backend always auto-assigns a default role matching user_type (e.g. a role
+      // literally named "ADMIN"). If a different role was picked in the dialog,
+      // swap it in — remove the auto-assigned default, assign the picked one —
+      // so the user ends up with exactly the one role that was selected.
+      if (newUser?.id && createRoleName) {
+        const currentRoles: string[] = newUser.roles ?? [];
+        if (!currentRoles.includes(createRoleName)) {
+          for (const roleName of currentRoles) {
+            const r = availableRoles.find((r) => r.role_name === roleName);
+            if (r) { try { await adminRemoveUserRole(newUser.id, r.id); } catch { /* ignore */ } }
+          }
+          const picked = availableRoles.find((r) => r.role_name === createRoleName);
+          if (picked) { try { await adminAssignUserRole(newUser.id, picked.id); } catch { /* ignore */ } }
+        }
+      }
+      return res;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
       toast.success("User created successfully");
       setDialogMode(null);
       createForm.reset();
+      setCreateRoleName(null);
     },
     onError: () => {
       toast.error("Failed to create user");
@@ -158,7 +184,10 @@ export default function UsersPage() {
   });
 
   const openCreate = () => {
-    createForm.reset({ name: "", email: "", user_type: "MEMBER", password: "" });
+    // This page only manages internal (admin) users — user_type is always ADMIN
+    // here; the actual access level is set via the role picked below instead.
+    createForm.reset({ name: "", email: "", user_type: "ADMIN", password: "" });
+    setCreateRoleName(null);
     setDialogMode("create");
   };
 
@@ -179,9 +208,14 @@ export default function UsersPage() {
     setEditingUser(null);
     createForm.reset();
     editForm.reset();
+    setCreateRoleName(null);
   };
 
   const onCreateSubmit = (values: CreateUserFormValues) => {
+    if (!createRoleName) {
+      toast.error("Please select a role");
+      return;
+    }
     createMutation.mutate(values);
   };
 
@@ -251,13 +285,25 @@ export default function UsersPage() {
         }
       />
 
+      <span className="p-input-icon-left" style={{ position: "relative", display: "inline-block", marginTop: "1.5rem" }}>
+        <i className="pi pi-search" style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af", fontSize: 13 }} />
+        <InputText
+          value={globalFilter}
+          onChange={(e) => setGlobalFilter(e.target.value)}
+          placeholder="Search by name, email, or user type…"
+          style={{ paddingLeft: 30, height: 34, fontSize: 13, width: 280, borderRadius: 7 }}
+        />
+      </span>
+
       <DataTable
         value={items}
         loading={isLoading}
         paginator
         rows={20}
         emptyMessage="No users found"
-        style={{ marginTop: "1.5rem" }}
+        globalFilter={globalFilter}
+        globalFilterFields={["name", "email", "user_type"]}
+        style={{ marginTop: "0.75rem" }}
       >
         <Column field="name" header="Name" sortable />
         <Column field="email" header="Email" sortable />
@@ -328,27 +374,17 @@ export default function UsersPage() {
           </div>
 
           <div>
-            <label htmlFor="c-user-type" style={{ display: "block", marginBottom: "0.25rem", fontWeight: 500 }}>
-              User Type <span style={{ color: "red" }}>*</span>
+            <label style={{ display: "block", marginBottom: "0.25rem", fontWeight: 500 }}>
+              Role <span style={{ color: "red" }}>*</span>
             </label>
-            <Controller
-              name="user_type"
-              control={createForm.control}
-              rules={{ required: "User type is required" }}
-              render={({ field }) => (
-                <Dropdown
-                  {...field}
-                  inputId="c-user-type"
-                  options={USER_TYPE_OPTIONS}
-                  placeholder="Select user type"
-                  style={{ width: "100%" }}
-                  className={createErrors.user_type ? "p-invalid" : ""}
-                />
-              )}
+            <Dropdown
+              value={createRoleName}
+              onChange={(e) => setCreateRoleName(e.value)}
+              options={roleOptions}
+              placeholder="Select a role"
+              filter
+              style={{ width: "100%" }}
             />
-            {createErrors.user_type && (
-              <small style={{ color: "red" }}>{createErrors.user_type.message}</small>
-            )}
           </div>
 
           <div>
@@ -471,17 +507,18 @@ export default function UsersPage() {
       >
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div style={{ fontSize: 12.5, color: "#6b7280" }}>
-            What this user can access is controlled by their roles. Manage what each role can do
+            What this user can access is controlled by their role. Manage what each role can do
             on the <strong>Roles &amp; Permissions</strong> page.
           </div>
           <div>
-            <label style={{ display: "block", marginBottom: "0.25rem", fontWeight: 500 }}>Assigned roles</label>
-            <MultiSelect
-              value={selectedRoleNames}
-              onChange={(e) => setSelectedRoleNames(e.value)}
+            <label style={{ display: "block", marginBottom: "0.25rem", fontWeight: 500 }}>Assigned role</label>
+            <Dropdown
+              value={selectedRoleName}
+              onChange={(e) => setSelectedRoleName(e.value)}
               options={roleOptions}
-              placeholder="Select roles"
+              placeholder="Select a role"
               filter
+              showClear
               style={{ width: "100%" }}
             />
           </div>
@@ -491,7 +528,7 @@ export default function UsersPage() {
               type="button"
               label="Save"
               loading={setRolesMutation.isPending}
-              onClick={() => rolesDialogUser && setRolesMutation.mutate({ user: rolesDialogUser, nextRoleNames: selectedRoleNames })}
+              onClick={() => rolesDialogUser && setRolesMutation.mutate({ user: rolesDialogUser, nextRoleName: selectedRoleName })}
             />
           </div>
         </div>
