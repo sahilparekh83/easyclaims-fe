@@ -20,6 +20,7 @@ export interface PolicyRow {
   member_email?: string | null;
   partner_id?: string | null;
   partner_name?: string | null;
+  partner_code?: string | null;
   policy_type?: string | null;
   ai_confidence?: number | null;
   insurer?: string | null;
@@ -43,6 +44,10 @@ export interface PoliciesTableProps {
   showMemberSubline?: boolean;
   /** Show a separate MEMBER column (partner/policies) */
   showMemberColumn?: boolean;
+  /** Show a separate PARTNER column (member/policies — a member can be enrolled with several) */
+  showPartnerColumn?: boolean;
+  /** Click handler for the partner name/code cell — member portal links this to /member/plan */
+  onPartnerClick?: (policy: PolicyRow) => void;
   onDownload?: (policy: PolicyRow) => void;
   onView?: (policy: PolicyRow) => void;
   onDelete?: (policy: PolicyRow) => void;
@@ -106,6 +111,16 @@ const PolicySub = styled.div`
 
 const MemberName = styled.div`font-weight: 600; color: #161d26; font-size: 13.5px;`;
 const MemberEmail = styled.div`font-size: 12px; color: #6b7a8c; margin-top: 2px;`;
+
+const PartnerCellBtn = styled.button`
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+  font-weight: 600; color: #0050b0; font-size: 13.5px;
+  &:hover { text-decoration: underline; }
+`;
+const PartnerCodeText = styled.div`
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 11.5px; color: #94a3b8; margin-top: 1px;
+`;
 
 const MonoAmount = styled.span`
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
@@ -258,6 +273,8 @@ export default function PoliciesTable({
   role,
   showMemberSubline = false,
   showMemberColumn = false,
+  showPartnerColumn = false,
+  onPartnerClick,
   onDownload,
   onView,
   onDelete,
@@ -273,8 +290,8 @@ export default function PoliciesTable({
   const isMember = role === "member";
   const showFilters = !!onTypeFilter || !!onAiFilter;
 
-  // Column count: POLICY + [MEMBER col?] + TYPE + INSURER + [EXPIRY if !member] + SUM INSURED + [AI EXTRACTION if !member] + STATUS + ACTIONS
-  const colCount = 6 + (showMemberColumn ? 1 : 0) + (isMember ? 0 : 2);
+  // Column count: POLICY + [MEMBER col?] + [PARTNER col?] + TYPE + INSURER + [EXPIRY if !member] + SUM INSURED + [AI EXTRACTION if !member] + STATUS + ACTIONS
+  const colCount = 6 + (showMemberColumn ? 1 : 0) + (showPartnerColumn ? 1 : 0) + (isMember ? 0 : 2);
 
   return (
     <TableScroll>
@@ -283,6 +300,7 @@ export default function PoliciesTable({
         <tr>
           <Th>Policy</Th>
           {showMemberColumn && <Th>Member</Th>}
+          {showPartnerColumn && <Th>Partner</Th>}
           <Th>
             {showFilters && onTypeFilter && policyTypeOptions.length > 0 ? (
               <FilterDropdown
@@ -364,6 +382,27 @@ export default function PoliciesTable({
                 <Td>
                   <MemberName>{row.member_name || "—"}</MemberName>
                   {row.member_email && <MemberEmail>{row.member_email}</MemberEmail>}
+                </Td>
+              )}
+
+              {/* Partner column (member only — a member can be enrolled with several) */}
+              {showPartnerColumn && (
+                <Td>
+                  {row.partner_name ? (
+                    onPartnerClick ? (
+                      <PartnerCellBtn onClick={() => onPartnerClick(row)} title="View my plan">
+                        {row.partner_name}
+                        {row.partner_code && <PartnerCodeText>{row.partner_code}</PartnerCodeText>}
+                      </PartnerCellBtn>
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 600, fontSize: 13.5 }}>{row.partner_name}</div>
+                        {row.partner_code && <PartnerCodeText>{row.partner_code}</PartnerCodeText>}
+                      </>
+                    )
+                  ) : (
+                    <span style={{ color: "#9ca3af" }}>—</span>
+                  )}
                 </Td>
               )}
 

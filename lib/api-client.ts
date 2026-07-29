@@ -19,7 +19,7 @@ const apiClient: AxiosInstance = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Attach access token + X-Partner-Id (for member partner-context switching)
+// Attach access token
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // Let axios auto-set multipart/form-data (with correct boundary) for FormData
   if (config.data instanceof FormData) {
@@ -27,13 +27,6 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   }
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
-  }
-  const userType = Cookies.get("ec_user_type");
-  if (userType === "MEMBER") {
-    const activePartnerId = Cookies.get("ec_active_partner");
-    if (activePartnerId) {
-      config.headers["X-Partner-Id"] = activePartnerId;
-    }
   }
   return config;
 });

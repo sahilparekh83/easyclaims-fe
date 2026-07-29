@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, FileText, CreditCard, Bell,
   Settings, Package, ShieldCheck, Heart, UserCheck,
   BadgeCheck, Mail, Briefcase, BarChart2, ClipboardList, Wallet, Ticket, HelpCircle,
-  KeyRound, UserCog, MessageCircle, Headphones,
+  KeyRound, UserCog, MessageCircle, Headphones, Search,
 } from "lucide-react";
 import { adminGetBadgeCounts, partnerGetBadgeCounts } from "@/imports/core/api";
 import { useAuthStore } from "@/stores/AuthStore";
@@ -32,6 +32,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: "Change Requests", href: "/admin/change-requests", icon: <ClipboardList size={18} />, moduleKey: "members" },
   // { label: "Tickets",     href: "/admin/tickets",         icon: <Ticket size={18} />, badgeKey: "tickets", moduleKey: "tickets" },
   { label: "Claim Tickets",  href: "/admin/claim-tickets",   icon: <FileText size={18} />, moduleKey: "claims" },
+  { label: "Search Claims",  href: "/admin/search-claims",   icon: <Search size={18} />, moduleKey: "claims" },
   { label: "Claim Agents",   href: "/admin/claim-agents",    icon: <Headphones size={18} />, superadminOnly: true },
   { label: "Policies",       href: "/admin/policies",        icon: <ShieldCheck size={18} />, moduleKey: "policies" },
   { label: "Reports",        href: "/admin/reports",         icon: <BarChart2 size={18} />, moduleKey: "dashboard" },

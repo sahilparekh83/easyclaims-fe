@@ -2,14 +2,11 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import styled from "styled-components";
-import { Dialog } from "primereact/dialog";
-import { Button } from "primereact/button";
-import { Bell, LogOut, ChevronDown, User, Mail, Shield, ChevronsUpDown, ArrowLeftRight, Menu } from "lucide-react";
+import { Bell, LogOut, ChevronDown, User, Mail, Shield, Menu } from "lucide-react";
 import { useAuthStore } from "@/stores/AuthStore";
-import { useMemberStore } from "@/stores/MemberStore";
 import { useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { logout, memberGetProfile, partnerGetProfile, memberListPartners, getMe } from "@/imports/core/api";
+import { logout, memberGetProfile, partnerGetProfile, getMe } from "@/imports/core/api";
 import { toast } from "react-toastify";
 
 // ─── Styled Components ───────────────────────────────────────────────────────
@@ -96,6 +93,19 @@ const SearchBar = styled.div`
 
   @media (max-width: 640px) {
     display: none;
+  }
+`;
+
+const SearchInput = styled.input`
+  border: none;
+  background: none;
+  outline: none;
+  font-size: 13.5px;
+  color: var(--ec-text-strong, #0f172a);
+  width: 100%;
+
+  &::placeholder {
+    color: var(--ec-text-muted, #64748b);
   }
 `;
 
@@ -232,6 +242,14 @@ const DropEmail = styled.div`
   gap: 5px;
 `;
 
+const DropCode = styled.div`
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #7c3aed;
+  margin-top: 4px;
+`;
+
 const RoleBadge = styled.span`
   display: inline-flex;
   align-items: center;
@@ -272,87 +290,6 @@ const DropItem = styled.button`
   }
 `;
 
-// ─── Partner Switcher ────────────────────────────────────────────────────────
-
-const PartnerSwitcher = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
-  border-radius: 9px;
-  border: 1px solid #e5e7eb;
-  background: #fafafa;
-  cursor: pointer;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #374151;
-  transition: all 0.15s;
-  max-width: 180px;
-
-  &:hover {
-    background: #f5f3ff;
-    border-color: #ede9fe;
-    color: #7c3aed;
-  }
-
-  @media (max-width: 560px) {
-    max-width: 110px;
-  }
-`;
-
-const PartnerLabel = styled.span`
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-`;
-
-const SwitcherMenu = styled.div`
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 200px;
-  max-width: calc(100vw - 24px);
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  z-index: 100;
-  overflow: hidden;
-`;
-
-const SwitcherItem = styled.button<{ $active?: boolean }>`
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  padding: 10px 14px;
-  background: ${({ $active }) => ($active ? "#f5f3ff" : "none")};
-  border: none;
-  border-bottom: 1px solid #f3f4f6;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.1s;
-
-  &:last-child { border-bottom: none; }
-
-  &:hover {
-    background: #f5f3ff;
-  }
-`;
-
-const SwitcherItemName = styled.span`
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #111827;
-`;
-
-const SwitcherItemSub = styled.span`
-  font-size: 0.7rem;
-  color: #9ca3af;
-`;
-
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const PORTAL_LABELS: Record<string, string> = {
@@ -375,14 +312,12 @@ interface HeaderProps {
 
 export default function Header({ title, subtitle, unreadCount = 0, onBellClick, onMenuClick }: HeaderProps) {
   const { clearAuth, accessToken, userType } = useAuthStore();
-  const { activePartnerId, activePartnerName, partners, setActivePartner, setPartners } = useMemberStore();
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const [profileOpen, setProfileOpen] = useState(false);
-  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [headerSearch, setHeaderSearch] = useState("");
   const profileRef = useRef<HTMLDivElement>(null);
-  const switcherRef = useRef<HTMLDivElement>(null);
 
   const isMember = userType === "MEMBER";
   const isPartner = userType === "PARTNER";
@@ -404,14 +339,6 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
     staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch member's enrolled partners
-  const { data: partnersData } = useQuery({
-    queryKey: ["header", "member-partners"],
-    queryFn: memberListPartners,
-    enabled: isMember,
-    staleTime: 5 * 60 * 1000,
-  });
-
   // Fetch admin/superadmin's own profile — email + assigned roles
   const { data: meData } = useQuery({
     queryKey: ["header", "me"],
@@ -420,16 +347,6 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
     staleTime: 60 * 1000,
   });
 
-  // Sync partners into store and pick default
-  useEffect(() => {
-    if (!partnersData) return;
-    const list: any[] = (partnersData as any)?.data ?? [];
-    setPartners(list);
-    if (list.length > 0 && !activePartnerId) {
-      setActivePartner(list[0].partner_id, list[0].partner_name);
-    }
-  }, [partnersData]);
-
   // Resolve display name + email
   const memberProfile: any = (memberProfileData as any)?.data;
   const partnerProfile: any = (partnerProfileData as any)?.data;
@@ -437,18 +354,22 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
 
   let displayName = label;
   let displayEmail = "";
+  let displayCode = "";
   let adminRoles: string[] = [];
   let isSuperadminUser = false;
 
   if (isMember && memberProfile) {
     displayName = memberProfile.name || memberProfile.email || label;
     displayEmail = memberProfile.email || "";
+    displayCode = memberProfile.member_code || "";
   } else if (isPartner && partnerProfile) {
     displayName = partnerProfile.name || partnerProfile.user?.name || label;
     displayEmail = partnerProfile.email || partnerProfile.user?.email || "";
+    displayCode = partnerProfile.partner_code || "";
   } else if (isAdminPortal && meProfile) {
     displayName = meProfile.name || meProfile.email || label;
     displayEmail = meProfile.email || "";
+    displayCode = meProfile.agent_code || "";
     adminRoles = meProfile.roles ?? [];
     isSuperadminUser = !!meProfile.is_superadmin;
   }
@@ -460,9 +381,6 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
     function handler(e: MouseEvent) {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false);
-      }
-      if (switcherRef.current && !switcherRef.current.contains(e.target as Node)) {
-        setSwitcherOpen(false);
       }
     }
     document.addEventListener("mousedown", handler);
@@ -480,24 +398,14 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
     router.push("/login");
   };
 
-  const [pendingSwitch, setPendingSwitch] = useState<{ id: string; name: string | null } | null>(null);
-
-  const handleSwitchPartner = (partnerId: string, partnerName: string | null) => {
-    setSwitcherOpen(false);
-    if (partnerId === activePartnerId) return;
-    setPendingSwitch({ id: partnerId, name: partnerName });
+  const handleHeaderSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const q = headerSearch.trim();
+    if (!q) return;
+    if (isMember) {
+      router.push(`/member/policies?q=${encodeURIComponent(q)}`);
+    }
   };
-
-  const confirmSwitchPartner = () => {
-    if (!pendingSwitch) return;
-    setActivePartner(pendingSwitch.id, pendingSwitch.name);
-    setPendingSwitch(null);
-    // Reload the current page so all queries refetch with the new X-Partner-Id
-    window.location.reload();
-  };
-
-  const currentPartnerName = activePartnerName || (partners[0]?.partner_name) || "My Partner";
-  const multiplePartners = partners.length > 1;
 
   return (
     <Bar>
@@ -512,38 +420,19 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
 
       <SearchBar>
         <i className="pi pi-search" style={{ fontSize: "0.875rem", color: "var(--ec-text-muted, #64748b)" }} />
-        <span>Search members, policies…</span>
+        {isMember ? (
+          <SearchInput
+            value={headerSearch}
+            onChange={e => setHeaderSearch(e.target.value)}
+            onKeyDown={handleHeaderSearch}
+            placeholder="Search policies… (press Enter)"
+          />
+        ) : (
+          <span>Search members, policies…</span>
+        )}
       </SearchBar>
 
       <Right>
-        {/* Partner switcher — only for members with multiple partners */}
-        {isMember && multiplePartners && (
-          <DropWrap ref={switcherRef}>
-            <PartnerSwitcher onClick={() => setSwitcherOpen((o) => !o)}>
-              <ChevronsUpDown size={14} />
-              <PartnerLabel>{currentPartnerName}</PartnerLabel>
-              <ChevronDown size={13} />
-            </PartnerSwitcher>
-
-            {switcherOpen && (
-              <SwitcherMenu>
-                {partners.map((p: any) => (
-                  <SwitcherItem
-                    key={p.partner_id}
-                    $active={p.partner_id === activePartnerId}
-                    onClick={() => handleSwitchPartner(p.partner_id, p.partner_name)}
-                  >
-                    <SwitcherItemName>{p.partner_name || p.partner_id}</SwitcherItemName>
-                    <SwitcherItemSub>
-                      {p.enrollment_status} · {p.plan?.name || "No plan"}
-                    </SwitcherItemSub>
-                  </SwitcherItem>
-                ))}
-              </SwitcherMenu>
-            )}
-          </DropWrap>
-        )}
-
         {/* Bell icon */}
         {onBellClick !== undefined && (
           <IconBtn onClick={onBellClick} title="Notifications">
@@ -574,6 +463,9 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
                     <Mail size={11} />
                     {displayEmail}
                   </DropEmail>
+                )}
+                {displayCode && (
+                  <DropCode>{displayCode}</DropCode>
                 )}
                 {isAdminPortal ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 4 }}>
@@ -612,35 +504,6 @@ export default function Header({ title, subtitle, unreadCount = 0, onBellClick, 
           )}
         </DropWrap>
       </Right>
-
-      <Dialog
-        visible={!!pendingSwitch}
-        onHide={() => setPendingSwitch(null)}
-        header="Switch Partner"
-        style={{ width: "min(420px, 92vw)" }}
-        modal
-        draggable={false}
-        footer={
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-            <Button label="Cancel" severity="secondary" outlined onClick={() => setPendingSwitch(null)} />
-            <Button label="Switch" icon="pi pi-arrow-right-arrow-left" onClick={confirmSwitchPartner} />
-          </div>
-        }
-      >
-        {pendingSwitch && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10, paddingTop: "0.25rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <ArrowLeftRight size={18} color="#0050b0" />
-              <span style={{ fontSize: 14 }}>
-                Switch to <strong>{pendingSwitch.name || "this partner"}</strong>?
-              </span>
-            </div>
-            <div style={{ fontSize: 12.5, color: "#6b7280" }}>
-              The page will reload and any unsaved changes here will be lost.
-            </div>
-          </div>
-        )}
-      </Dialog>
     </Bar>
   );
 }

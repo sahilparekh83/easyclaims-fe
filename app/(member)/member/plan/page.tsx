@@ -1,14 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import styled from "styled-components";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { Button } from "primereact/button";
-import { Dialog } from "primereact/dialog";
-import { toast } from "react-toastify";
-import { memberGetPlan, memberSwitchPlan } from "@/imports/core/api";
-import { getApiError } from "@/imports/core/errors";
+import { memberListPartners } from "@/imports/core/api";
 import PlanFeaturesBlock from "@/components/ui/PlanFeaturesBlock";
 import {
   CreditCard, CheckCircle2, Minus, AlertTriangle, XCircle,
@@ -21,8 +17,22 @@ import {
 const Page = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  max-width: 860px;
+  gap: 14px;
+  max-width: 680px;
+`;
+
+const PartnerLabel = styled.div`
+  display: flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+  color: #6b7a8c; font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  margin-bottom: 6px;
+`;
+
+const PartnerCodeBadge = styled.span`
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px; font-weight: 600; text-transform: none; letter-spacing: normal;
+  color: #0050b0; background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 999px; padding: 2px 9px;
 `;
 
 const BannerWrap = styled.div<{ $variant: "warn" | "error" }>`
@@ -50,7 +60,7 @@ const PlanCard = styled.div<{ $color: string }>`
 `;
 
 const CardBody = styled.div`
-  padding: 24px 28px 28px;
+  padding: 16px 20px 18px;
 `;
 
 const CardTop = styled.div`
@@ -59,17 +69,26 @@ const CardTop = styled.div`
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 `;
 
 const PlanName = styled.div`
-  font-size: 22px; font-weight: 800; color: #161d26;
+  font-size: 17px; font-weight: 800; color: #161d26;
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   letter-spacing: -0.01em;
 `;
 
+const PlanCode = styled.span`
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px; font-weight: 700; color: #7c3aed;
+  background: #f5f3ff; border: 1px solid #ddd6fe;
+  border-radius: 999px; padding: 2px 9px;
+  margin-left: 8px;
+  vertical-align: middle;
+`;
+
 const StatusPill = styled.span<{ $status: string }>`
-  font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 4px 12px;
+  font-size: 11px; font-weight: 600; border-radius: 999px; padding: 3px 10px;
   flex: none;
   background: ${p =>
     p.$status === "Active" ? "#f0fdf4" :
@@ -80,34 +99,34 @@ const StatusPill = styled.span<{ $status: string }>`
 `;
 
 const Tagline = styled.div`
-  font-size: 13.5px; color: #6b7a8c; margin-top: 4px;
+  font-size: 12.5px; color: #6b7a8c; margin-top: 2px;
 `;
 
 const PriceRow = styled.div`
-  display: flex; align-items: baseline; gap: 6px; margin-top: 18px;
+  display: flex; align-items: baseline; gap: 5px; margin-top: 10px;
 `;
 
 const Price = styled.div`
-  font-size: 32px; font-weight: 800; color: #161d26;
+  font-size: 24px; font-weight: 800; color: #161d26;
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   letter-spacing: -0.02em; line-height: 1;
 `;
 
 const PriceSuffix = styled.span`
-  font-size: 14px; color: #6b7a8c; font-weight: 500;
+  font-size: 13px; color: #6b7a8c; font-weight: 500;
 `;
 
 const MemberCount = styled.div`
   display: flex; align-items: center; gap: 5px;
-  font-size: 13px; color: #6b7a8c; margin-top: 8px;
+  font-size: 12px; color: #6b7a8c; margin-top: 6px;
 `;
 
 const Divider = styled.div`
-  height: 1px; background: #e0e6ec; margin: 22px 0;
+  height: 1px; background: #e0e6ec; margin: 14px 0;
 `;
 
 const DatesRow = styled.div`
-  display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 22px;
+  display: flex; flex-wrap: wrap; gap: 20px; margin-bottom: 4px;
 `;
 
 const DateItem = styled.div`
@@ -125,21 +144,21 @@ const DateValue = styled.div`
 `;
 
 const BenefitsLabel = styled.div`
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
   color: #6b7a8c; font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  margin-bottom: 14px;
+  margin-bottom: 8px;
 `;
 
 const BenefitsList = styled.div`
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 32px;
+  gap: 6px 24px;
   @media (max-width: 600px) { grid-template-columns: 1fr; }
 `;
 
 const BenefitRow = styled.div<{ $active?: boolean }>`
-  display: flex; align-items: center; gap: 9px;
-  font-size: 13px; font-weight: 500;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 500;
   color: ${p => p.$active !== false ? "#3a4756" : "#b0bac5"};
 `;
 
@@ -147,10 +166,6 @@ const EmptyState = styled.div`
   background: #fff; border: 1px dashed #e0e6ec; border-radius: 14px;
   padding: 56px 24px; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 12px;
-`;
-
-const DialogFooterRow = styled.div`
-  display: flex; justify-content: flex-end; gap: 8px;
 `;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -228,43 +243,12 @@ function buildBenefits(plan: any): Benefit[] {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MemberPlanPage() {
-  const queryClient = useQueryClient();
-  const [confirmVisible, setConfirmVisible] = useState(false);
-
-  const { data: planData, isLoading } = useQuery({
-    queryKey: ["member", "plan"],
-    queryFn: memberGetPlan,
-    retry: false,
+  const { data: partnersData, isLoading } = useQuery({
+    queryKey: ["member", "partners"],
+    queryFn: memberListPartners,
   });
 
-  const enrollment = planData?.data?.enrollment;
-  const currentPlan: any = planData?.data?.plan ?? null;
-
-  const daysUntilExpiry = enrollment?.end_date
-    ? dayjs(enrollment.end_date).diff(dayjs(), "day")
-    : null;
-  const showExpiredBanner = enrollment?.status === "Expired";
-  const showExpiryWarning =
-    !showExpiredBanner &&
-    daysUntilExpiry !== null &&
-    daysUntilExpiry >= 0 &&
-    daysUntilExpiry <= 7;
-
-  const switchMutation = useMutation({
-    mutationFn: (planId: string) => memberSwitchPlan(planId),
-    onSuccess: () => {
-      toast.success("Plan changed successfully!");
-      queryClient.invalidateQueries({ queryKey: ["member", "plan"] });
-      setConfirmVisible(false);
-    },
-    onError: (err: any) => {
-      toast.error(getApiError(err, "Failed to change plan"));
-    },
-  });
-
-  const enrollmentStatus: string = enrollment?.status ?? (currentPlan ? "Active" : "");
-  const benefits = buildBenefits(currentPlan);
-  const color = planColor(currentPlan?.name);
+  const enrollments: any[] = (partnersData as any)?.data ?? [];
 
   if (isLoading) {
     return (
@@ -274,136 +258,142 @@ export default function MemberPlanPage() {
     );
   }
 
-  return (
-    <Page>
-      {showExpiredBanner && (
-        <BannerWrap $variant="error">
-          <XCircle size={17} />
-          <span><strong>Your plan has expired.</strong> Contact your partner to renew your membership.</span>
-        </BannerWrap>
-      )}
-      {showExpiryWarning && daysUntilExpiry !== null && (
-        <BannerWrap $variant="warn">
-          <AlertTriangle size={17} />
-          <span>
-            <strong>Plan expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? "s" : ""}</strong>
-            {enrollment?.end_date && <> ({dayjs(enrollment.end_date).format("DD MMM YYYY")})</>}.
-            {" "}Contact your partner to renew.
-          </span>
-        </BannerWrap>
-      )}
-
-      {currentPlan ? (
-        <PlanCard $color={color}>
-          <CardBody>
-            <CardTop>
-              <div>
-                <PlanName>{currentPlan.name}</PlanName>
-                {currentPlan.tagline && <Tagline>{currentPlan.tagline}</Tagline>}
-              </div>
-              {enrollmentStatus && (
-                <StatusPill $status={enrollmentStatus}>{enrollmentStatus}</StatusPill>
-              )}
-            </CardTop>
-
-            {currentPlan.price != null && (
-              <>
-                <PriceRow>
-                  <Price>₹{Number(currentPlan.price).toLocaleString("en-IN")}</Price>
-                  <PriceSuffix>/{currentPlan.cycle ?? "year"}</PriceSuffix>
-                </PriceRow>
-                {currentPlan.member_count != null && (
-                  <MemberCount>
-                    <Users size={13} />
-                    {Number(currentPlan.member_count).toLocaleString("en-IN")} members
-                  </MemberCount>
-                )}
-              </>
-            )}
-
-            <Divider />
-
-            {(enrollment?.start_date || enrollment?.end_date) && (
-              <DatesRow>
-                {enrollment?.start_date && (
-                  <DateItem>
-                    <DateLabel>Valid from</DateLabel>
-                    <DateValue>{dayjs(enrollment.start_date).format("DD MMM YYYY")}</DateValue>
-                  </DateItem>
-                )}
-                {enrollment?.end_date && (
-                  <DateItem>
-                    <DateLabel>Valid to</DateLabel>
-                    <DateValue>{dayjs(enrollment.end_date).format("DD MMM YYYY")}</DateValue>
-                  </DateItem>
-                )}
-                {currentPlan.partner_name && (
-                  <DateItem>
-                    <DateLabel>Partner</DateLabel>
-                    <DateValue>{currentPlan.partner_name}</DateValue>
-                  </DateItem>
-                )}
-              </DatesRow>
-            )}
-
-            <BenefitsLabel>What's included</BenefitsLabel>
-            <BenefitsList>
-              {benefits.map((b, i) => (
-                <BenefitRow key={i} $active={b.active}>
-                  {b.active
-                    ? <CheckCircle2 size={15} color="#65a147" style={{ flex: "none" }} />
-                    : <Minus size={15} color="#b0bac5" style={{ flex: "none" }} />
-                  }
-                  {b.label}
-                </BenefitRow>
-              ))}
-            </BenefitsList>
-
-            {(currentPlan.fee_slabs?.length || currentPlan.basic_features?.length || currentPlan.advanced_features?.length) ? (
-              <>
-                <Divider />
-                <PlanFeaturesBlock plan={currentPlan} />
-              </>
-            ) : null}
-          </CardBody>
-        </PlanCard>
-      ) : (
+  if (enrollments.length === 0) {
+    return (
+      <Page>
         <EmptyState>
           <CreditCard size={36} color="#e0e6ec" />
           <div style={{ fontSize: 16, fontWeight: 700, color: "#3a4756" }}>No active plan</div>
           <div style={{ fontSize: 13, color: "#6b7a8c" }}>Contact your partner to get enrolled in a plan.</div>
         </EmptyState>
-      )}
+      </Page>
+    );
+  }
 
-      {/* Confirm switch dialog — kept for partner-initiated switches if needed */}
-      <Dialog
-        header="Confirm Plan Change"
-        visible={confirmVisible}
-        onHide={() => { if (!switchMutation.isPending) setConfirmVisible(false); }}
-        style={{ width: "480px" }}
-        footer={
-          <DialogFooterRow>
-            <Button
-              label="Cancel"
-              severity="secondary"
-              outlined
-              onClick={() => setConfirmVisible(false)}
-              disabled={switchMutation.isPending}
-            />
-            <Button
-              label="Yes, confirm"
-              icon="pi pi-check"
-              loading={switchMutation.isPending}
-              onClick={() => currentPlan && switchMutation.mutate(currentPlan.id)}
-              style={{ background: "#0050b0", borderColor: "#0050b0" }}
-            />
-          </DialogFooterRow>
-        }
-      >
-        <div style={{ fontSize: "0.9rem", color: "#3a4756" }}>
-          This action will update your plan. It takes effect immediately.
-        </div>
-      </Dialog>
+  return (
+    <Page>
+      {enrollments.map((enrollment) => {
+        const currentPlan: any = enrollment.plan ?? null;
+        const daysUntilExpiry = enrollment.end_date
+          ? dayjs(enrollment.end_date).diff(dayjs(), "day")
+          : null;
+        const showExpiredBanner = enrollment.enrollment_status === "Expired";
+        const showExpiryWarning =
+          !showExpiredBanner &&
+          daysUntilExpiry !== null &&
+          daysUntilExpiry >= 0 &&
+          daysUntilExpiry <= 7;
+        const enrollmentStatus: string = enrollment.enrollment_status ?? (currentPlan ? "Active" : "");
+        const benefits = buildBenefits(currentPlan);
+        const color = planColor(currentPlan?.name);
+
+        return (
+          <div key={enrollment.partner_id}>
+            <PartnerLabel>
+              <span>{enrollment.partner_name || "Partner"}</span>
+              {enrollment.partner_code && (
+                <PartnerCodeBadge>{enrollment.partner_code}</PartnerCodeBadge>
+              )}
+            </PartnerLabel>
+
+            {showExpiredBanner && (
+              <BannerWrap $variant="error" style={{ marginBottom: 12 }}>
+                <XCircle size={17} />
+                <span><strong>This plan has expired.</strong> Contact {enrollment.partner_name || "your partner"} to renew.</span>
+              </BannerWrap>
+            )}
+            {showExpiryWarning && daysUntilExpiry !== null && (
+              <BannerWrap $variant="warn" style={{ marginBottom: 12 }}>
+                <AlertTriangle size={17} />
+                <span>
+                  <strong>Plan expires in {daysUntilExpiry} day{daysUntilExpiry !== 1 ? "s" : ""}</strong>
+                  {enrollment.end_date && <> ({dayjs(enrollment.end_date).format("DD MMM YYYY")})</>}.
+                  {" "}Contact {enrollment.partner_name || "your partner"} to renew.
+                </span>
+              </BannerWrap>
+            )}
+
+            {currentPlan ? (
+              <PlanCard $color={color}>
+                <CardBody>
+                  <CardTop>
+                    <div>
+                      <div>
+                        <PlanName style={{ display: "inline" }}>{currentPlan.name}</PlanName>
+                        {currentPlan.plan_code && <PlanCode>{currentPlan.plan_code}</PlanCode>}
+                      </div>
+                      {currentPlan.tagline && <Tagline>{currentPlan.tagline}</Tagline>}
+                    </div>
+                    {enrollmentStatus && (
+                      <StatusPill $status={enrollmentStatus}>{enrollmentStatus}</StatusPill>
+                    )}
+                  </CardTop>
+
+                  {currentPlan.price != null && (
+                    <>
+                      <PriceRow>
+                        <Price>₹{Number(currentPlan.price).toLocaleString("en-IN")}</Price>
+                        <PriceSuffix>/{currentPlan.cycle ?? "year"}</PriceSuffix>
+                      </PriceRow>
+                      {currentPlan.member_count != null && (
+                        <MemberCount>
+                          <Users size={13} />
+                          {Number(currentPlan.member_count).toLocaleString("en-IN")} members
+                        </MemberCount>
+                      )}
+                    </>
+                  )}
+
+                  <Divider />
+
+                  {(enrollment.start_date || enrollment.end_date) && (
+                    <DatesRow>
+                      {enrollment.start_date && (
+                        <DateItem>
+                          <DateLabel>Valid from</DateLabel>
+                          <DateValue>{dayjs(enrollment.start_date).format("DD MMM YYYY")}</DateValue>
+                        </DateItem>
+                      )}
+                      {enrollment.end_date && (
+                        <DateItem>
+                          <DateLabel>Valid to</DateLabel>
+                          <DateValue>{dayjs(enrollment.end_date).format("DD MMM YYYY")}</DateValue>
+                        </DateItem>
+                      )}
+                    </DatesRow>
+                  )}
+
+                  <BenefitsLabel>What's included</BenefitsLabel>
+                  <BenefitsList>
+                    {benefits.map((b, i) => (
+                      <BenefitRow key={i} $active={b.active}>
+                        {b.active
+                          ? <CheckCircle2 size={15} color="#65a147" style={{ flex: "none" }} />
+                          : <Minus size={15} color="#b0bac5" style={{ flex: "none" }} />
+                        }
+                        {b.label}
+                      </BenefitRow>
+                    ))}
+                  </BenefitsList>
+
+                  {(currentPlan.fee_slabs?.length || currentPlan.basic_features?.length || currentPlan.advanced_features?.length) ? (
+                    <>
+                      <Divider />
+                      <PlanFeaturesBlock plan={currentPlan} />
+                    </>
+                  ) : null}
+                </CardBody>
+              </PlanCard>
+            ) : (
+              <EmptyState>
+                <CreditCard size={36} color="#e0e6ec" />
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#3a4756" }}>No plan on this partner</div>
+                <div style={{ fontSize: 13, color: "#6b7a8c" }}>Contact {enrollment.partner_name || "your partner"} for details.</div>
+              </EmptyState>
+            )}
+          </div>
+        );
+      })}
     </Page>
   );
 }

@@ -301,6 +301,7 @@ interface PartnerProfile {
   id: string;
   user_id: string;
   name: string;
+  partner_code: string | null;
   partner_type: string;
   city: string | null;
   state: string | null;
@@ -583,13 +584,21 @@ export default function PartnerProfilePage() {
                 </ProfileSection>
               )}
 
-              {profile?.created_at && (
+              {(profile?.created_at || profile?.partner_code) && (
                 <ProfileSection>
                   <ProfileGrid>
-                    <div>
-                      <InfoLabel>Partner since</InfoLabel>
-                      <InfoValue>{dayjs(profile.created_at).format("DD MMM YYYY")}</InfoValue>
-                    </div>
+                    {profile?.partner_code && (
+                      <div>
+                        <InfoLabel>Partner code</InfoLabel>
+                        <InfoValue style={{ fontFamily: "'IBM Plex Mono', ui-monospace, monospace" }}>{profile.partner_code}</InfoValue>
+                      </div>
+                    )}
+                    {profile?.created_at && (
+                      <div>
+                        <InfoLabel>Partner since</InfoLabel>
+                        <InfoValue>{dayjs(profile.created_at).format("DD MMM YYYY")}</InfoValue>
+                      </div>
+                    )}
                   </ProfileGrid>
                 </ProfileSection>
               )}

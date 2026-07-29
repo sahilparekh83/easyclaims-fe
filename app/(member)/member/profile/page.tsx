@@ -210,6 +210,12 @@ export default function MemberProfilePage() {
           <SectionCard>
             <CardHeader><CardTitle>Account Details</CardTitle></CardHeader>
             <CardBody style={{ padding: "8px 22px 16px" }}>
+              {d.member_code && (
+                <InfoRow>
+                  <InfoLabel>Member Code</InfoLabel>
+                  <MonoValue>{d.member_code}</MonoValue>
+                </InfoRow>
+              )}
               <InfoRow>
                 <InfoLabel>Member ID</InfoLabel>
                 <MonoValue>{d.id?.slice(-12)?.toUpperCase() || "—"}</MonoValue>
@@ -240,6 +246,12 @@ export default function MemberProfilePage() {
                   {selectedPartner.partner_type && <PartnerTypeChip>{selectedPartner.partner_type}</PartnerTypeChip>}
                 </div>
               </InfoRow>
+              {selectedPartner.partner_code && (
+                <InfoRow>
+                  <InfoLabel>Partner Code</InfoLabel>
+                  <MonoValue>{selectedPartner.partner_code}</MonoValue>
+                </InfoRow>
+              )}
               <InfoRow>
                 <InfoLabel>Status</InfoLabel>
                 <EnrollBadge $status={selectedPartner.enrollment_status ?? ""}>{selectedPartner.enrollment_status ?? "—"}</EnrollBadge>

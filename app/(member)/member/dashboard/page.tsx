@@ -10,6 +10,7 @@ import {
   memberListPolicies,
   memberListFamily,
   memberGetPlan,
+  memberListPartners,
 } from "@/imports/core/api";
 import StatusBadge from "@/components/ui/StatusBadge";
 import { CreditCard, FileText, Users } from "lucide-react";
@@ -54,13 +55,6 @@ const KpiValue = styled.div`
   font-size: 2rem; font-weight: 800; color: #161d26;
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   letter-spacing: -0.02em; line-height: 1;
-`;
-
-const KpiValueText = styled.div`
-  font-size: 1.1rem; font-weight: 800; color: #161d26;
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-  letter-spacing: -0.01em; line-height: 1.2;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 `;
 
 const KpiLabel = styled.div`
@@ -225,6 +219,11 @@ export default function MemberDashboardPage() {
     retry: false,
   });
 
+  const { data: partnersData, isLoading: partnersL } = useQuery({
+    queryKey: ["member", "partners"],
+    queryFn: memberListPartners,
+  });
+
   const totalPolicies: number =
     policiesData?.data?.total ??
     policiesData?.data?.items?.length ??
@@ -240,7 +239,11 @@ export default function MemberDashboardPage() {
 
   const enrollment = planData?.data?.enrollment;
   const currentPlan = planData?.data?.plan;
-  const planName: string = currentPlan?.name ?? "No active plan";
+
+  const activePlanCount: number = ((partnersData as any)?.data ?? []).filter(
+    (p: any) => p.enrollment_status === "Active"
+  ).length;
+  const showPartnerCol = ((partnersData as any)?.data ?? []).length > 1;
 
   const daysUntilExpiry = enrollment?.end_date
     ? dayjs(enrollment.end_date).diff(dayjs(), "day")
@@ -251,10 +254,10 @@ export default function MemberDashboardPage() {
   return (
     <Page>
       <KpiGrid>
-        <KpiCard>
+        <KpiCard style={{ cursor: "pointer" }} onClick={() => router.push("/member/plan")}>
           <KpiIconBox $bg="#eff6ff" $color="#2563eb"><CreditCard size={18} /></KpiIconBox>
-          {planL ? <Skeleton /> : <KpiValueText>{planName}</KpiValueText>}
-          <KpiLabel>Active Plan</KpiLabel>
+          {partnersL ? <Skeleton /> : <KpiValue>{activePlanCount.toLocaleString("en-IN")}</KpiValue>}
+          <KpiLabel>Active Plan{activePlanCount === 1 ? "" : "s"}</KpiLabel>
         </KpiCard>
         <KpiCard>
           <KpiIconBox $bg="#fefce8" $color="#ca8a04"><FileText size={18} /></KpiIconBox>
@@ -279,6 +282,7 @@ export default function MemberDashboardPage() {
             <thead>
               <tr>
                 <Th>Policy ID</Th>
+                {showPartnerCol && <ThSm>Partner</ThSm>}
                 <ThSm>Type</ThSm>
                 <Th>Insurer</Th>
                 <ThSm>Status</ThSm>
@@ -295,6 +299,9 @@ export default function MemberDashboardPage() {
                   <Td>
                     <MonoText>{p.policy_number ?? p.id?.slice(-8)?.toUpperCase() ?? "—"}</MonoText>
                   </Td>
+                  {showPartnerCol && (
+                    <TdSm style={{ color: "#3a4756", fontSize: 12.5 }}>{p.partner_name || "—"}</TdSm>
+                  )}
                   <TdSm>
                     {p.policy_type
                       ? <TypeBadge $type={p.policy_type}>{p.policy_type}</TypeBadge>

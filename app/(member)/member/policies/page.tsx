@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { Suspense, useState, useRef } from "react";
 import styled, { keyframes } from "styled-components";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Eye, Download, Upload, CheckCircle2, X, AlertTriangle, RefreshCw } from "lucide-react";
 import PoliciesTable from "@/components/ui/PoliciesTable";
@@ -9,11 +9,12 @@ import ClaimPolicyModal from "@/components/ui/ClaimPolicyModal";
 import {
   memberListPolicies, memberUploadPolicy, memberUpdatePolicy,
   memberDeletePolicy, memberViewPolicyPdf, memberDownloadPolicyPdf,
-  memberListFamily,
+  memberListFamily, memberListPartners,
 } from "@/imports/core/api";
 import PolicyStatusBadge from "@/components/ui/PolicyStatusBadge";
 import { Button } from "primereact/button";
 import { Dialog } from "primereact/dialog";
+import { Dropdown } from "primereact/dropdown";
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 import { useDebounce } from "@/hooks/useDebounce";
@@ -273,6 +274,7 @@ const DialogFooter = styled.div`display: flex; justify-content: flex-end; gap: 0
 interface LinkedMember { id: string; name: string; relation: string; }
 interface Policy {
   id: string; policy_number: string; insurer: string; policy_type?: string;
+  partner_id?: string | null; partner_name?: string | null; partner_code?: string | null;
   sum_insured?: number | null; premium_amount?: number | null;
   start_date: string; end_date: string; status: string; file_name?: string | null;
   previous_policy_id?: string | null;
@@ -309,16 +311,26 @@ async function downloadPdf(policyId: string, fileName?: string | null) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function MemberPoliciesPage() {
+  return (
+    <Suspense fallback={null}>
+      <MemberPoliciesContent />
+    </Suspense>
+  );
+}
+
+function MemberPoliciesContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const debouncedSearch = useDebounce(search, 300);
   React.useEffect(() => { setPage(0); }, [debouncedSearch]);
 
   // Upload overlay state
   const [uploadVisible, setUploadVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [dropActive, setDropActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -343,11 +355,16 @@ export default function MemberPoliciesPage() {
     },
   });
   const { data: familyData } = useQuery({ queryKey: ["member", "family"], queryFn: memberListFamily });
+  const { data: partnersData } = useQuery({ queryKey: ["member", "partners"], queryFn: memberListPartners });
 
   const policies: Policy[] = policiesData?.data?.data ?? [];
   const total: number = policiesData?.data?.total ?? 0;
   const totalPages = Math.ceil(total / ROWS);
   const familyMembers: FamilyMember[] = (familyData as any)?.data?.family ?? (familyData as any)?.data ?? [];
+  const partnerOptions = ((partnersData as any)?.data ?? []).map((p: any) => ({
+    label: p.partner_name || p.partner_id,
+    value: p.partner_id,
+  }));
 
   const uploadMutation = useMutation({
     mutationFn: (formData: FormData) => memberUploadPolicy(formData),
@@ -373,6 +390,7 @@ export default function MemberPoliciesPage() {
 
   const openUpload = () => {
     setSelectedFile(null);
+    setSelectedPartnerId(partnerOptions.length === 1 ? partnerOptions[0].value : null);
     setDropActive(false);
     setUploadVisible(true);
   };
@@ -380,6 +398,7 @@ export default function MemberPoliciesPage() {
   const closeUpload = () => {
     setUploadVisible(false);
     setSelectedFile(null);
+    setSelectedPartnerId(null);
     setDropActive(false);
   };
 
@@ -408,8 +427,10 @@ export default function MemberPoliciesPage() {
   };
 
   const handleUploadSubmit = () => {
+    if (!selectedPartnerId) { toast.error("Please select a partner."); return; }
     if (!selectedFile) { toast.error("Please select a PDF file."); return; }
     const fd = new FormData();
+    fd.append("partner_id", selectedPartnerId);
     fd.append("file", selectedFile);
     uploadMutation.mutate(fd);
   };
@@ -444,6 +465,8 @@ export default function MemberPoliciesPage() {
           policies={policies}
           isLoading={isLoading}
           role="member"
+          showPartnerColumn={partnerOptions.length > 1}
+          onPartnerClick={() => router.push("/member/plan")}
           onDownload={p => downloadPdf(p.id, p.file_name ?? undefined)}
           onView={p => router.push(`/member/policies/${p.id}`)}
           onDelete={p => handleDelete(p as any)}
@@ -473,6 +496,15 @@ export default function MemberPoliciesPage() {
 
             <input ref={fileInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handleFileChange} />
 
+            <FieldLabel>Partner *</FieldLabel>
+            <Dropdown
+              value={selectedPartnerId}
+              onChange={e => setSelectedPartnerId(e.value)}
+              options={partnerOptions}
+              placeholder="Which partner is this policy under?"
+              style={{ width: "100%", marginBottom: 20 }}
+            />
+
             <FieldLabel>Policy Document (PDF) *</FieldLabel>
             <UploadDropzone
               $active={dropActive}
@@ -495,7 +527,7 @@ export default function MemberPoliciesPage() {
                   </>}
             </UploadDropzone>
 
-            <SubmitBtn onClick={handleUploadSubmit} disabled={uploadMutation.isPending}>
+            <SubmitBtn onClick={handleUploadSubmit} disabled={uploadMutation.isPending || !selectedPartnerId || !selectedFile}>
               {uploadMutation.isPending ? <Spinner /> : <><Upload size={15} /> Submit Document</>}
             </SubmitBtn>
           </ModalCard>

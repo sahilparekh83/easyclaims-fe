@@ -718,6 +718,9 @@ export const adminUpdateTicketStatus = (id: string, status: string) =>
 export const adminListClaims = (params?: object) =>
   apiClient.post("/admin/claims/list", params || {}).then((r) => r.data);
 
+export const adminSearchAllClaims = (params: { search: string; skip?: number; limit?: number }) =>
+  apiClient.post("/admin/claims/search-all", params).then((r) => r.data);
+
 export const adminGetClaim = (id: string) =>
   apiClient.get(`/admin/claims/${id}`).then((r) => r.data);
 
