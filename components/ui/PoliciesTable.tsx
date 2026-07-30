@@ -46,6 +46,8 @@ export interface PoliciesTableProps {
   showMemberColumn?: boolean;
   /** Show a separate PARTNER column (member/policies — a member can be enrolled with several) */
   showPartnerColumn?: boolean;
+  /** Click handler for the member name cell — admin/policies links this to /admin/members/[id] */
+  onMemberClick?: (policy: PolicyRow) => void;
   /** Click handler for the partner name/code cell — member portal links this to /member/plan */
   onPartnerClick?: (policy: PolicyRow) => void;
   onDownload?: (policy: PolicyRow) => void;
@@ -274,6 +276,7 @@ export default function PoliciesTable({
   showMemberSubline = false,
   showMemberColumn = false,
   showPartnerColumn = false,
+  onMemberClick,
   onPartnerClick,
   onDownload,
   onView,
@@ -380,7 +383,13 @@ export default function PoliciesTable({
               {/* Member column (partner only) */}
               {showMemberColumn && (
                 <Td>
-                  <MemberName>{row.member_name || "—"}</MemberName>
+                  {row.member_name && onMemberClick ? (
+                    <PartnerCellBtn onClick={() => onMemberClick(row)} title="View member">
+                      {row.member_name}
+                    </PartnerCellBtn>
+                  ) : (
+                    <MemberName>{row.member_name || "—"}</MemberName>
+                  )}
                   {row.member_email && <MemberEmail>{row.member_email}</MemberEmail>}
                 </Td>
               )}

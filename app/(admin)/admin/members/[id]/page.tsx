@@ -1006,6 +1006,8 @@ export default function MemberDetailPage() {
             <PoliciesTable
               policies={memberPolicies}
               role="admin"
+              showPartnerColumn
+              onPartnerClick={p => { if (p.partner_id) router.push(`/admin/partners/${p.partner_id}`); }}
               onDownload={async p => { const blob = await adminDownloadPolicyPdf(p.id); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `policy_${p.policy_number}.pdf`; a.click(); URL.revokeObjectURL(url); }}
               onView={p => {
                 const qs = new URLSearchParams();

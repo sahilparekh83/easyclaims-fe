@@ -471,6 +471,7 @@ function PoliciesPageContent() {
   const [memberQuery, setMemberQuery] = useState("");
   const [memberResults, setMemberResults] = useState<any[]>([]);
   const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadResult, setUploadResult] = useState<any>(null);
   const memberSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -517,6 +518,7 @@ function PoliciesPageContent() {
     setMemberQuery("");
     setMemberResults([]);
     setSelectedMember(null);
+    setSelectedPartnerId(null);
     setUploadFile(null);
     setUploadResult(null);
     setUploadOpen(true);
@@ -539,13 +541,12 @@ function PoliciesPageContent() {
 
   const doUpload = async () => {
     if (!selectedMember || !uploadFile) return;
-    const partnerId = selectedMember.enrollments?.[0]?.partner_id;
-    if (!partnerId) { toast.error("Member has no partner enrollment"); return; }
+    if (!selectedPartnerId) { toast.error("Please select which partner this policy belongs to"); return; }
     setStep('uploading');
     try {
       const fd = new FormData();
       fd.append("user_id", selectedMember.id);
-      fd.append("partner_id", partnerId);
+      fd.append("partner_id", selectedPartnerId);
       fd.append("file", uploadFile);
       const res = await adminUploadPolicy(fd);
       setUploadResult(res?.data ?? {});
@@ -658,7 +659,10 @@ function PoliciesPageContent() {
           policies={policies}
           isLoading={isLoading}
           role="admin"
-          showMemberSubline
+          showMemberColumn
+          showPartnerColumn
+          onMemberClick={row => { if (row.member_id) router.push(`/admin/members/${row.member_id}`); }}
+          onPartnerClick={row => { if (row.partner_id) router.push(`/admin/partners/${row.partner_id}`); }}
           onDownload={row => downloadPdf(row.id, row.file_name ?? undefined)}
           onView={row => router.push(`/admin/policies/${row.id}?member_id=${row.member_id ?? ""}&member_name=${encodeURIComponent(row.member_name ?? "")}&partner_id=${row.partner_id ?? ""}&partner_name=${encodeURIComponent(row.partner_name ?? "")}`)}
           onLinked={row => setViewLinkedPolicy(row)}
@@ -730,7 +734,13 @@ function PoliciesPageContent() {
                           {memberResults.map((m: any) => (
                             <div
                               key={m.id}
-                              onClick={() => { setSelectedMember(m); setMemberQuery(""); setMemberResults([]); }}
+                              onClick={() => {
+                                setSelectedMember(m);
+                                setMemberQuery("");
+                                setMemberResults([]);
+                                const enrollments = m.enrollments ?? [];
+                                setSelectedPartnerId(enrollments.length === 1 ? enrollments[0].partner_id : null);
+                              }}
                               style={{
                                 padding: "9px 14px", cursor: "pointer", display: "flex", alignItems: "center", gap: 10,
                                 borderBottom: "1px solid #f1f5f9",
@@ -756,11 +766,37 @@ function PoliciesPageContent() {
                     {selectedMember && (
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
                         <span style={{ fontSize: 12, color: "#16a34a" }}>
-                          ✓ {selectedMember.partner_name ? `Enrolled under ${selectedMember.partner_name}` : "Member selected"}
+                          ✓ {(selectedMember.enrollments?.length ?? 0) > 1
+                            ? `Enrolled under ${selectedMember.enrollments.length} partners — select one below`
+                            : selectedMember.partner_name ? `Enrolled under ${selectedMember.partner_name}` : "Member selected"}
                         </span>
-                        <button onClick={() => setSelectedMember(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, padding: 0 }}>
+                        <button onClick={() => { setSelectedMember(null); setSelectedPartnerId(null); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: 12, padding: 0 }}>
                           Change
                         </button>
+                      </div>
+                    )}
+                    {selectedMember && (selectedMember.enrollments?.length ?? 0) > 1 && (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+                        {selectedMember.enrollments.map((en: any) => (
+                          <div
+                            key={en.partner_id}
+                            onClick={() => setSelectedPartnerId(en.partner_id)}
+                            style={{
+                              display: "flex", alignItems: "center", justifyContent: "space-between",
+                              padding: "8px 12px", borderRadius: 8, cursor: "pointer",
+                              border: selectedPartnerId === en.partner_id ? "1.5px solid #2563eb" : "1px solid #e0e6ec",
+                              background: selectedPartnerId === en.partner_id ? "#eff6ff" : "#fff",
+                            }}
+                          >
+                            <div>
+                              <div style={{ fontSize: 13, fontWeight: 600, color: "#0f172a" }}>{en.partner_name || en.partner_id}</div>
+                              <div style={{ fontSize: 11.5, color: "#64748b" }}>
+                                {en.partner_code}{en.plan_name ? ` · ${en.plan_name}` : ""}
+                              </div>
+                            </div>
+                            {selectedPartnerId === en.partner_id && <Check size={16} color="#2563eb" />}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -805,8 +841,8 @@ function PoliciesPageContent() {
                   <GhostBtn onClick={closeUploadModal}>Cancel</GhostBtn>
                   <AccentBtn
                     onClick={doUpload}
-                    disabled={!selectedMember || !uploadFile}
-                    style={{ opacity: (!selectedMember || !uploadFile) ? 0.5 : 1 }}
+                    disabled={!selectedMember || !selectedPartnerId || !uploadFile}
+                    style={{ opacity: (!selectedMember || !selectedPartnerId || !uploadFile) ? 0.5 : 1 }}
                   >
                     <Sparkles size={15} />
                     Upload &amp; extract
