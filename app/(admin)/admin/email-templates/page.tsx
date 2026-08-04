@@ -63,25 +63,11 @@ const FooterRow = styled.div`
   gap: 0.5rem;
 `;
 
-const TypeChip = styled.span<{ $type: "email" | "whatsapp" }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: ${p => p.$type === "whatsapp" ? "#f0fdf4" : "#eff6ff"};
-  color: ${p => p.$type === "whatsapp" ? "#15803d" : "#1d4ed8"};
-  border: 1px solid ${p => p.$type === "whatsapp" ? "#bbf7d0" : "#bfdbfe"};
-`;
-
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface MessageTemplate {
   id: string;
   slug: string;
-  channel_type: "email" | "whatsapp";
   description?: string | null;
   subject?: string | null;
   html_body: string;
@@ -190,50 +176,32 @@ export default function EmailTemplatesPage() {
 
   const onCreateOverride = () => {
     if (!overridePartnerId) { toast.error("Select a partner"); return; }
-    if (overridesFor?.channel_type === "email" && !overrideSubject.trim()) {
-      toast.error("Subject is required for email templates"); return;
-    }
+    if (!overrideSubject.trim()) { toast.error("Subject is required"); return; }
     if (!overrideBody.trim()) { toast.error("Body is required"); return; }
     createOverrideMutation.mutate();
   };
 
   const onSave = () => {
     if (!editTemplate) return;
-    if (editTemplate.channel_type === "email" && !subject.trim()) {
-      toast.error("Subject is required for email templates");
-      return;
-    }
+    if (!subject.trim()) { toast.error("Subject is required"); return; }
     if (!htmlBody.trim()) { toast.error("Body is required"); return; }
-    const payload: Record<string, any> = {
-      html_body: htmlBody.trim(),
-      description: description.trim() || null,
-    };
-    if (editTemplate.channel_type === "email") {
-      payload.subject = subject.trim();
-    }
-    updateMutation.mutate({ id: editTemplate.id, payload });
+    updateMutation.mutate({
+      id: editTemplate.id,
+      payload: {
+        subject: subject.trim(),
+        html_body: htmlBody.trim(),
+        description: description.trim() || null,
+      },
+    });
   };
 
   // ─── Column renderers ──────────────────────────────────────────────────────
-
-  const typeBody = (row: MessageTemplate) => {
-    const type = (row.channel_type ?? "email") as "email" | "whatsapp";
-    return (
-      <TypeChip $type={type}>
-        {type === "whatsapp" ? (
-          <><i className="pi pi-whatsapp" style={{ fontSize: 11 }} /> WhatsApp</>
-        ) : (
-          <><i className="pi pi-envelope" style={{ fontSize: 11 }} /> Email</>
-        )}
-      </TypeChip>
-    );
-  };
 
   const slugBody = (row: MessageTemplate) => <SlugChip>{row.slug}</SlugChip>;
 
   const subjectBody = (row: MessageTemplate) => (
     <span style={{ fontSize: "0.875rem", color: row.subject ? "#111827" : "#9ca3af" }}>
-      {row.subject ?? (row.channel_type === "whatsapp" ? "— (WhatsApp)" : "—")}
+      {row.subject ?? "—"}
     </span>
   );
 
@@ -273,15 +241,13 @@ export default function EmailTemplatesPage() {
     </div>
   );
 
-  const isWA = editTemplate?.channel_type === "whatsapp";
-
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div>
       <PageHeader
-        title="Message Templates"
-        subtitle="Manage all system email and WhatsApp message templates. Templates use Jinja2 syntax ({{ variable }})."
+        title="Email Templates"
+        subtitle="Manage all system email templates. Templates use Jinja2 syntax ({{ variable }})."
       />
 
       <div style={{ marginTop: "1.5rem" }}>
@@ -293,11 +259,10 @@ export default function EmailTemplatesPage() {
             stripedRows
             emptyMessage="No templates found."
             style={{ fontSize: "0.875rem" }}
-            sortField="channel_type"
+            sortField="slug"
             sortOrder={1}
           >
-            <Column header="Type" body={typeBody} style={{ width: "120px" }} sortable field="channel_type" />
-            <Column header="Slug" body={slugBody} style={{ minWidth: "200px" }} />
+            <Column header="Slug" body={slugBody} style={{ minWidth: "200px" }} sortable field="slug" />
             <Column header="Subject / Title" body={subjectBody} style={{ minWidth: "200px" }} />
             <Column header="Description" body={descBody} style={{ minWidth: "200px" }} />
             <Column header="Status" body={statusBody} style={{ width: "90px" }} />
@@ -311,18 +276,7 @@ export default function EmailTemplatesPage() {
       <Dialog
         header={
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={{ fontSize: "1rem", fontWeight: 600 }}>Edit Template</span>
-              {editTemplate && (
-                <TypeChip $type={(editTemplate.channel_type ?? "email") as "email" | "whatsapp"}>
-                  {isWA ? (
-                    <><i className="pi pi-whatsapp" style={{ fontSize: 11 }} /> WhatsApp</>
-                  ) : (
-                    <><i className="pi pi-envelope" style={{ fontSize: 11 }} /> Email</>
-                  )}
-                </TypeChip>
-              )}
-            </div>
+            <span style={{ fontSize: "1rem", fontWeight: 600 }}>Edit Template</span>
             {editTemplate && (
               <div style={{ fontSize: "0.78rem", color: "#6b7280", marginTop: "2px" }}>
                 Slug: <SlugChip>{editTemplate.slug}</SlugChip>
@@ -352,40 +306,34 @@ export default function EmailTemplatesPage() {
             />
           </Field>
 
-          {!isWA && (
-            <Field>
-              <Label htmlFor="et-subject">Subject *</Label>
-              <InputText
-                id="et-subject"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="Email subject line"
-                style={{ width: "100%" }}
-              />
-              <Hint>Supports Jinja2 variables, e.g. {"{{ member_name }}"}</Hint>
-            </Field>
-          )}
+          <Field>
+            <Label htmlFor="et-subject">Subject *</Label>
+            <InputText
+              id="et-subject"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              placeholder="Email subject line"
+              style={{ width: "100%" }}
+            />
+            <Hint>Supports Jinja2 variables, e.g. {"{{ member_name }}"}</Hint>
+          </Field>
 
           <Field>
-            <Label htmlFor="et-body">{isWA ? "Message Body *" : "HTML Body *"}</Label>
+            <Label htmlFor="et-body">HTML Body *</Label>
             <InputTextarea
               id="et-body"
               value={htmlBody}
               onChange={(e) => setHtmlBody(e.target.value)}
-              rows={isWA ? 10 : 16}
+              rows={16}
               style={{
                 width: "100%",
                 fontFamily: "'IBM Plex Mono', ui-monospace, monospace",
                 fontSize: "0.8rem",
               }}
-              placeholder={isWA
-                ? "Hi {{ member_name }}! 👋\n\nYour message here..."
-                : "<p>Hello {{ member_name }},</p>"}
+              placeholder="<p>Hello {{ member_name }},</p>"
             />
             <Hint>
-              {isWA
-                ? "Plain text with WhatsApp formatting (*bold*, _italic_). Variables use Jinja2 syntax: {{ variable_name }}."
-                : "Full HTML supported. Variables use Jinja2 syntax: {{ variable_name }}. Check the slug description for available variables."}
+              Full HTML supported. Variables use Jinja2 syntax: {"{{ variable_name }}"}. Check the slug description for available variables.
             </Hint>
           </Field>
         </FormGrid>
@@ -463,22 +411,20 @@ export default function EmailTemplatesPage() {
                     style={{ width: "100%" }}
                   />
                 </Field>
-                {overridesFor?.channel_type === "email" && (
-                  <Field>
-                    <Label>Subject *</Label>
-                    <InputText
-                      value={overrideSubject}
-                      onChange={(e) => setOverrideSubject(e.target.value)}
-                      style={{ width: "100%" }}
-                    />
-                  </Field>
-                )}
                 <Field>
-                  <Label>{overridesFor?.channel_type === "whatsapp" ? "Message Body *" : "HTML Body *"}</Label>
+                  <Label>Subject *</Label>
+                  <InputText
+                    value={overrideSubject}
+                    onChange={(e) => setOverrideSubject(e.target.value)}
+                    style={{ width: "100%" }}
+                  />
+                </Field>
+                <Field>
+                  <Label>HTML Body *</Label>
                   <InputTextarea
                     value={overrideBody}
                     onChange={(e) => setOverrideBody(e.target.value)}
-                    rows={overridesFor?.channel_type === "whatsapp" ? 8 : 12}
+                    rows={12}
                     style={{ width: "100%", fontFamily: "'IBM Plex Mono', ui-monospace, monospace", fontSize: "0.8rem" }}
                     placeholder={overridesFor?.html_body}
                   />
